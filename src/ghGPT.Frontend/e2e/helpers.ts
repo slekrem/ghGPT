@@ -38,3 +38,7 @@ export async function importRepo(localPath: string): Promise<{ id: string; name:
 export async function setActiveRepo(id: string) {
   await fetch(`${API}/repos/active/${id}`, { method: 'PUT' });
 }
+
+export async function deleteRepo(id: string) {
+  await fetch(`${API}/repos/${id}`, { method: 'DELETE' });
+}

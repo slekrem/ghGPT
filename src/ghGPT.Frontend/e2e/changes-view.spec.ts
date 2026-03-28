@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo } from './helpers';
+import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo } from './helpers';
 
 let repoDir = '';
 let repoId = '';
@@ -12,7 +12,8 @@ test.beforeAll(async () => {
   await setActiveRepo(repoId);
 });
 
-test.afterAll(() => {
+test.afterAll(async () => {
+  await deleteRepo(repoId);
   removeTempRepo(repoDir);
 });
 

@@ -164,6 +164,14 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         Commands.Unstage(repo, "*");
     }
 
+    public void Remove(string id)
+    {
+        var repo = GetRepoById(id);
+        _repos.Remove(repo);
+        if (_activeRepoId == id) _activeRepoId = null;
+        store.Save(_repos);
+    }
+
     private RepositoryInfo GetRepoById(string id) =>
         _repos.FirstOrDefault(r => r.Id == id)
         ?? throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
