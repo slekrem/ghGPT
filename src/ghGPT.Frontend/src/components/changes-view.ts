@@ -238,19 +238,19 @@ export class ChangesView extends LitElement {
       return html`<div class="diff-placeholder">Kein Diff verfügbar</div>`;
     }
 
-    const isHeader = (l: string) =>
+    const isSkipped = (l: string) =>
       l.startsWith('diff --git') || l.startsWith('index ') ||
-      l.startsWith('--- ') || l.startsWith('+++ ');
+      l.startsWith('--- ') || l.startsWith('+++ ') ||
+      l.startsWith('@@') || l.startsWith('\\ No newline');
 
-    const lines = this.diff.split('\n').filter(l => !isHeader(l));
+    const lines = this.diff.split('\n').filter(l => !isSkipped(l));
     let lineNum = 0;
 
     return html`
       <div class="diff-content">
         ${lines.map(line => {
           let cls = '';
-          if (line.startsWith('@@')) { cls = 'hunk'; lineNum = 0; }
-          else if (line.startsWith('+')) { cls = 'added'; lineNum++; }
+          if (line.startsWith('+')) { cls = 'added'; lineNum++; }
           else if (line.startsWith('-')) { cls = 'removed'; }
           else { lineNum++; }
 
