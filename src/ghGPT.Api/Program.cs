@@ -18,10 +18,12 @@ if (!app.Environment.IsDevelopment())
     app.UseStaticFiles();
 }
 
+// SignalR and API routes must be mapped before the SPA catch-all
 app.MapHub<RepositoryHub>("/hubs/repository");
 
 if (app.Environment.IsDevelopment())
 {
+    // Proxy all unmatched requests to the Vite dev server (HMR included)
     app.MapForwarder("/{**catch-all}", "http://localhost:5173");
 }
 else
