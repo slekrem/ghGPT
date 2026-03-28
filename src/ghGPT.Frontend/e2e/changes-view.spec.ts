@@ -17,22 +17,22 @@ test.afterAll(() => {
 });
 
 test.beforeEach(async ({ page }) => {
+  // Ensure the file is unstaged before each test
+  await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
+
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  // Click on "Änderungen" nav item
-  const navItems = page.locator('.nav-item');
-  await navItems.filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
 });
 
 test('shows modified file in unstaged section', async ({ page }) => {
   const changesView = page.locator('changes-view');
-  await expect(changesView.locator('.file-entry')).not.toHaveCount(0);
-
   const fileEntry = changesView.locator('.file-entry').filter({ hasText: 'README.md' });
   await expect(fileEntry).toBeVisible();
+  await expect(changesView.locator('.section-header').filter({ hasText: 'Änderungen' })).toBeVisible();
 });
 
 test('shows diff when clicking a modified file', async ({ page }) => {
@@ -40,40 +40,36 @@ test('shows diff when clicking a modified file', async ({ page }) => {
   const fileEntry = changesView.locator('.file-entry').filter({ hasText: 'README.md' });
   await fileEntry.first().click();
 
-  const diffContent = changesView.locator('.diff-content');
-  await expect(diffContent).toBeVisible({ timeout: 5000 });
-
-  const addedLine = changesView.locator('.diff-line.added');
-  await expect(addedLine).not.toHaveCount(0);
+  await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+  await expect(changesView.locator('.diff-line.added')).not.toHaveCount(0);
 });
 
 test('stages a file via ↑ button', async ({ page }) => {
   const changesView = page.locator('changes-view');
   const unstagedEntry = changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first();
-  const stageBtn = unstagedEntry.locator('.action-btn');
-  await stageBtn.click();
+  await unstagedEntry.locator('.action-btn').click();
 
-  // File should appear in staged section (first section-header = "Staged")
-  const stagedSection = changesView.locator('.section').first();
-  await expect(stagedSection.locator('.file-entry').filter({ hasText: 'README.md' })).toBeVisible({ timeout: 5000 });
+  const stagedHeader = changesView.locator('.section-header').filter({ hasText: 'Staged' });
+  const stagedEntry = stagedHeader.locator('..').locator('.file-entry').filter({ hasText: 'README.md' });
+  await expect(stagedEntry).toBeVisible({ timeout: 5000 });
 });
 
 test('unstages a file via ↓ button', async ({ page }) => {
   const changesView = page.locator('changes-view');
 
-  // First stage the file
-  const unstagedEntry = changesView.locator('.section').last().locator('.file-entry').filter({ hasText: 'README.md' });
-  if (await unstagedEntry.count() > 0) {
-    await unstagedEntry.first().locator('.action-btn').click();
-  }
+  // Stage first
+  await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first().locator('.action-btn').click();
 
-  // Now unstage it
-  const stagedSection = changesView.locator('.section').first();
-  const stagedEntry = stagedSection.locator('.file-entry').filter({ hasText: 'README.md' });
+  // Verify staged
+  const stagedHeader = changesView.locator('.section-header').filter({ hasText: 'Staged' });
+  const stagedEntry = stagedHeader.locator('..').locator('.file-entry').filter({ hasText: 'README.md' });
   await expect(stagedEntry).toBeVisible({ timeout: 5000 });
+
+  // Unstage
   await stagedEntry.first().locator('.action-btn').click();
 
-  // Should be back in unstaged
-  const unstagedSection = changesView.locator('.section').last();
-  await expect(unstagedSection.locator('.file-entry').filter({ hasText: 'README.md' })).toBeVisible({ timeout: 5000 });
+  // Verify back in unstaged
+  const unstagedHeader = changesView.locator('.section-header').filter({ hasText: 'Änderungen' });
+  const unstagedEntry = unstagedHeader.locator('..').locator('.file-entry').filter({ hasText: 'README.md' });
+  await expect(unstagedEntry).toBeVisible({ timeout: 5000 });
 });
