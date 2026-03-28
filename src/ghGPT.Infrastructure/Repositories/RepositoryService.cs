@@ -133,7 +133,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             patch = repo.Diff.Compare<Patch>([filePath]);
         }
 
-        return patch.Content;
+        return string.Concat(patch.Select(e => e.Patch));
     }
 
     public void StageFile(string id, string filePath)

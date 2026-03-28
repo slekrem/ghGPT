@@ -168,6 +168,7 @@ export class ChangesView extends LitElement {
   @state() private status: RepositoryStatusResult = { staged: [], unstaged: [] };
   @state() private selectedFile: FileStatusEntry | null = null;
   @state() private diff = '';
+  @state() private diffError = '';
   updated(changed: Map<string, unknown>) {
     if (changed.has('repoId') && this.repoId) {
       this.loadStatus();
@@ -186,11 +187,12 @@ export class ChangesView extends LitElement {
   private async selectFile(entry: FileStatusEntry) {
     this.selectedFile = entry;
     this.diff = '';
+    this.diffError = '';
     if (entry.status === 'Untracked') return;
     try {
       this.diff = await repositoryService.getDiff(this.repoId, entry.filePath, entry.isStaged);
-    } catch {
-      this.diff = '';
+    } catch (e: unknown) {
+      this.diffError = e instanceof Error ? e.message : 'Fehler beim Laden des Diffs';
     }
   }
 
@@ -228,6 +230,9 @@ export class ChangesView extends LitElement {
     }
     if (this.selectedFile.status === 'Untracked') {
       return html`<div class="diff-placeholder">Kein Diff für ungetrackte Dateien</div>`;
+    }
+    if (this.diffError) {
+      return html`<div class="diff-placeholder" style="color:#f38ba8">${this.diffError}</div>`;
     }
     if (!this.diff) {
       return html`<div class="diff-placeholder">Kein Diff verfügbar</div>`;
