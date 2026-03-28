@@ -3,6 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { repositoryService, type RepositoryInfo } from '../services/repository-service';
 import { startHub } from '../services/hub-client';
 import './repo-dialog';
+import './changes-view';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests';
 
@@ -178,9 +179,15 @@ export class AppShell extends LitElement {
 
     .content {
       flex: 1;
-      overflow: auto;
-      padding: 1rem;
+      overflow: hidden;
       color: #cdd6f4;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .content.padded {
+      padding: 1rem;
+      overflow: auto;
     }
 
     .placeholder {
@@ -306,7 +313,7 @@ export class AppShell extends LitElement {
           <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↑ Push</button>
         </div>
 
-        <div class="content">
+        <div class="content ${this.activeView !== 'changes' ? 'padded' : ''}">
           ${this.activeRepo ? this.renderView() : html`
             <div class="placeholder">
               <span class="placeholder-icon">📂</span>
@@ -331,7 +338,7 @@ export class AppShell extends LitElement {
   private renderView() {
     switch (this.activeView) {
       case 'changes':
-        return html`<div class="placeholder"><span class="placeholder-icon">✏️</span><span>Keine Änderungen</span></div>`;
+        return html`<changes-view .repoId=${this.activeRepoId ?? ''}></changes-view>`;
       case 'history':
         return html`<div class="placeholder"><span class="placeholder-icon">🕐</span><span>Keine Commits</span></div>`;
       case 'branches':

@@ -62,6 +62,20 @@ public class RepositoriesController(IRepositoryService service, IHubContext<Repo
         }
     }
 
+    [HttpDelete("{id}")]
+    public ActionResult Remove(string id)
+    {
+        try
+        {
+            service.Remove(id);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("clone")]
     public async Task<ActionResult<RepositoryInfo>> Clone([FromBody] CloneRepoRequest request)
     {

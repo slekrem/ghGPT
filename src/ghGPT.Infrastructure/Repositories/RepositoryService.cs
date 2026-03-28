@@ -82,6 +82,100 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         return Task.FromResult(info);
     }
 
+    public RepositoryStatusResult GetStatus(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        var status = repo.RetrieveStatus();
+
+        var staged = new List<FileStatusEntry>();
+        var unstaged = new List<FileStatusEntry>();
+
+        foreach (var entry in status)
+        {
+            var state = entry.State;
+
+            if (state.HasFlag(FileStatus.NewInIndex))
+                staged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Added", IsStaged = true });
+            if (state.HasFlag(FileStatus.ModifiedInIndex))
+                staged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Modified", IsStaged = true });
+            if (state.HasFlag(FileStatus.DeletedFromIndex))
+                staged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Deleted", IsStaged = true });
+            if (state.HasFlag(FileStatus.RenamedInIndex))
+                staged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Renamed", IsStaged = true });
+
+            if (state.HasFlag(FileStatus.ModifiedInWorkdir))
+                unstaged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Modified", IsStaged = false });
+            if (state.HasFlag(FileStatus.DeletedFromWorkdir))
+                unstaged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Deleted", IsStaged = false });
+            if (state.HasFlag(FileStatus.NewInWorkdir))
+                unstaged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Untracked", IsStaged = false });
+            if (state.HasFlag(FileStatus.RenamedInWorkdir))
+                unstaged.Add(new FileStatusEntry { FilePath = entry.FilePath, Status = "Renamed", IsStaged = false });
+        }
+
+        return new RepositoryStatusResult { Staged = staged, Unstaged = unstaged };
+    }
+
+    public string GetDiff(string id, string filePath, bool staged)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        Patch patch;
+        if (staged)
+        {
+            var headTree = repo.Head.Tip?.Tree;
+            patch = repo.Diff.Compare<Patch>(headTree, DiffTargets.Index, [filePath]);
+        }
+        else
+        {
+            patch = repo.Diff.Compare<Patch>([filePath]);
+        }
+
+        return string.Concat(patch.Select(e => e.Patch));
+    }
+
+    public void StageFile(string id, string filePath)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        Commands.Stage(repo, filePath);
+    }
+
+    public void UnstageFile(string id, string filePath)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        Commands.Unstage(repo, filePath);
+    }
+
+    public void StageAll(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        Commands.Stage(repo, "*");
+    }
+
+    public void UnstageAll(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        Commands.Unstage(repo, "*");
+    }
+
+    public void Remove(string id)
+    {
+        var repo = GetRepoById(id);
+        _repos.Remove(repo);
+        if (_activeRepoId == id) _activeRepoId = null;
+        store.Save(_repos);
+    }
+
+    private RepositoryInfo GetRepoById(string id) =>
+        _repos.FirstOrDefault(r => r.Id == id)
+        ?? throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
+
     private static RepositoryInfo BuildInfo(string localPath)
     {
         using var repo = new LibGit2Sharp.Repository(localPath);

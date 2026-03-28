@@ -10,6 +10,17 @@ export interface RepositoryInfo {
 
 const ACTIVE_REPO_KEY = 'ghgpt:activeRepoId';
 
+export interface FileStatusEntry {
+  filePath: string;
+  status: string;
+  isStaged: boolean;
+}
+
+export interface RepositoryStatusResult {
+  staged: FileStatusEntry[];
+  unstaged: FileStatusEntry[];
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -20,6 +31,17 @@ export const repositoryService = {
     api.post<RepositoryInfo>('/repos/import', { localPath }),
   clone: (remoteUrl: string, localPath: string) =>
     api.post<RepositoryInfo>('/repos/clone', { remoteUrl, localPath }),
+
+  getStatus: (id: string) =>
+    api.get<RepositoryStatusResult>(`/repos/${id}/status`),
+  getDiff: (id: string, file: string, staged: boolean) =>
+    api.get<string>(`/repos/${id}/diff?file=${encodeURIComponent(file)}&staged=${staged}`),
+  stageFile: (id: string, file: string) =>
+    api.post<void>(`/repos/${id}/stage?file=${encodeURIComponent(file)}`),
+  unstageFile: (id: string, file: string) =>
+    api.post<void>(`/repos/${id}/unstage?file=${encodeURIComponent(file)}`),
+  stageAll: (id: string) => api.post<void>(`/repos/${id}/stage-all`),
+  unstageAll: (id: string) => api.post<void>(`/repos/${id}/unstage-all`),
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),
