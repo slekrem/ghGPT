@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { execSync } from 'child_process';
 import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo } from './helpers';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -11,7 +12,19 @@ let repoId = '';
 test.beforeAll(async () => {
   fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
   repoDir = createTempRepo();
-  modifyFile(repoDir, 'README.md', '# Test Repo\n\nGeänderte Zeile\nNoch eine Änderung\n');
+
+  // Create a multi-line file and commit it, then modify a line in the middle
+  // so the hunk starts at line > 1 — this validates correct line numbering
+  const multiLine =
+    '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf\nZeile sechs\nZeile sieben\n';
+  modifyFile(repoDir, 'README.md', multiLine);
+  execSync('git add README.md', { cwd: repoDir });
+  execSync('git commit -m "add multi-line readme"', { cwd: repoDir });
+
+  // Now modify only line 5 (unstaged)
+  modifyFile(repoDir, 'README.md',
+    '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf GEÄNDERT\nZeile sechs\nZeile sieben\n');
+
   const repo = await importRepo(repoDir);
   repoId = repo.id;
   await setActiveRepo(repoId);

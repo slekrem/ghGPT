@@ -238,17 +238,26 @@ export class ChangesView extends LitElement {
       return html`<div class="diff-placeholder">Kein Diff verfügbar</div>`;
     }
 
-    const isSkipped = (l: string) =>
+    const isMetadata = (l: string) =>
       l.startsWith('diff --git') || l.startsWith('index ') ||
       l.startsWith('--- ') || l.startsWith('+++ ') ||
-      l.startsWith('@@') || l.startsWith('\\ No newline');
+      l.startsWith('\\ No newline');
 
-    const lines = this.diff.split('\n').filter(l => !isSkipped(l));
+    const raw = this.diff.split('\n');
+    if (raw[raw.length - 1] === '') raw.pop();
+    const lines = raw.filter(l => !isMetadata(l));
     let lineNum = 0;
 
     return html`
       <div class="diff-content">
         ${lines.map(line => {
+          // Parse hunk header to get correct starting line number, then skip rendering
+          if (line.startsWith('@@')) {
+            const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+            if (match) lineNum = parseInt(match[1]) - 1;
+            return '';
+          }
+
           let cls = '';
           if (line.startsWith('+')) { cls = 'added'; lineNum++; }
           else if (line.startsWith('-')) { cls = 'removed'; }
@@ -256,7 +265,7 @@ export class ChangesView extends LitElement {
 
           return html`
             <div class="diff-line ${cls}">
-              <span class="diff-line-num">${cls !== 'hunk' && cls !== 'removed' ? lineNum : ''}</span>
+              <span class="diff-line-num">${cls !== 'removed' ? lineNum : ''}</span>
               <span class="diff-line-content">${line}</span>
             </div>`;
         })}
