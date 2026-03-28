@@ -19,7 +19,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const text = await response.text();
-  return text ? JSON.parse(text) : (undefined as T);
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text as unknown as T;
+  }
 }
 
 export const api = {
