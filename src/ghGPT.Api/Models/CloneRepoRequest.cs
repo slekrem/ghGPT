@@ -1,3 +1,7 @@
 namespace ghGPT.Api.Models;
 
-public record CloneRepoRequest(string RemoteUrl, string LocalPath);
+public class CloneRepoRequest
+{
+    public string RemoteUrl { get; init; } = string.Empty;
+    public string LocalPath { get; init; } = string.Empty;
+}

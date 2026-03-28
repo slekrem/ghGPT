@@ -1,3 +1,6 @@
 namespace ghGPT.Api.Models;
 
-public record ImportRepoRequest(string LocalPath);
+public class ImportRepoRequest
+{
+    public string LocalPath { get; init; } = string.Empty;
+}
