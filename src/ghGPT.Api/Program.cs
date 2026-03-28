@@ -16,8 +16,6 @@ app.UseStaticFiles();
 
 app.MapHub<RepositoryHub>("/hubs/repository");
 
-app.MapFallbackToFile("index.html");
-
 app.Run();
 
 public partial class Program { }
