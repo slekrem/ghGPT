@@ -1,9 +1,9 @@
-using ghGPT.Api.Endpoints;
 using ghGPT.Api.Hubs;
 using ghGPT.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
@@ -17,8 +17,8 @@ app.UseSwaggerUI();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.MapControllers();
 app.MapHub<RepositoryHub>("/hubs/repository");
-app.MapRepositoryEndpoints();
 
 app.Run();
 
