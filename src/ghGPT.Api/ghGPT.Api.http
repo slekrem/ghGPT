@@ -1,0 +1,6 @@
+@ghGPT.Api_HostAddress = http://localhost:5101
+
+GET {{ghGPT.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
