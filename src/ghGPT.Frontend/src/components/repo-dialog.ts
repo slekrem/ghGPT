@@ -242,8 +242,8 @@ export class RepoDialog extends LitElement {
               <input type="text" .value=${this.cloneUrl} @input=${(e: Event) => this.cloneUrl = (e.target as HTMLInputElement).value} placeholder="https://github.com/user/repo" />
             </div>
             <div class="field">
-              <label>Lokaler Pfad</label>
-              <input type="text" .value=${this.clonePath} @input=${(e: Event) => this.clonePath = (e.target as HTMLInputElement).value} placeholder="C:/Projekte/repo" />
+              <label>Zielverzeichnis (Repo wird als Unterordner angelegt)</label>
+              <input type="text" .value=${this.clonePath} @input=${(e: Event) => this.clonePath = (e.target as HTMLInputElement).value} placeholder="C:/Projekte" />
             </div>
             ${this.progressLines.length > 0 ? html`
               <div class="progress">${this.progressLines.map(l => html`<div>${l}</div>`)}</div>

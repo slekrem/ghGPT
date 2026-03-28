@@ -36,6 +36,12 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
     public Task<RepositoryInfo> CloneAsync(string remoteUrl, string localPath, IProgress<string>? progress = null)
     {
+        var repoName = Path.GetFileNameWithoutExtension(remoteUrl.TrimEnd('/').Split('/').Last());
+        localPath = Path.Combine(localPath, repoName);
+
+        if (Directory.Exists(localPath))
+            throw new InvalidOperationException($"'{localPath}' existiert bereits.");
+
         var options = new CloneOptions();
 
         if (progress is not null)
