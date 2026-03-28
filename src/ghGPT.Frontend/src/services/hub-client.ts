@@ -12,12 +12,12 @@ export async function startHub(): Promise<void> {
   }
 }
 
-export function onHubEvent(event: string, callback: (...args: unknown[]) => void): void {
-  hub.on(event, callback);
+export function onHubEvent<T = unknown>(event: string, callback: (arg: T) => void): void {
+  hub.on(event, callback as (...args: unknown[]) => void);
 }
 
-export function offHubEvent(event: string, callback: (...args: unknown[]) => void): void {
-  hub.off(event, callback);
+export function offHubEvent<T = unknown>(event: string, callback: (arg: T) => void): void {
+  hub.off(event, callback as (...args: unknown[]) => void);
 }
 
 export { hub };
