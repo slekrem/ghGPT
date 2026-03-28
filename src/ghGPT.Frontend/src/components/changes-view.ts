@@ -161,6 +161,52 @@ export class ChangesView extends LitElement {
       color: #45475a;
       font-size: 0.875rem;
     }
+
+    .commit-form {
+      flex-shrink: 0;
+      padding: 0.6rem 0.75rem;
+      border-top: 1px solid #313244;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      background: #1e1e2e;
+    }
+
+    .commit-input {
+      background: #181825;
+      border: 1px solid #313244;
+      border-radius: 4px;
+      color: #cdd6f4;
+      font-size: 0.8rem;
+      padding: 0.35rem 0.5rem;
+      width: 100%;
+      box-sizing: border-box;
+      font-family: inherit;
+      resize: none;
+    }
+
+    .commit-input:focus { outline: none; border-color: #89b4fa; }
+    .commit-input::placeholder { color: #45475a; }
+
+    .commit-btn {
+      background: #89b4fa;
+      border: none;
+      border-radius: 4px;
+      color: #1e1e2e;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      width: 100%;
+    }
+
+    .commit-btn:disabled { background: #313244; color: #45475a; cursor: default; }
+    .commit-btn:not(:disabled):hover { background: #b4d0ff; }
+
+    .commit-error {
+      font-size: 0.72rem;
+      color: #f38ba8;
+    }
   `;
 
   @property() repoId = '';
@@ -169,6 +215,10 @@ export class ChangesView extends LitElement {
   @state() private selectedFile: FileStatusEntry | null = null;
   @state() private diff = '';
   @state() private diffError = '';
+  @state() private commitMessage = '';
+  @state() private commitDescription = '';
+  @state() private commitError = '';
+  @state() private committing = false;
   updated(changed: Map<string, unknown>) {
     if (changed.has('repoId') && this.repoId) {
       this.selectedFile = null;
@@ -221,6 +271,24 @@ export class ChangesView extends LitElement {
     await repositoryService.unstageAll(this.repoId);
     this.selectedFile = null;
     await this.loadStatus();
+  }
+
+  private async doCommit() {
+    if (!this.commitMessage.trim() || this.status.staged.length === 0) return;
+    this.committing = true;
+    this.commitError = '';
+    try {
+      await repositoryService.commit(this.repoId, this.commitMessage.trim(), this.commitDescription.trim() || undefined);
+      this.commitMessage = '';
+      this.commitDescription = '';
+      this.selectedFile = null;
+      this.diff = '';
+      await this.loadStatus();
+    } catch (e: unknown) {
+      this.commitError = e instanceof Error ? e.message : 'Commit fehlgeschlagen';
+    } finally {
+      this.committing = false;
+    }
   }
 
   private statusChar(s: string) {
@@ -321,6 +389,21 @@ export class ChangesView extends LitElement {
               ? html`<div class="empty-hint">Keine Änderungen</div>`
               : this.status.unstaged.map(e => this.renderFileEntry(e, false))}
           </div>
+        </div>
+
+        <div class="commit-form">
+          <input class="commit-input" type="text" placeholder="Commit-Titel (Pflichtfeld)"
+            .value=${this.commitMessage}
+            @input=${(e: Event) => { this.commitMessage = (e.target as HTMLInputElement).value; }} />
+          <textarea class="commit-input" rows="2" placeholder="Beschreibung (optional)"
+            .value=${this.commitDescription}
+            @input=${(e: Event) => { this.commitDescription = (e.target as HTMLTextAreaElement).value; }}></textarea>
+          ${this.commitError ? html`<div class="commit-error">${this.commitError}</div>` : ''}
+          <button class="commit-btn"
+            ?disabled=${!this.commitMessage.trim() || this.status.staged.length === 0 || this.committing}
+            @click=${this.doCommit}>
+            ${this.committing ? 'Committing…' : `Commit (${this.status.staged.length} Datei${this.status.staged.length !== 1 ? 'en' : ''})`}
+          </button>
         </div>
       </div>
 

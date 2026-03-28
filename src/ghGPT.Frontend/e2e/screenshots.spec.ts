@@ -116,3 +116,17 @@ test('08 - Changes View: Datei gestaget', async ({ page }) => {
   await page.locator('changes-view').locator('.section-header').filter({ hasText: 'Staged (1)' }).waitFor({ timeout: 5000 });
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '08-changes-staged.png'), fullPage: true });
 });
+
+test('09 - Changes View: Commit-Formular', async ({ page }) => {
+  await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('changes-view').waitFor();
+  await page.locator('changes-view').locator('.file-entry').filter({ hasText: 'README.md' }).first().locator('.action-btn').click();
+  await page.locator('changes-view').locator('.section-header').filter({ hasText: 'Staged (1)' }).waitFor({ timeout: 5000 });
+  await page.locator('changes-view').locator('.commit-input[type="text"]').fill('feat: neue Funktion');
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '09-commit-form.png'), fullPage: true });
+});

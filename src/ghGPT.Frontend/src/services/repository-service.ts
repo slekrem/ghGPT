@@ -42,6 +42,8 @@ export const repositoryService = {
     api.post<void>(`/repos/${id}/unstage?file=${encodeURIComponent(file)}`),
   stageAll: (id: string) => api.post<void>(`/repos/${id}/stage-all`),
   unstageAll: (id: string) => api.post<void>(`/repos/${id}/unstage-all`),
+  commit: (id: string, message: string, description?: string) =>
+    api.post<void>(`/repos/${id}/commit`, { message, description }),
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),

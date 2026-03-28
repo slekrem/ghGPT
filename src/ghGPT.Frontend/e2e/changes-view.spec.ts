@@ -31,10 +31,13 @@ test.afterAll(async () => {
   removeTempRepo(repoDir2);
 });
 
+let modCounter = 0;
+
 test.beforeEach(async ({ page }) => {
+  modCounter++;
   await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
   modifyFile(repoDir, 'README.md',
-    '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf GEÄNDERT\nZeile sechs\nZeile sieben\n');
+    `# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf GEÄNDERT ${modCounter}\nZeile sechs\nZeile sieben\n`);
 
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
@@ -104,6 +107,42 @@ test('diff shows line numbers for both removed and added lines', async ({ page }
   const newNum = await nums.nth(1).textContent();
   expect(oldNum?.trim()).not.toBe('');
   expect(newNum?.trim()).toBe(''); // new-side is blank for removed lines
+});
+
+test('commit button is disabled when nothing is staged', async ({ page }) => {
+  const changesView = page.locator('changes-view');
+  const commitBtn = changesView.locator('.commit-btn');
+  await expect(commitBtn).toBeDisabled();
+});
+
+test('commit button is disabled when message is empty', async ({ page }) => {
+  const changesView = page.locator('changes-view');
+
+  // Stage the file
+  await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first().locator('.action-btn').click();
+  await changesView.locator('.section-header').filter({ hasText: 'Staged (1)' }).waitFor({ timeout: 5000 });
+
+  // Button still disabled — no message entered
+  const commitBtn = changesView.locator('.commit-btn');
+  await expect(commitBtn).toBeDisabled();
+});
+
+test('commit creates a new commit and clears staged files', async ({ page }) => {
+  const changesView = page.locator('changes-view');
+
+  // Stage the file
+  await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first().locator('.action-btn').click();
+  await changesView.locator('.section-header').filter({ hasText: 'Staged (1)' }).waitFor({ timeout: 5000 });
+
+  // Enter commit message
+  await changesView.locator('.commit-input[type="text"]').fill('test: commit from e2e');
+
+  // Commit
+  await changesView.locator('.commit-btn').click();
+
+  // After commit: staged section is empty, form is cleared
+  await expect(changesView.locator('.section-header').filter({ hasText: 'Staged (0)' })).toBeVisible({ timeout: 5000 });
+  await expect(changesView.locator('.commit-input[type="text"]')).toHaveValue('');
 });
 
 test('clears diff when switching to a different repository', async ({ page }) => {

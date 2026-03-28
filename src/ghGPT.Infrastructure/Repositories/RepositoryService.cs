@@ -164,6 +164,26 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         Commands.Unstage(repo, "*");
     }
 
+    public void Commit(string id, string message, string? description = null)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (!repo.RetrieveStatus().IsDirty || !repo.Index.Any())
+            throw new InvalidOperationException("Keine gestagten Änderungen vorhanden.");
+
+        var fullMessage = string.IsNullOrWhiteSpace(description)
+            ? message
+            : $"{message}\n\n{description}";
+
+        var config = repo.Config;
+        var name = config.Get<string>("user.name")?.Value ?? "ghGPT User";
+        var email = config.Get<string>("user.email")?.Value ?? "ghgpt@local";
+        var author = new Signature(name, email, DateTimeOffset.Now);
+
+        repo.Commit(fullMessage, author, author);
+    }
+
     public void Remove(string id)
     {
         var repo = GetRepoById(id);

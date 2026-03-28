@@ -281,6 +281,47 @@ public class RepositoryServiceTests : IDisposable
         Assert.Contains(status.Unstaged, f => f.FilePath == "README.md");
     }
 
+    // --- Commit ---
+
+    [Fact]
+    public void Commit_CreatesCommitWithStagedFiles()
+    {
+        var path = CreateGitRepo("commit-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+
+        service.Commit("id-1", "test: first commit");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        Assert.Equal("test: first commit", repo.Head.Tip.Message.Trim());
+        Assert.Empty(service.GetStatus("id-1").Staged);
+    }
+
+    [Fact]
+    public void Commit_IncludesDescriptionInMessage()
+    {
+        var path = CreateGitRepo("commit-desc-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+
+        service.Commit("id-1", "feat: title", "some description");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        Assert.Contains("feat: title", repo.Head.Tip.Message);
+        Assert.Contains("some description", repo.Head.Tip.Message);
+    }
+
+    [Fact]
+    public void Commit_ThrowsWhenNothingStaged()
+    {
+        var path = CreateGitRepo("commit-empty-repo");
+        var service = ServiceWithRepo(path);
+
+        Assert.Throws<InvalidOperationException>(() => service.Commit("id-1", "should fail"));
+    }
+
     public void Dispose()
     {
         if (!Directory.Exists(_tempPath)) return;
