@@ -221,17 +221,28 @@ export class AppShell extends LitElement {
 
   private async loadRepos() {
     this.repos = await repositoryService.getAll();
-    if (!this.activeRepoId && this.repos.length > 0)
-      this.activeRepoId = this.repos[0].id;
+
+    const savedId = repositoryService.loadActiveId();
+    if (savedId && this.repos.some(r => r.id === savedId)) {
+      await this.activateRepo(savedId);
+    } else if (this.repos.length > 0) {
+      await this.activateRepo(this.repos[0].id);
+    }
+  }
+
+  private async activateRepo(id: string) {
+    this.activeRepoId = id;
+    repositoryService.saveActiveId(id);
+    await repositoryService.setActive(id).catch(() => {});
   }
 
   private get activeRepo(): RepositoryInfo | undefined {
     return this.repos.find(r => r.id === this.activeRepoId);
   }
 
-  private onRepoAdded(e: CustomEvent<RepositoryInfo>) {
+  private async onRepoAdded(e: CustomEvent<RepositoryInfo>) {
     this.repos = [...this.repos, e.detail];
-    this.activeRepoId = e.detail.id;
+    await this.activateRepo(e.detail.id);
   }
 
   render() {
@@ -250,7 +261,7 @@ export class AppShell extends LitElement {
 
           ${this.repos.map(repo => html`
             <div class="repo-item ${repo.id === this.activeRepoId ? 'active' : ''}"
-              @click=${() => this.activeRepoId = repo.id}>
+              @click=${() => this.activateRepo(repo.id)}>
               <span>📁</span>
               <span class="repo-name">${repo.name}</span>
               <span class="repo-branch">${repo.currentBranch}</span>
