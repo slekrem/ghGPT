@@ -18,16 +18,30 @@ public static class RepositoryEndpoints
             [FromBody] CreateRepoRequest request,
             IRepositoryService service) =>
         {
-            var repo = await service.CreateAsync(request.LocalPath, request.Name);
-            return Results.Created($"/api/repos/{repo.Id}", repo);
+            try
+            {
+                var repo = await service.CreateAsync(request.LocalPath, request.Name);
+                return Results.Created($"/api/repos/{repo.Id}", repo);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
 
         group.MapPost("/import", async (
             [FromBody] ImportRepoRequest request,
             IRepositoryService service) =>
         {
-            var repo = await service.ImportAsync(request.LocalPath);
-            return Results.Created($"/api/repos/{repo.Id}", repo);
+            try
+            {
+                var repo = await service.ImportAsync(request.LocalPath);
+                return Results.Created($"/api/repos/{repo.Id}", repo);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
 
         group.MapPost("/clone", async (
@@ -35,12 +49,19 @@ public static class RepositoryEndpoints
             IRepositoryService service,
             IHubContext<RepositoryHub> hub) =>
         {
-            var progress = new Progress<string>(async message =>
-                await hub.Clients.All.SendAsync("clone-progress", message));
+            try
+            {
+                var progress = new Progress<string>(async message =>
+                    await hub.Clients.All.SendAsync("clone-progress", message));
 
-            var repo = await Task.Run(() => service.CloneAsync(request.RemoteUrl, request.LocalPath, progress));
-            await hub.Clients.All.SendAsync("clone-progress", "✓ Abgeschlossen");
-            return Results.Created($"/api/repos/{repo.Id}", repo);
+                var repo = await Task.Run(() => service.CloneAsync(request.RemoteUrl, request.LocalPath, progress));
+                await hub.Clients.All.SendAsync("clone-progress", "✓ Abgeschlossen");
+                return Results.Created($"/api/repos/{repo.Id}", repo);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
     }
 }

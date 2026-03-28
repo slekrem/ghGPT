@@ -215,7 +215,7 @@ export class AppShell extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    await startHub();
+    startHub().catch(err => console.warn('SignalR connection failed:', err));
     await this.loadRepos();
   }
 
