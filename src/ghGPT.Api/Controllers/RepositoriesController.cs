@@ -1,4 +1,5 @@
 using ghGPT.Api.Hubs;
+using ghGPT.Api.Models;
 using ghGPT.Core.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -58,7 +59,3 @@ public class RepositoriesController(IRepositoryService service, IHubContext<Repo
         }
     }
 }
-
-public record CreateRepoRequest(string LocalPath, string Name);
-public record ImportRepoRequest(string LocalPath);
-public record CloneRepoRequest(string RemoteUrl, string LocalPath);
