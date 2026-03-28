@@ -14,6 +14,44 @@ public class RepositoryServiceTests : IDisposable
         _store.Load().Returns([]);
     }
 
+    // --- Helpers ---
+
+    private string CreateGitRepo(string name = "repo")
+    {
+        var path = Path.Combine(_tempPath, name);
+        Directory.CreateDirectory(path);
+        Run("git init", path);
+        Run("git config user.email test@test.com", path);
+        Run("git config user.name Test", path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Hello\n\nLine three\nLine four\nLine five\nLine six\n");
+        Run("git add .", path);
+        Run("git commit -m initial", path);
+        return path;
+    }
+
+    private static void Run(string cmd, string cwd)
+    {
+        var parts = cmd.Split(' ', 2);
+        var psi = new System.Diagnostics.ProcessStartInfo(parts[0], parts.Length > 1 ? parts[1] : "")
+        {
+            WorkingDirectory = cwd,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        p.WaitForExit();
+    }
+
+    private RepositoryService ServiceWithRepo(string path)
+    {
+        var info = new RepositoryInfo { Id = "id-1", Name = "repo", LocalPath = path, CurrentBranch = "master" };
+        _store.Load().Returns([info]);
+        return new RepositoryService(_store);
+    }
+
+    // --- Create / Import ---
+
     [Fact]
     public async Task CreateAsync_InitializesGitRepo()
     {
@@ -47,7 +85,6 @@ public class RepositoryServiceTests : IDisposable
         _store.Load().Returns([existing]);
         var service = new RepositoryService(_store);
 
-        // create a real git repo so the valid-check passes
         Directory.CreateDirectory(path);
         LibGit2Sharp.Repository.Init(path);
 
@@ -70,9 +107,186 @@ public class RepositoryServiceTests : IDisposable
         Assert.Equal("repo-a", result[0].Name);
     }
 
+    // --- Active repo ---
+
+    [Fact]
+    public void GetActive_ReturnsNullInitially()
+    {
+        var service = new RepositoryService(_store);
+        Assert.Null(service.GetActive());
+    }
+
+    [Fact]
+    public void SetActive_AndGetActive_ReturnCorrectRepo()
+    {
+        var path = CreateGitRepo("active-repo");
+        var service = ServiceWithRepo(path);
+
+        service.SetActive("id-1");
+
+        Assert.Equal("id-1", service.GetActive()?.Id);
+    }
+
+    [Fact]
+    public void SetActive_ThrowsForUnknownId()
+    {
+        var service = new RepositoryService(_store);
+        Assert.Throws<InvalidOperationException>(() => service.SetActive("unknown"));
+    }
+
+    // --- Remove ---
+
+    [Fact]
+    public void Remove_RemovesRepoFromList()
+    {
+        var info = new RepositoryInfo { Id = "id-1", Name = "r", LocalPath = "/x", CurrentBranch = "main" };
+        _store.Load().Returns([info]);
+        var service = new RepositoryService(_store);
+
+        service.Remove("id-1");
+
+        Assert.Empty(service.GetAll());
+        _store.Received().Save(Arg.Any<IReadOnlyList<RepositoryInfo>>());
+    }
+
+    [Fact]
+    public void Remove_ClearsActiveRepoWhenRemoved()
+    {
+        var path = CreateGitRepo("remove-active");
+        var service = ServiceWithRepo(path);
+        service.SetActive("id-1");
+
+        service.Remove("id-1");
+
+        Assert.Null(service.GetActive());
+    }
+
+    // --- Status ---
+
+    [Fact]
+    public void GetStatus_ShowsModifiedFileAsUnstaged()
+    {
+        var path = CreateGitRepo("status-repo");
+        var service = ServiceWithRepo(path);
+
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+
+        var status = service.GetStatus("id-1");
+
+        Assert.Contains(status.Unstaged, f => f.FilePath == "README.md" && f.Status == "Modified");
+        Assert.Empty(status.Staged);
+    }
+
+    [Fact]
+    public void GetStatus_ShowsModifiedFileAsStaged_AfterStage()
+    {
+        var path = CreateGitRepo("status-staged-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+
+        service.StageFile("id-1", "README.md");
+        var status = service.GetStatus("id-1");
+
+        Assert.Contains(status.Staged, f => f.FilePath == "README.md" && f.Status == "Modified");
+        Assert.Empty(status.Unstaged);
+    }
+
+    // --- Diff ---
+
+    [Fact]
+    public void GetDiff_ReturnsNonEmptyDiffForModifiedFile()
+    {
+        var path = CreateGitRepo("diff-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+
+        var diff = service.GetDiff("id-1", "README.md", staged: false);
+
+        Assert.False(string.IsNullOrWhiteSpace(diff));
+        Assert.Contains("@@", diff);
+    }
+
+    [Fact]
+    public void GetDiff_ReturnsStagedDiff_AfterStage()
+    {
+        var path = CreateGitRepo("diff-staged-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+
+        var diff = service.GetDiff("id-1", "README.md", staged: true);
+
+        Assert.False(string.IsNullOrWhiteSpace(diff));
+        Assert.Contains("@@", diff);
+    }
+
+    // --- Stage / Unstage ---
+
+    [Fact]
+    public void StageFile_MovesFileToStaged()
+    {
+        var path = CreateGitRepo("stage-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+
+        service.StageFile("id-1", "README.md");
+
+        var status = service.GetStatus("id-1");
+        Assert.Contains(status.Staged, f => f.FilePath == "README.md");
+        Assert.Empty(status.Unstaged);
+    }
+
+    [Fact]
+    public void UnstageFile_MovesFileBackToUnstaged()
+    {
+        var path = CreateGitRepo("unstage-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+
+        service.UnstageFile("id-1", "README.md");
+
+        var status = service.GetStatus("id-1");
+        Assert.Contains(status.Unstaged, f => f.FilePath == "README.md");
+        Assert.Empty(status.Staged);
+    }
+
+    [Fact]
+    public void StageAll_StagesAllModifiedFiles()
+    {
+        var path = CreateGitRepo("stageall-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        File.WriteAllText(Path.Combine(path, "new-file.txt"), "new\n");
+
+        service.StageAll("id-1");
+
+        var status = service.GetStatus("id-1");
+        Assert.Empty(status.Unstaged);
+        Assert.NotEmpty(status.Staged);
+    }
+
+    [Fact]
+    public void UnstageAll_MovesAllStagedFilesBackToUnstaged()
+    {
+        var path = CreateGitRepo("unstageall-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageAll("id-1");
+
+        service.UnstageAll("id-1");
+
+        var status = service.GetStatus("id-1");
+        Assert.Empty(status.Staged);
+        Assert.Contains(status.Unstaged, f => f.FilePath == "README.md");
+    }
+
     public void Dispose()
     {
-        if (Directory.Exists(_tempPath))
-            Directory.Delete(_tempPath, recursive: true);
+        if (!Directory.Exists(_tempPath)) return;
+        // Git objects on Windows have read-only attributes — clear them before deletion
+        foreach (var file in Directory.EnumerateFiles(_tempPath, "*", SearchOption.AllDirectories))
+            File.SetAttributes(file, FileAttributes.Normal);
+        Directory.Delete(_tempPath, recursive: true);
     }
 }
