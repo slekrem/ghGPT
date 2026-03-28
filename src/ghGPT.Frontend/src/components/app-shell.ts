@@ -1,5 +1,8 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { repositoryService, type RepositoryInfo } from '../services/repository-service';
+import { startHub } from '../services/hub-client';
+import './repo-dialog';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests';
 
@@ -45,7 +48,22 @@ export class AppShell extends LitElement {
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: #6c7086;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
+
+    .add-btn {
+      background: none;
+      border: none;
+      color: #6c7086;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0 0.25rem;
+      line-height: 1;
+    }
+
+    .add-btn:hover { color: #cdd6f4; }
 
     .nav-item {
       display: flex;
@@ -54,18 +72,49 @@ export class AppShell extends LitElement {
       padding: 0.4rem 1rem;
       cursor: pointer;
       font-size: 0.875rem;
-      border-radius: 0;
       color: #cdd6f4;
       transition: background-color 0.1s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .nav-item:hover {
-      background-color: #313244;
-    }
+    .nav-item:hover { background-color: #313244; }
 
     .nav-item.active {
       background-color: #45475a;
       color: #cba6f7;
+    }
+
+    .repo-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: #cdd6f4;
+      transition: background-color 0.1s;
+    }
+
+    .repo-item:hover { background-color: #313244; }
+
+    .repo-item.active {
+      background-color: #45475a;
+      color: #cba6f7;
+    }
+
+    .repo-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .repo-branch {
+      font-size: 0.7rem;
+      color: #6c7086;
+      margin-left: auto;
+      flex-shrink: 0;
     }
 
     .sidebar-footer {
@@ -79,9 +128,7 @@ export class AppShell extends LitElement {
       cursor: pointer;
     }
 
-    .sidebar-footer:hover {
-      color: #cdd6f4;
-    }
+    .sidebar-footer:hover { color: #cdd6f4; }
 
     .main {
       flex: 1;
@@ -113,13 +160,9 @@ export class AppShell extends LitElement {
       cursor: pointer;
     }
 
-    .toolbar-branch:hover {
-      background-color: #313244;
-    }
+    .toolbar-branch:hover { background-color: #313244; }
 
-    .toolbar-spacer {
-      flex: 1;
-    }
+    .toolbar-spacer { flex: 1; }
 
     .toolbar-btn {
       padding: 0.3rem 0.75rem;
@@ -131,9 +174,7 @@ export class AppShell extends LitElement {
       cursor: pointer;
     }
 
-    .toolbar-btn:hover {
-      background-color: #313244;
-    }
+    .toolbar-btn:hover { background-color: #313244; }
 
     .content {
       flex: 1;
@@ -149,18 +190,48 @@ export class AppShell extends LitElement {
       justify-content: center;
       height: 100%;
       color: #6c7086;
-      gap: 0.5rem;
+      gap: 0.75rem;
     }
 
-    .placeholder-icon {
-      font-size: 2.5rem;
+    .placeholder-icon { font-size: 2.5rem; }
+
+    .placeholder-btn {
+      padding: 0.4rem 1.25rem;
+      border-radius: 6px;
+      border: 1px solid #45475a;
+      background: transparent;
+      color: #cdd6f4;
+      font-size: 0.875rem;
+      cursor: pointer;
     }
+
+    .placeholder-btn:hover { background-color: #313244; }
   `;
 
   @state() private activeView: View = 'changes';
+  @state() private repos: RepositoryInfo[] = [];
+  @state() private activeRepoId: string | null = null;
+  @state() private showDialog = false;
 
-  private navigate(view: View) {
-    this.activeView = view;
+  async connectedCallback() {
+    super.connectedCallback();
+    startHub().catch(err => console.warn('SignalR connection failed:', err));
+    await this.loadRepos();
+  }
+
+  private async loadRepos() {
+    this.repos = await repositoryService.getAll();
+    if (!this.activeRepoId && this.repos.length > 0)
+      this.activeRepoId = this.repos[0].id;
+  }
+
+  private get activeRepo(): RepositoryInfo | undefined {
+    return this.repos.find(r => r.id === this.activeRepoId);
+  }
+
+  private onRepoAdded(e: CustomEvent<RepositoryInfo>) {
+    this.repos = [...this.repos, e.detail];
+    this.activeRepoId = e.detail.id;
   }
 
   render() {
@@ -172,31 +243,37 @@ export class AppShell extends LitElement {
         </div>
 
         <div class="sidebar-section">
-          <div class="sidebar-section-title">Workspace</div>
-          <div
-            class="nav-item ${this.activeView === 'changes' ? 'active' : ''}"
-            @click=${() => this.navigate('changes')}
-          >
+          <div class="sidebar-section-title">
+            <span>Repositories</span>
+            <button class="add-btn" title="Repository hinzufügen" @click=${() => this.showDialog = true}>＋</button>
+          </div>
+
+          ${this.repos.map(repo => html`
+            <div class="repo-item ${repo.id === this.activeRepoId ? 'active' : ''}"
+              @click=${() => this.activeRepoId = repo.id}>
+              <span>📁</span>
+              <span class="repo-name">${repo.name}</span>
+              <span class="repo-branch">${repo.currentBranch}</span>
+            </div>
+          `)}
+
+          <div class="sidebar-section-title" style="margin-top:0.5rem">Workspace</div>
+          <div class="nav-item ${this.activeView === 'changes' ? 'active' : ''}"
+            @click=${() => this.activeView = 'changes'}>
             <span>✏️</span> Änderungen
           </div>
-          <div
-            class="nav-item ${this.activeView === 'history' ? 'active' : ''}"
-            @click=${() => this.navigate('history')}
-          >
+          <div class="nav-item ${this.activeView === 'history' ? 'active' : ''}"
+            @click=${() => this.activeView = 'history'}>
             <span>🕐</span> History
           </div>
 
           <div class="sidebar-section-title" style="margin-top:0.5rem">Repository</div>
-          <div
-            class="nav-item ${this.activeView === 'branches' ? 'active' : ''}"
-            @click=${() => this.navigate('branches')}
-          >
+          <div class="nav-item ${this.activeView === 'branches' ? 'active' : ''}"
+            @click=${() => this.activeView = 'branches'}>
             <span>🌿</span> Branches
           </div>
-          <div
-            class="nav-item ${this.activeView === 'pull-requests' ? 'active' : ''}"
-            @click=${() => this.navigate('pull-requests')}
-          >
+          <div class="nav-item ${this.activeView === 'pull-requests' ? 'active' : ''}"
+            @click=${() => this.activeView = 'pull-requests'}>
             <span>🔀</span> Pull Requests
           </div>
         </div>
@@ -209,30 +286,47 @@ export class AppShell extends LitElement {
 
       <main class="main">
         <div class="toolbar">
-          <button class="toolbar-branch">🌿 main ▾</button>
+          <button class="toolbar-branch">
+            🌿 ${this.activeRepo?.currentBranch ?? '–'} ▾
+          </button>
           <div class="toolbar-spacer"></div>
-          <button class="toolbar-btn">↓ Fetch</button>
-          <button class="toolbar-btn">↓ Pull</button>
-          <button class="toolbar-btn">↑ Push</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↓ Fetch</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↓ Pull</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↑ Push</button>
         </div>
 
         <div class="content">
-          ${this.renderView()}
+          ${this.activeRepo ? this.renderView() : html`
+            <div class="placeholder">
+              <span class="placeholder-icon">📂</span>
+              <span>Kein Repository geöffnet</span>
+              <button class="placeholder-btn" @click=${() => this.showDialog = true}>
+                Repository hinzufügen
+              </button>
+            </div>
+          `}
         </div>
       </main>
+
+      ${this.showDialog ? html`
+        <repo-dialog
+          @close=${() => this.showDialog = false}
+          @repo-added=${this.onRepoAdded}>
+        </repo-dialog>
+      ` : ''}
     `;
   }
 
   private renderView() {
     switch (this.activeView) {
       case 'changes':
-        return html`<div class="placeholder"><span class="placeholder-icon">✏️</span><span>Kein Repository geöffnet</span></div>`;
+        return html`<div class="placeholder"><span class="placeholder-icon">✏️</span><span>Keine Änderungen</span></div>`;
       case 'history':
-        return html`<div class="placeholder"><span class="placeholder-icon">🕐</span><span>Kein Repository geöffnet</span></div>`;
+        return html`<div class="placeholder"><span class="placeholder-icon">🕐</span><span>Keine Commits</span></div>`;
       case 'branches':
-        return html`<div class="placeholder"><span class="placeholder-icon">🌿</span><span>Kein Repository geöffnet</span></div>`;
+        return html`<div class="placeholder"><span class="placeholder-icon">🌿</span><span>Keine Branches</span></div>`;
       case 'pull-requests':
-        return html`<div class="placeholder"><span class="placeholder-icon">🔀</span><span>Kein Repository geöffnet</span></div>`;
+        return html`<div class="placeholder"><span class="placeholder-icon">🔀</span><span>Keine Pull Requests</span></div>`;
     }
   }
 }
