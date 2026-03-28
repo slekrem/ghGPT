@@ -5,29 +5,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
-
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
+builder.Services.AddHttpForwarder();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI();
+
+if (!app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
 }
 
-app.UseCors();
-
 app.MapHub<RepositoryHub>("/hubs/repository");
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapForwarder("/{**catch-all}", "http://localhost:5173");
+}
+else
+{
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();
