@@ -139,12 +139,12 @@ export class ChangesView extends LitElement {
     }
 
     .diff-line-num {
-      width: 40px;
+      width: 32px;
       flex-shrink: 0;
       color: #45475a;
       user-select: none;
       text-align: right;
-      padding-right: 1rem;
+      padding-right: 0.5rem;
     }
 
     .diff-line-content { flex: 1; }
@@ -246,26 +246,30 @@ export class ChangesView extends LitElement {
     const raw = this.diff.split('\n');
     if (raw[raw.length - 1] === '') raw.pop();
     const lines = raw.filter(l => !isMetadata(l));
-    let lineNum = 0;
+    let oldLineNum = 0;
+    let newLineNum = 0;
 
     return html`
       <div class="diff-content">
         ${lines.map(line => {
-          // Parse hunk header to get correct starting line number, then skip rendering
+          // Parse hunk header to get correct starting line numbers, then skip rendering
           if (line.startsWith('@@')) {
-            const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-            if (match) lineNum = parseInt(match[1]) - 1;
+            const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+            if (match) { oldLineNum = parseInt(match[1]) - 1; newLineNum = parseInt(match[2]) - 1; }
             return '';
           }
 
           let cls = '';
-          if (line.startsWith('+')) { cls = 'added'; lineNum++; }
-          else if (line.startsWith('-')) { cls = 'removed'; }
-          else { lineNum++; }
+          let oldNum: number | '' = '';
+          let newNum: number | '' = '';
+          if (line.startsWith('+')) { cls = 'added'; newLineNum++; newNum = newLineNum; }
+          else if (line.startsWith('-')) { cls = 'removed'; oldLineNum++; oldNum = oldLineNum; }
+          else { oldLineNum++; newLineNum++; oldNum = oldLineNum; newNum = newLineNum; }
 
           return html`
             <div class="diff-line ${cls}">
-              <span class="diff-line-num">${cls !== 'removed' ? lineNum : ''}</span>
+              <span class="diff-line-num">${oldNum}</span>
+              <span class="diff-line-num">${newNum}</span>
               <span class="diff-line-content">${line}</span>
             </div>`;
         })}
