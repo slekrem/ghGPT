@@ -9,11 +9,11 @@ export interface RepositoryInfo {
 }
 
 export const repositoryService = {
-  getAll: () => api.get<RepositoryInfo[]>('/api/repos'),
+  getAll: () => api.get<RepositoryInfo[]>('/repos'),
   create: (localPath: string, name: string) =>
-    api.post<RepositoryInfo>('/api/repos/create', { localPath, name }),
+    api.post<RepositoryInfo>('/repos/create', { localPath, name }),
   import: (localPath: string) =>
-    api.post<RepositoryInfo>('/api/repos/import', { localPath }),
+    api.post<RepositoryInfo>('/repos/import', { localPath }),
   clone: (remoteUrl: string, localPath: string) =>
-    api.post<RepositoryInfo>('/api/repos/clone', { remoteUrl, localPath }),
+    api.post<RepositoryInfo>('/repos/clone', { remoteUrl, localPath }),
 };
