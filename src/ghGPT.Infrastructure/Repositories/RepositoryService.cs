@@ -78,6 +78,13 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         var remoteUrl = repo.Network.Remotes["origin"]?.Url;
         var branch = repo.Head.FriendlyName;
         var id = Guid.NewGuid().ToString();
-        return new RepositoryInfo(id, name, localPath, remoteUrl, branch);
+        return new RepositoryInfo
+        {
+            Id = id,
+            Name = name,
+            LocalPath = localPath,
+            RemoteUrl = remoteUrl,
+            CurrentBranch = branch
+        };
     }
 }

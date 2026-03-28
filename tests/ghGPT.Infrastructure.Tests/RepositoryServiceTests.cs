@@ -43,7 +43,7 @@ public class RepositoryServiceTests : IDisposable
     public async Task ImportAsync_ThrowsWhenAlreadyImported()
     {
         var path = Path.Combine(_tempPath, "existing-repo");
-        var existing = new RepositoryInfo("id-1", "existing-repo", path, null, "main");
+        var existing = new RepositoryInfo { Id = "id-1", Name = "existing-repo", LocalPath = path, CurrentBranch = "main" };
         _store.Load().Returns([existing]);
         var service = new RepositoryService(_store);
 
@@ -59,7 +59,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var repos = new List<RepositoryInfo>
         {
-            new("id-1", "repo-a", "/a", null, "main"),
+            new() { Id = "id-1", Name = "repo-a", LocalPath = "/a", CurrentBranch = "main" },
         };
         _store.Load().Returns(repos);
         var service = new RepositoryService(_store);

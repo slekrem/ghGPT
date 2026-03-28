@@ -30,8 +30,8 @@ public class RepositoryStoreTests : IDisposable
         var store = CreateStore();
         var repos = new List<RepositoryInfo>
         {
-            new("id-1", "repo-a", "/path/a", null, "main"),
-            new("id-2", "repo-b", "/path/b", "https://github.com/x/y", "develop"),
+            new() { Id = "id-1", Name = "repo-a", LocalPath = "/path/a", CurrentBranch = "main" },
+            new() { Id = "id-2", Name = "repo-b", LocalPath = "/path/b", RemoteUrl = "https://github.com/x/y", CurrentBranch = "develop" },
         };
 
         store.Save(repos);
