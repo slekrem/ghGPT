@@ -171,6 +171,9 @@ export class ChangesView extends LitElement {
   @state() private diffError = '';
   updated(changed: Map<string, unknown>) {
     if (changed.has('repoId') && this.repoId) {
+      this.selectedFile = null;
+      this.diff = '';
+      this.diffError = '';
       this.loadStatus();
     }
   }
