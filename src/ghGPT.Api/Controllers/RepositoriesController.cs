@@ -13,6 +13,27 @@ public class RepositoriesController(IRepositoryService service, IHubContext<Repo
     [HttpGet]
     public ActionResult<IReadOnlyList<RepositoryInfo>> GetAll() => Ok(service.GetAll());
 
+    [HttpGet("active")]
+    public ActionResult<RepositoryInfo> GetActive()
+    {
+        var repo = service.GetActive();
+        return repo is not null ? Ok(repo) : NoContent();
+    }
+
+    [HttpPut("active/{id}")]
+    public ActionResult SetActive(string id)
+    {
+        try
+        {
+            service.SetActive(id);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("create")]
     public async Task<ActionResult<RepositoryInfo>> Create([FromBody] CreateRepoRequest request)
     {

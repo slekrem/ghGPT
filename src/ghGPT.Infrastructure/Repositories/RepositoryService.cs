@@ -6,8 +6,19 @@ namespace ghGPT.Infrastructure.Repositories;
 public class RepositoryService(IRepositoryStore store) : IRepositoryService
 {
     private readonly List<RepositoryInfo> _repos = [.. store.Load()];
+    private string? _activeRepoId;
 
     public IReadOnlyList<RepositoryInfo> GetAll() => _repos.AsReadOnly();
+
+    public RepositoryInfo? GetActive() =>
+        _activeRepoId is not null ? _repos.FirstOrDefault(r => r.Id == _activeRepoId) : null;
+
+    public void SetActive(string id)
+    {
+        if (_repos.All(r => r.Id != id))
+            throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
+        _activeRepoId = id;
+    }
 
     public Task<RepositoryInfo> CreateAsync(string localPath, string name)
     {
