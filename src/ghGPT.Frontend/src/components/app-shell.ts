@@ -5,6 +5,7 @@ import { startHub } from '../services/hub-client';
 import './repo-dialog';
 import './changes-view';
 import './history-view';
+import './branches-view';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests';
 
@@ -258,6 +259,10 @@ export class AppShell extends LitElement {
     this.historyRefreshKey++;
   };
 
+  private onBranchChanged = async () => {
+    this.repos = await repositoryService.getAll();
+  };
+
   render() {
     return html`
       <aside class="sidebar">
@@ -319,7 +324,7 @@ export class AppShell extends LitElement {
           <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↑ Push</button>
         </div>
 
-        <div class="content ${this.activeView !== 'changes' ? 'padded' : ''}">
+        <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' ? 'padded' : ''}">
           ${this.activeRepo ? this.renderView() : html`
             <div class="placeholder">
               <span class="placeholder-icon">📂</span>
@@ -348,7 +353,7 @@ export class AppShell extends LitElement {
       case 'history':
         return html`<history-view .repoId=${this.activeRepoId ?? ''} .branch=${this.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
-        return html`<div class="placeholder"><span class="placeholder-icon">🌿</span><span>Keine Branches</span></div>`;
+        return html`<branches-view .repoId=${this.activeRepoId ?? ''} @branch-changed=${this.onBranchChanged}></branches-view>`;
       case 'pull-requests':
         return html`<div class="placeholder"><span class="placeholder-icon">🔀</span><span>Keine Pull Requests</span></div>`;
     }

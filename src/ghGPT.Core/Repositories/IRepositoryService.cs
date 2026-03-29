@@ -16,6 +16,10 @@ public interface IRepositoryService
     void UnstageAll(string id);
     void Commit(string id, string message, string? description = null);
     void Remove(string id);
+    IReadOnlyList<BranchInfo> GetBranches(string id);
+    void CheckoutBranch(string id, string branchName);
+    BranchInfo CreateBranch(string id, string name, string? startPoint = null);
+    void DeleteBranch(string id, string branchName);
     Task<RepositoryInfo> CreateAsync(string localPath, string name);
     Task<RepositoryInfo> ImportAsync(string localPath);
     Task<RepositoryInfo> CloneAsync(string remoteUrl, string localPath, IProgress<string>? progress = null);

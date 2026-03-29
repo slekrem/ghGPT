@@ -312,6 +312,92 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         store.Save(_repos);
     }
 
+    public IReadOnlyList<BranchInfo> GetBranches(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        return repo.Branches
+            .Select(branch => new BranchInfo
+            {
+                Name = branch.FriendlyName,
+                IsRemote = branch.IsRemote,
+                IsHead = branch.IsCurrentRepositoryHead,
+                AheadBy = branch.TrackingDetails?.AheadBy ?? 0,
+                BehindBy = branch.TrackingDetails?.BehindBy ?? 0,
+                TrackingBranch = branch.TrackedBranch?.FriendlyName
+            })
+            .OrderBy(b => b.IsRemote)
+            .ThenBy(b => b.Name)
+            .ToList();
+    }
+
+    public void CheckoutBranch(string id, string branchName)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        var status = repo.RetrieveStatus();
+        var isDirty = status.Any(e =>
+            e.State != FileStatus.Ignored &&
+            e.State != FileStatus.Unaltered);
+
+        if (isDirty)
+            throw new InvalidOperationException("Uncommitted changes vorhanden. Bitte zuerst committen oder stashen.");
+
+        var branch = repo.Branches[branchName]
+            ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
+
+        Commands.Checkout(repo, branch);
+    }
+
+    public BranchInfo CreateBranch(string id, string name, string? startPoint = null)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException("Branch-Name darf nicht leer sein.");
+
+        Commit? startCommit = null;
+        if (!string.IsNullOrWhiteSpace(startPoint))
+        {
+            var startBranch = repo.Branches[startPoint]
+                ?? throw new InvalidOperationException($"Start-Branch '{startPoint}' nicht gefunden.");
+            startCommit = startBranch.Tip;
+        }
+
+        var newBranch = startCommit is not null
+            ? repo.CreateBranch(name, startCommit)
+            : repo.CreateBranch(name);
+
+        Commands.Checkout(repo, newBranch);
+
+        return new BranchInfo
+        {
+            Name = newBranch.FriendlyName,
+            IsRemote = false,
+            IsHead = true,
+            AheadBy = 0,
+            BehindBy = 0,
+            TrackingBranch = null
+        };
+    }
+
+    public void DeleteBranch(string id, string branchName)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        var branch = repo.Branches[branchName]
+            ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
+
+        if (branch.IsCurrentRepositoryHead)
+            throw new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden.");
+
+        repo.Branches.Remove(branch);
+    }
+
     private RepositoryInfo GetRepoById(string id) =>
         _repos.FirstOrDefault(r => r.Id == id)
         ?? throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");

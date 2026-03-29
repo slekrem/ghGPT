@@ -65,6 +65,15 @@ export interface CommitDetail {
   files: CommitFileChange[];
 }
 
+export interface BranchInfo {
+  name: string;
+  isRemote: boolean;
+  isHead: boolean;
+  aheadBy: number;
+  behindBy: number;
+  trackingBranch: string | null;
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -100,6 +109,15 @@ export const repositoryService = {
   unstageAll: (id: string) => api.post<void>(`/repos/${id}/unstage-all`),
   commit: (id: string, message: string, description?: string) =>
     api.post<void>(`/repos/${id}/commit`, { message, description }),
+
+  getBranches: (id: string) =>
+    api.get<BranchInfo[]>(`/repos/${id}/branches`),
+  checkoutBranch: (id: string, name: string) =>
+    api.put<void>(`/repos/${id}/branches/checkout`, { name }),
+  createBranch: (id: string, name: string, startPoint?: string) =>
+    api.post<BranchInfo>(`/repos/${id}/branches`, { name, startPoint }),
+  deleteBranch: (id: string, name: string) =>
+    api.delete<void>(`/repos/${id}/branches/${encodeURIComponent(name)}`),
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),
