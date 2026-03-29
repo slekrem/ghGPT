@@ -1,6 +1,8 @@
 using ghGPT.Core.Account;
+using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
 using ghGPT.Infrastructure.Account;
+using ghGPT.Infrastructure.PullRequests;
 using ghGPT.Infrastructure.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using System.Runtime.InteropServices;
@@ -21,6 +23,7 @@ public static class DependencyInjection
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
         services.AddSingleton<IRepositoryService, RepositoryService>();
         services.AddSingleton<IAccountService, AccountService>();
+        services.AddSingleton<IPullRequestService, PullRequestService>();
         return services;
     }
 }
