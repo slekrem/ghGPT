@@ -92,13 +92,15 @@ test('unstages a file via checkbox', async ({ page }) => {
   const changesView = page.locator('changes-view');
   const entry = changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first();
   const checkbox = entry.locator('input[type="checkbox"]');
+  const commitButton = changesView.locator('.commit-btn');
 
   await checkbox.click();
   await expect(checkbox).toBeChecked({ timeout: 5000 });
+  await expect(commitButton).toContainText('Commit (1', { timeout: 5000 });
 
   await checkbox.click();
   await expect(checkbox).not.toBeChecked({ timeout: 5000 });
-  await expect(changesView.locator('.commit-btn')).toContainText('Commit (0');
+  await expect(commitButton).toContainText('Commit (0', { timeout: 5000 });
 });
 
 test('diff shows line numbers for both removed and added lines', async ({ page }) => {
