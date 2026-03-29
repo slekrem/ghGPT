@@ -145,6 +145,32 @@ test('commit creates a new commit and clears staged files', async ({ page }) => 
   await expect(changesView.locator('.commit-input[type="text"]')).toHaveValue('');
 });
 
+test('commit works when only deleted files are staged', async ({ page }) => {
+  const changesView = page.locator('changes-view');
+
+  // Delete main.ts (tracked file from createTempRepo) so it shows as deleted
+  const { execSync: exec } = await import('child_process');
+  exec(`del /f "${repoDir}\\main.ts"`, { shell: 'cmd.exe' });
+
+  // Reload to pick up the deletion
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('changes-view').waitFor();
+
+  // Stage the deleted file
+  await changesView.locator('.file-entry').filter({ hasText: 'main.ts' }).first().locator('.action-btn').click();
+  await changesView.locator('.section-header').filter({ hasText: 'Staged (1)' }).waitFor({ timeout: 5000 });
+
+  // Enter commit message — button must be enabled
+  await changesView.locator('.commit-input[type="text"]').fill('chore: remove main.ts');
+  await expect(changesView.locator('.commit-btn')).not.toBeDisabled();
+
+  // Commit should succeed
+  await changesView.locator('.commit-btn').click();
+  await expect(changesView.locator('.section-header').filter({ hasText: 'Staged (0)' })).toBeVisible({ timeout: 5000 });
+});
+
 test('clears diff when switching to a different repository', async ({ page }) => {
   const changesView = page.locator('changes-view');
 
