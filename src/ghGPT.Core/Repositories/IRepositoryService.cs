@@ -6,6 +6,8 @@ public interface IRepositoryService
     RepositoryInfo? GetActive();
     void SetActive(string id);
     RepositoryStatusResult GetStatus(string id);
+    CommitListResult GetCommits(string id, string? branch = null, int skip = 0, int take = 100);
+    CommitDetail GetCommitDetail(string id, string sha);
     IReadOnlyList<CommitHistoryEntry> GetHistory(string id, int limit = 50);
     string GetDiff(string id, string filePath, bool staged);
     void StageFile(string id, string filePath);

@@ -29,6 +29,21 @@ public class RepositoryServiceTests : IDisposable
         return path;
     }
 
+    private string CreateGitRepoWithCommitCount(string name, int additionalCommits)
+    {
+        var path = CreateGitRepo(name);
+        var filePath = Path.Combine(path, "README.md");
+
+        for (var i = 1; i <= additionalCommits; i++)
+        {
+            File.WriteAllText(filePath, $"# Commit {i}\n");
+            Run("git add README.md", path);
+            Run($"git commit -m commit-{i}", path);
+        }
+
+        return path;
+    }
+
     private static void Run(string cmd, string cwd)
     {
         var parts = cmd.Split(' ', 2);
@@ -205,6 +220,63 @@ public class RepositoryServiceTests : IDisposable
         Assert.NotEmpty(history);
         Assert.Equal("feat: history test", history[0].Message);
         Assert.Equal(7, history[0].ShortSha.Length);
+    }
+
+    [Fact]
+    public void GetCommits_ReturnsPagedBranchHistory()
+    {
+        var path = CreateGitRepo("commits-page-repo");
+        var service = ServiceWithRepo(path);
+
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Change 1\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: first");
+
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Change 2\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: second");
+
+        var page = service.GetCommits("id-1", "master", skip: 0, take: 1);
+
+        Assert.Single(page.Commits);
+        Assert.Equal("master", page.Branch);
+        Assert.Equal("feat: second", page.Commits[0].Message);
+        Assert.True(page.HasMore);
+    }
+
+    [Fact]
+    public void GetCommitDetail_ReturnsFilesAndPatch()
+    {
+        var path = CreateGitRepo("commit-detail-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Detailed Change\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: detail");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        var detail = service.GetCommitDetail("id-1", repo.Head.Tip.Sha);
+
+        Assert.Equal("feat: detail", detail.Message);
+        Assert.Contains(detail.Files, file => file.Path == "README.md" && file.Patch.Contains("+# Detailed Change"));
+    }
+
+    [Fact]
+    public void GetCommits_CanPageThroughLargeHistory()
+    {
+        var path = CreateGitRepoWithCommitCount("large-history-repo", 220);
+        var service = ServiceWithRepo(path);
+
+        var firstPage = service.GetCommits("id-1", "master", skip: 0, take: 100);
+        var thirdPage = service.GetCommits("id-1", "master", skip: 200, take: 100);
+
+        Assert.Equal(100, firstPage.Commits.Count);
+        Assert.True(firstPage.HasMore);
+        Assert.Equal(21, thirdPage.Commits.Count);
+        Assert.False(thirdPage.HasMore);
+        Assert.Equal("commit-220", firstPage.Commits[0].Message);
+        Assert.DoesNotContain(firstPage.Commits.Select(commit => commit.Sha), sha => thirdPage.Commits.Any(other => other.Sha == sha));
+        Assert.Equal("initial", thirdPage.Commits[^1].Message);
+        Assert.All(thirdPage.Commits.Take(thirdPage.Commits.Count - 1), commit => Assert.StartsWith("commit-", commit.Message));
     }
 
     // --- Diff ---
