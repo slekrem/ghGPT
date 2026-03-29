@@ -21,6 +21,15 @@ export interface RepositoryStatusResult {
   unstaged: FileStatusEntry[];
 }
 
+export interface CommitHistoryEntry {
+  sha: string;
+  shortSha: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  authorDate: string;
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -34,6 +43,8 @@ export const repositoryService = {
 
   getStatus: (id: string) =>
     api.get<RepositoryStatusResult>(`/repos/${id}/status`),
+  getHistory: (id: string, limit = 50) =>
+    api.get<CommitHistoryEntry[]>(`/repos/${id}/history?limit=${limit}`),
   getDiff: (id: string, file: string, staged: boolean) =>
     api.get<string>(`/repos/${id}/diff?file=${encodeURIComponent(file)}&staged=${staged}`),
   stageFile: (id: string, file: string) =>

@@ -45,6 +45,30 @@ public class ChangesControllerTests
         Assert.IsType<NotFoundObjectResult>(result.Result);
     }
 
+    [Fact]
+    public void GetHistory_ReturnsOkWithCommits()
+    {
+        _service.GetHistory("id-1", 50).Returns([
+            new CommitHistoryEntry { Sha = "abcdef123456", ShortSha = "abcdef1", Message = "feat: test" }
+        ]);
+
+        var result = _controller.GetHistory("id-1");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var history = Assert.IsAssignableFrom<IReadOnlyList<CommitHistoryEntry>>(ok.Value);
+        Assert.Single(history);
+    }
+
+    [Fact]
+    public void GetHistory_ReturnsNotFoundForUnknownRepo()
+    {
+        _service.When(s => s.GetHistory("bad", Arg.Any<int>())).Throw(new InvalidOperationException("not found"));
+
+        var result = _controller.GetHistory("bad");
+
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
     // --- GetDiff ---
 
     [Fact]

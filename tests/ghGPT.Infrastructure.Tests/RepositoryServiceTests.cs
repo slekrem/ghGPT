@@ -191,6 +191,22 @@ public class RepositoryServiceTests : IDisposable
         Assert.Empty(status.Unstaged);
     }
 
+    [Fact]
+    public void GetHistory_ReturnsNewestCommitFirst()
+    {
+        var path = CreateGitRepo("history-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: history test");
+
+        var history = service.GetHistory("id-1");
+
+        Assert.NotEmpty(history);
+        Assert.Equal("feat: history test", history[0].Message);
+        Assert.Equal(7, history[0].ShortSha.Length);
+    }
+
     // --- Diff ---
 
     [Fact]

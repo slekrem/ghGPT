@@ -117,6 +117,25 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         return new RepositoryStatusResult { Staged = staged, Unstaged = unstaged };
     }
 
+    public IReadOnlyList<CommitHistoryEntry> GetHistory(string id, int limit = 50)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        return repo.Commits
+            .Take(limit)
+            .Select(commit => new CommitHistoryEntry
+            {
+                Sha = commit.Sha,
+                ShortSha = commit.Sha[..7],
+                Message = commit.MessageShort,
+                AuthorName = commit.Author.Name,
+                AuthorEmail = commit.Author.Email,
+                AuthorDate = commit.Author.When
+            })
+            .ToList();
+    }
+
     public string GetDiff(string id, string filePath, bool staged)
     {
         var info = GetRepoById(id);

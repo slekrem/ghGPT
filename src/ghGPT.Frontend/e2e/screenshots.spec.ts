@@ -13,18 +13,16 @@ test.beforeAll(async () => {
   fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
   repoDir = createTempRepo();
 
-  // Create a multi-line file and commit it, then modify a line in the middle
   const multiLine =
     '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf\nZeile sechs\nZeile sieben\n';
   modifyFile(repoDir, 'README.md', multiLine);
   execSync('git add README.md', { cwd: repoDir });
   execSync('git commit -m "add multi-line readme"', { cwd: repoDir });
 
-  // Simulate mixed changes: modified file, new file, deleted file
   modifyFile(repoDir, 'README.md',
     '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf GEÄNDERT\nZeile sechs\nZeile sieben\n');
   modifyFile(repoDir, 'new-file.txt', 'new file content\n');
-  fs.unlinkSync(path.join(repoDir, 'main.ts')); // delete tracked file
+  fs.unlinkSync(path.join(repoDir, 'main.ts'));
 
   const repo = await importRepo(repoDir);
   repoId = repo.id;
@@ -39,10 +37,8 @@ test.afterAll(async () => {
 test('01 - App startet ohne aktives Repo', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
-  // Reload after clear so app starts fresh without active repo
   await page.reload();
   await page.locator('app-shell').waitFor();
-  // Wait briefly for repos to load and check if placeholder shows
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '01-no-repo.png'), fullPage: true });
 });
@@ -128,7 +124,6 @@ test('09 - Changes View: Commit-Formular mit gemischten Änderungen', async ({ p
   await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
 
-  // Check all via header checkbox
   await page.locator('changes-view').locator('.list-header input[type="checkbox"]').click();
   await expect(page.locator('changes-view').locator('.commit-btn')).toContainText(/Commit \([1-9]/, { timeout: 5000 });
 

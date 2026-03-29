@@ -21,6 +21,19 @@ public class ChangesController(IRepositoryService service) : ControllerBase
         }
     }
 
+    [HttpGet("history")]
+    public ActionResult<IReadOnlyList<CommitHistoryEntry>> GetHistory(string id, [FromQuery] int limit = 50)
+    {
+        try
+        {
+            return Ok(service.GetHistory(id, limit));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
     [HttpGet("diff")]
     public ActionResult<string> GetDiff(string id, [FromQuery] string file, [FromQuery] bool staged = false)
     {

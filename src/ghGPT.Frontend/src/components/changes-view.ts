@@ -298,6 +298,7 @@ export class ChangesView extends LitElement {
       this.selectedFile = null;
       this.diff = '';
       await this.loadStatus();
+      this.dispatchEvent(new CustomEvent('commit-created', { bubbles: true, composed: true }));
     } catch (e: unknown) {
       this.commitError = e instanceof Error ? e.message : 'Commit fehlgeschlagen';
     } finally {

@@ -5,7 +5,6 @@ import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, 
 let repoDir = '';
 let repoId = '';
 
-// Second repo for switching test
 let repoDir2 = '';
 let repoId2 = '';
 
@@ -94,11 +93,9 @@ test('unstages a file via checkbox', async ({ page }) => {
   const entry = changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first();
   const checkbox = entry.locator('input[type="checkbox"]');
 
-  // Stage
   await checkbox.click();
   await expect(checkbox).toBeChecked({ timeout: 5000 });
 
-  // Unstage
   await checkbox.click();
   await expect(checkbox).not.toBeChecked({ timeout: 5000 });
   await expect(changesView.locator('.commit-btn')).toContainText('Commit (0');
@@ -146,6 +143,24 @@ test('commit creates a new commit and clears staged files', async ({ page }) => 
   await expect(changesView.locator('.commit-input[type="text"]')).toHaveValue('');
 });
 
+test('commit appears in history after creating it', async ({ page }) => {
+  const changesView = page.locator('changes-view');
+  const commitTitle = `test: history commit ${modCounter}`;
+
+  await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first()
+    .locator('input[type="checkbox"]').click();
+  await expect(changesView.locator('.commit-btn')).toContainText('Commit (1');
+
+  await changesView.locator('.commit-input[type="text"]').fill(commitTitle);
+  await changesView.locator('.commit-btn').click();
+  await expect(changesView.locator('.commit-btn')).toContainText('Commit (0', { timeout: 5000 });
+
+  await page.locator('.nav-item').filter({ hasText: 'History' }).first().click();
+  const historyView = page.locator('history-view');
+  await historyView.waitFor();
+  await expect(historyView).toContainText(commitTitle, { timeout: 5000 });
+});
+
 test('commit works when only deleted files are staged', async ({ page }) => {
   const changesView = page.locator('changes-view');
   const { execSync: exec } = await import('child_process');
@@ -169,16 +184,13 @@ test('commit works when only deleted files are staged', async ({ page }) => {
 test('diff stays visible after toggling checkbox', async ({ page }) => {
   const changesView = page.locator('changes-view');
 
-  // Click file to show diff
   await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first().click();
   await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
 
-  // Toggle checkbox — diff must stay visible
   await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first()
     .locator('input[type="checkbox"]').click();
   await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
 
-  // Toggle back — diff still visible
   await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first()
     .locator('input[type="checkbox"]').click();
   await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
