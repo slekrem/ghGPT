@@ -231,6 +231,7 @@ export class BranchesView extends LitElement {
   `;
 
   @property() repoId = '';
+  @property({ type: Number }) refreshKey = 0;
   @state() private branches: BranchInfo[] = [];
   @state() private showNewBranchDialog = false;
   @state() private newBranchName = '';
@@ -239,7 +240,7 @@ export class BranchesView extends LitElement {
   @state() private loading = false;
 
   updated(changedProps: Map<string, unknown>) {
-    if (changedProps.has('repoId') && this.repoId) {
+    if ((changedProps.has('repoId') || changedProps.has('refreshKey')) && this.repoId) {
       this.loadBranches();
     }
   }

@@ -1,4 +1,5 @@
 using ghGPT.Api.Hubs;
+using ghGPT.Core.Repositories;
 using ghGPT.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<IRepositoryEventNotifier, RepositoryEventNotifier>();
 builder.Services.AddInfrastructure();
 
 var app = builder.Build();

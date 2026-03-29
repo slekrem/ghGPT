@@ -20,4 +20,23 @@ export function offHubEvent<T = unknown>(event: string, callback: (arg: T) => vo
   hub.off(event, callback as (...args: unknown[]) => void);
 }
 
+export type HubConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
+
+export function getHubState(): HubConnectionStatus {
+  switch (hub.state) {
+    case signalR.HubConnectionState.Connected:
+      return 'connected';
+    case signalR.HubConnectionState.Reconnecting:
+      return 'reconnecting';
+    default:
+      return 'disconnected';
+  }
+}
+
+export function onHubStateChange(cb: (state: HubConnectionStatus) => void): void {
+  hub.onclose(() => cb('disconnected'));
+  hub.onreconnecting(() => cb('reconnecting'));
+  hub.onreconnected(() => cb('connected'));
+}
+
 export { hub };
