@@ -15,6 +15,9 @@ public interface IRepositoryService
     void StageAll(string id);
     void UnstageAll(string id);
     void Commit(string id, string message, string? description = null);
+    Task FetchAsync(string id, IProgress<string>? progress = null);
+    Task PullAsync(string id, IProgress<string>? progress = null);
+    Task PushAsync(string id, IProgress<string>? progress = null);
     void Remove(string id);
     IReadOnlyList<BranchInfo> GetBranches(string id);
     void CheckoutBranch(string id, string branchName);

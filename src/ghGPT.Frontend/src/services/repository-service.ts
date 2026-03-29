@@ -74,6 +74,13 @@ export interface BranchInfo {
   trackingBranch: string | null;
 }
 
+export interface GitOperationProgressEvent {
+  repoId: string;
+  operation: string;
+  status: string;
+  message: string;
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -109,6 +116,9 @@ export const repositoryService = {
   unstageAll: (id: string) => api.post<void>(`/repos/${id}/unstage-all`),
   commit: (id: string, message: string, description?: string) =>
     api.post<void>(`/repos/${id}/commit`, { message, description }),
+  fetch: (id: string) => api.post<void>(`/repos/${id}/fetch`),
+  pull: (id: string) => api.post<void>(`/repos/${id}/pull`),
+  push: (id: string) => api.post<void>(`/repos/${id}/push`),
 
   getBranches: (id: string) =>
     api.get<BranchInfo[]>(`/repos/${id}/branches`),

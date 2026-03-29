@@ -44,6 +44,34 @@ public class RepositoryServiceTests : IDisposable
         return path;
     }
 
+    private (string RemotePath, string LocalPath, string PeerPath) CreateRemoteRepos(string name)
+    {
+        var remotePath = Path.Combine(_tempPath, $"{name}-remote.git");
+        Directory.CreateDirectory(remotePath);
+        Run("git init --bare", remotePath);
+
+        var seedPath = Path.Combine(_tempPath, $"{name}-seed");
+        Run($"git clone \"{remotePath}\" \"{seedPath}\"", _tempPath);
+        Run("git config user.email test@test.com", seedPath);
+        Run("git config user.name Test", seedPath);
+        File.WriteAllText(Path.Combine(seedPath, "README.md"), "# Initial\n");
+        Run("git add README.md", seedPath);
+        Run("git commit -m initial", seedPath);
+        Run("git push origin HEAD", seedPath);
+
+        var localPath = Path.Combine(_tempPath, $"{name}-local");
+        Run($"git clone \"{remotePath}\" \"{localPath}\"", _tempPath);
+        Run("git config user.email test@test.com", localPath);
+        Run("git config user.name Test", localPath);
+
+        var peerPath = Path.Combine(_tempPath, $"{name}-peer");
+        Run($"git clone \"{remotePath}\" \"{peerPath}\"", _tempPath);
+        Run("git config user.email test@test.com", peerPath);
+        Run("git config user.name Test", peerPath);
+
+        return (remotePath, localPath, peerPath);
+    }
+
     private static void Run(string cmd, string cwd)
     {
         var parts = cmd.Split(' ', 2);
@@ -438,6 +466,64 @@ public class RepositoryServiceTests : IDisposable
 
         using var repo = new LibGit2Sharp.Repository(path);
         Assert.Equal("chore: remove readme", repo.Head.Tip.Message.Trim());
+    }
+
+    [Fact]
+    public async Task FetchAsync_UpdatesRemoteTrackingBranch()
+    {
+        var (_, localPath, peerPath) = CreateRemoteRepos("fetch-repo");
+        var service = ServiceWithRepo(localPath);
+
+        File.WriteAllText(Path.Combine(peerPath, "README.md"), "# Peer change\n");
+        Run("git add README.md", peerPath);
+        Run("git commit -m peer-change", peerPath);
+        Run("git push origin HEAD", peerPath);
+
+        var progressLines = new List<string>();
+        var progress = new Progress<string>(line => progressLines.Add(line));
+        await service.FetchAsync("id-1", progress);
+
+        using var repo = new LibGit2Sharp.Repository(localPath);
+        var remoteBranch = repo.Branches[$"origin/{repo.Head.FriendlyName}"];
+        Assert.NotNull(remoteBranch);
+        Assert.Equal("peer-change", remoteBranch.Tip.MessageShort);
+        Assert.NotEmpty(progressLines);
+    }
+
+    [Fact]
+    public async Task PullAsync_UpdatesLocalBranchFromRemote()
+    {
+        var (_, localPath, peerPath) = CreateRemoteRepos("pull-repo");
+        var service = ServiceWithRepo(localPath);
+
+        File.WriteAllText(Path.Combine(peerPath, "README.md"), "# Pulled change\n");
+        Run("git add README.md", peerPath);
+        Run("git commit -m peer-change", peerPath);
+        Run("git push origin HEAD", peerPath);
+
+        await service.PullAsync("id-1");
+
+        using var repo = new LibGit2Sharp.Repository(localPath);
+        Assert.Equal("peer-change", repo.Head.Tip.MessageShort);
+        Assert.Contains("Pulled change", File.ReadAllText(Path.Combine(localPath, "README.md")));
+    }
+
+    [Fact]
+    public async Task PushAsync_PushesCurrentBranchToRemote()
+    {
+        var (remotePath, localPath, _) = CreateRemoteRepos("push-repo");
+        var service = ServiceWithRepo(localPath);
+
+        File.WriteAllText(Path.Combine(localPath, "README.md"), "# Local push\n");
+        Run("git add README.md", localPath);
+        Run("git commit -m local-push", localPath);
+
+        await service.PushAsync("id-1");
+
+        using var remoteRepo = new LibGit2Sharp.Repository(remotePath);
+        var remoteBranch = remoteRepo.Branches["master"] ?? remoteRepo.Branches["main"];
+        Assert.NotNull(remoteBranch);
+        Assert.Equal("local-push", remoteBranch.Tip.MessageShort);
     }
 
     public void Dispose()
