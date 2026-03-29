@@ -1,5 +1,7 @@
 using ghGPT.Core.Repositories;
 using LibGit2Sharp;
+using System.ComponentModel;
+using System.Diagnostics;
 
 namespace ghGPT.Infrastructure.Repositories;
 
@@ -304,6 +306,15 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         repo.Commit(fullMessage, author, author);
     }
 
+    public Task FetchAsync(string id, IProgress<string>? progress = null) =>
+        RunGitOperationAsync(id, "fetch --all --progress", progress);
+
+    public Task PullAsync(string id, IProgress<string>? progress = null) =>
+        RunGitOperationAsync(id, "pull --progress", progress);
+
+    public Task PushAsync(string id, IProgress<string>? progress = null) =>
+        RunGitOperationAsync(id, "push --progress", progress);
+
     public void Remove(string id)
     {
         var repo = GetRepoById(id);
@@ -420,6 +431,100 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
     private RepositoryInfo GetRepoById(string id) =>
         _repos.FirstOrDefault(r => r.Id == id)
         ?? throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
+
+    private async Task RunGitOperationAsync(string id, string arguments, IProgress<string>? progress)
+    {
+        var info = GetRepoById(id);
+        progress?.Report($"> git {arguments}");
+
+        var psi = new ProcessStartInfo("git", arguments)
+        {
+            WorkingDirectory = info.LocalPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        var outputLines = new List<string>();
+
+        void OnOutput(object _, DataReceivedEventArgs args)
+        {
+            if (string.IsNullOrWhiteSpace(args.Data))
+                return;
+
+            var line = args.Data.Trim();
+            lock (outputLines)
+            {
+                outputLines.Add(line);
+            }
+            progress?.Report(line);
+        }
+
+        process.OutputDataReceived += OnOutput;
+        process.ErrorDataReceived += OnOutput;
+
+        try
+        {
+            if (!process.Start())
+                throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            await process.WaitForExitAsync();
+        }
+        catch (Win32Exception ex)
+        {
+            throw new InvalidOperationException("Git wurde nicht gefunden oder konnte nicht gestartet werden.", ex);
+        }
+        finally
+        {
+            process.OutputDataReceived -= OnOutput;
+            process.ErrorDataReceived -= OnOutput;
+        }
+
+        if (process.ExitCode == 0)
+            return;
+
+        var message = BuildGitOperationError(outputLines);
+        throw new InvalidOperationException(message);
+    }
+
+    private static string BuildGitOperationError(IEnumerable<string> outputLines)
+    {
+        var relevantLines = outputLines
+            .Select(line => line.Trim())
+            .Where(line =>
+                !string.IsNullOrWhiteSpace(line) &&
+                !line.StartsWith("remote:", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("From ", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("Enumerating objects:", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("Counting objects:", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("Compressing objects:", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("Writing objects:", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("Receiving objects:", StringComparison.OrdinalIgnoreCase) &&
+                !line.StartsWith("Resolving deltas:", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var mergeConflict = relevantLines.FirstOrDefault(line =>
+            line.Contains("CONFLICT", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Automatic merge failed", StringComparison.OrdinalIgnoreCase));
+        if (mergeConflict is not null)
+            return $"Merge-Konflikt beim Aktualisieren des Branches. {mergeConflict}";
+
+        var authError = relevantLines.FirstOrDefault(line =>
+            line.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("could not read Username", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Permission denied", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Repository not found", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("fatal: could not", StringComparison.OrdinalIgnoreCase));
+        if (authError is not null)
+            return $"Authentifizierung oder Remote-Zugriff fehlgeschlagen. {authError}";
+
+        return relevantLines.LastOrDefault()
+            ?? "Git-Operation fehlgeschlagen.";
+    }
 
     private static RepositoryInfo BuildInfo(string localPath)
     {

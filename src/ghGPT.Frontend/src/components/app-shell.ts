@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { repositoryService, type RepositoryInfo, type BranchInfo } from '../services/repository-service';
+import { repositoryService, type RepositoryInfo, type BranchInfo, type GitOperationProgressEvent } from '../services/repository-service';
+import { onHubEvent, offHubEvent } from '../services/hub-client';
 import { startHub } from '../services/hub-client';
 import './repo-dialog';
 import './changes-view';
@@ -204,6 +205,29 @@ export class AppShell extends LitElement {
 
     .branch-dropdown-item .check { font-size: 0.75rem; flex-shrink: 0; }
 
+    .branch-dropdown-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .branch-dropdown-ahead-behind {
+      display: inline-flex;
+      gap: 0.35rem;
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      color: #6c7086;
+    }
+
+    .branch-dropdown-ahead {
+      color: #a6e3a1;
+    }
+
+    .branch-dropdown-behind {
+      color: #f38ba8;
+    }
+
     .branch-dropdown-separator {
       height: 1px;
       background: #313244;
@@ -244,6 +268,91 @@ export class AppShell extends LitElement {
     }
 
     .toolbar-btn:hover { background-color: #313244; }
+
+    .toolbar-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .git-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 12, 18, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 400;
+      padding: 1.5rem;
+    }
+
+    .git-overlay-card {
+      width: min(720px, 100%);
+      max-height: min(70vh, 620px);
+      display: flex;
+      flex-direction: column;
+      background: #1e1e2e;
+      border: 1px solid #45475a;
+      border-radius: 12px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+
+    .git-overlay-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid #313244;
+    }
+
+    .git-overlay-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #cdd6f4;
+      text-transform: capitalize;
+    }
+
+    .git-overlay-status {
+      font-size: 0.75rem;
+      color: #6c7086;
+    }
+
+    .git-overlay-status.error {
+      color: #f38ba8;
+    }
+
+    .git-overlay-close {
+      padding: 0.25rem 0.7rem;
+      border-radius: 6px;
+      border: 1px solid #45475a;
+      background: transparent;
+      color: #cdd6f4;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .git-overlay-close:hover {
+      background: #313244;
+    }
+
+    .git-overlay-log {
+      padding: 0.9rem 1rem 1rem;
+      overflow: auto;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      color: #a6adc8;
+    }
+
+    .git-overlay-line + .git-overlay-line {
+      margin-top: 0.35rem;
+    }
+
+    .git-overlay-empty {
+      color: #6c7086;
+      font-style: italic;
+    }
 
     .content {
       flex: 1;
@@ -288,18 +397,25 @@ export class AppShell extends LitElement {
   @state() private activeRepoId: string | null = null;
   @state() private showDialog = false;
   @state() private historyRefreshKey = 0;
+  @state() private changesRefreshKey = 0;
   @state() private showBranchDropdown = false;
   @state() private branches: BranchInfo[] = [];
+  @state() private gitOperation: 'fetch' | 'pull' | 'push' | null = null;
+  @state() private gitOperationLines: string[] = [];
+  @state() private gitOperationError = '';
+  @state() private gitOperationStatus = '';
 
   async connectedCallback() {
     super.connectedCallback();
     startHub().catch(err => console.warn('SignalR connection failed:', err));
+    onHubEvent<GitOperationProgressEvent>('git-operation-progress', this.onGitOperationProgress);
     await this.loadRepos();
     document.addEventListener('click', this._onDocClick);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    offHubEvent<GitOperationProgressEvent>('git-operation-progress', this.onGitOperationProgress);
     document.removeEventListener('click', this._onDocClick);
   }
 
@@ -344,6 +460,65 @@ export class AppShell extends LitElement {
     }
   };
 
+  private onGitOperationProgress = (event: GitOperationProgressEvent) => {
+    if (!this.activeRepoId || event.repoId !== this.activeRepoId || event.operation !== this.gitOperation) {
+      return;
+    }
+
+    this.gitOperationStatus = event.status;
+    if (event.message) {
+      this.gitOperationLines = [...this.gitOperationLines, event.message];
+    }
+    if (event.status === 'error') {
+      this.gitOperationError = event.message;
+    }
+  };
+
+  private closeGitOverlay() {
+    if (this.gitOperationStatus === 'progress' || this.gitOperationStatus === 'started') {
+      return;
+    }
+
+    this.gitOperation = null;
+    this.gitOperationLines = [];
+    this.gitOperationError = '';
+    this.gitOperationStatus = '';
+  }
+
+  private async runGitOperation(operation: 'fetch' | 'pull' | 'push') {
+    if (!this.activeRepoId || this.gitOperation) return;
+
+    this.gitOperation = operation;
+    this.gitOperationLines = [];
+    this.gitOperationError = '';
+    this.gitOperationStatus = 'started';
+
+    try {
+      if (operation === 'fetch') {
+        await repositoryService.fetch(this.activeRepoId);
+      } else if (operation === 'pull') {
+        await repositoryService.pull(this.activeRepoId);
+      } else {
+        await repositoryService.push(this.activeRepoId);
+      }
+
+      this.repos = await repositoryService.getAll();
+      this.branches = await repositoryService.getBranches(this.activeRepoId);
+      this.changesRefreshKey++;
+      if (operation !== 'fetch') {
+        this.historyRefreshKey++;
+      }
+      this.gitOperationStatus = 'completed';
+      this.closeGitOverlay();
+    } catch (err) {
+      this.gitOperationError = (err as Error).message;
+      this.gitOperationStatus = 'error';
+      if (!this.gitOperationLines.includes(this.gitOperationError)) {
+        this.gitOperationLines = [...this.gitOperationLines, this.gitOperationError];
+      }
+    }
+  }
+
   private async openBranchDropdown() {
     if (!this.activeRepoId) return;
     this.branches = await repositoryService.getBranches(this.activeRepoId);
@@ -360,6 +535,22 @@ export class AppShell extends LitElement {
     } catch (err) {
       alert((err as Error).message);
     }
+  }
+
+  private renderAheadBehind(branch: BranchInfo) {
+    if (!branch.trackingBranch) return null;
+
+    const parts = [];
+    if (branch.aheadBy > 0) {
+      parts.push(html`<span class="branch-dropdown-ahead">↑${branch.aheadBy}</span>`);
+    }
+    if (branch.behindBy > 0) {
+      parts.push(html`<span class="branch-dropdown-behind">↓${branch.behindBy}</span>`);
+    }
+
+    return parts.length > 0
+      ? html`<span class="branch-dropdown-ahead-behind">${parts}</span>`
+      : null;
   }
 
   render() {
@@ -427,7 +618,8 @@ export class AppShell extends LitElement {
                     <div class="branch-dropdown-item ${b.isHead ? 'active' : ''}"
                       @click=${() => !b.isHead && this.checkoutFromDropdown(b.name)}>
                       <span class="check">${b.isHead ? '✓' : ' '}</span>
-                      <span>${b.name}</span>
+                      <span class="branch-dropdown-name">${b.name}</span>
+                      ${this.renderAheadBehind(b)}
                     </div>
                   `)}
                 ` : ''}
@@ -450,9 +642,9 @@ export class AppShell extends LitElement {
             ` : ''}
           </div>
           <div class="toolbar-spacer"></div>
-          <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↓ Fetch</button>
-          <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↓ Pull</button>
-          <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↑ Push</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('fetch')}>↓ Fetch</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('pull')}>↓ Pull</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('push')}>↑ Push</button>
         </div>
 
         <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' ? 'padded' : ''}">
@@ -474,13 +666,40 @@ export class AppShell extends LitElement {
           @repo-added=${this.onRepoAdded}>
         </repo-dialog>
       ` : ''}
+
+      ${this.gitOperation ? html`
+        <div class="git-overlay">
+          <div class="git-overlay-card">
+            <div class="git-overlay-header">
+              <div>
+                <div class="git-overlay-title">${this.gitOperation}</div>
+                <div class="git-overlay-status ${this.gitOperationError ? 'error' : ''}">
+                  ${this.gitOperationError
+                    ? this.gitOperationError
+                    : this.gitOperationStatus === 'completed'
+                      ? 'Abgeschlossen'
+                      : 'Läuft…'}
+                </div>
+              </div>
+              <button class="git-overlay-close" ?disabled=${this.gitOperationStatus === 'progress' || this.gitOperationStatus === 'started'} @click=${() => this.closeGitOverlay()}>
+                Schließen
+              </button>
+            </div>
+            <div class="git-overlay-log">
+              ${this.gitOperationLines.length > 0
+                ? this.gitOperationLines.map(line => html`<div class="git-overlay-line">${line}</div>`)
+                : html`<div class="git-overlay-empty">Warte auf Git-Ausgabe…</div>`}
+            </div>
+          </div>
+        </div>
+      ` : ''}
     `;
   }
 
   private renderView() {
     switch (this.activeView) {
       case 'changes':
-        return html`<changes-view .repoId=${this.activeRepoId ?? ''} @commit-created=${this.onCommitCreated}></changes-view>`;
+        return html`<changes-view .repoId=${this.activeRepoId ?? ''} .refreshKey=${this.changesRefreshKey} @commit-created=${this.onCommitCreated}></changes-view>`;
       case 'history':
         return html`<history-view .repoId=${this.activeRepoId ?? ''} .branch=${this.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':

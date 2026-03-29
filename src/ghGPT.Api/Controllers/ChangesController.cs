@@ -1,12 +1,14 @@
 using ghGPT.Api.Models;
+using ghGPT.Api.Hubs;
 using ghGPT.Core.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace ghGPT.Api.Controllers;
 
 [ApiController]
 [Route("api/repos/{id}")]
-public class ChangesController(IRepositoryService service) : ControllerBase
+public class ChangesController(IRepositoryService service, IHubContext<RepositoryHub> hub) : ControllerBase
 {
     [HttpGet("status")]
     public ActionResult<RepositoryStatusResult> GetStatus(string id)
@@ -147,6 +149,70 @@ public class ChangesController(IRepositoryService service) : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("fetch")]
+    public Task<ActionResult> Fetch(string id) =>
+        RunGitOperationAsync(id, "fetch", progress => service.FetchAsync(id, progress));
+
+    [HttpPost("pull")]
+    public Task<ActionResult> Pull(string id) =>
+        RunGitOperationAsync(id, "pull", progress => service.PullAsync(id, progress));
+
+    [HttpPost("push")]
+    public Task<ActionResult> Push(string id) =>
+        RunGitOperationAsync(id, "push", progress => service.PushAsync(id, progress));
+
+    private async Task<ActionResult> RunGitOperationAsync(
+        string repoId,
+        string operation,
+        Func<IProgress<string>, Task> execute)
+    {
+        try
+        {
+            var progress = new Progress<string>(async message =>
+                await hub.Clients.All.SendAsync("git-operation-progress", new GitOperationProgressEvent
+                {
+                    RepoId = repoId,
+                    Operation = operation,
+                    Status = "progress",
+                    Message = message
+                }));
+
+            await hub.Clients.All.SendAsync("git-operation-progress", new GitOperationProgressEvent
+            {
+                RepoId = repoId,
+                Operation = operation,
+                Status = "started",
+                Message = $"Git {operation} gestartet"
+            });
+
+            await execute(progress);
+
+            await hub.Clients.All.SendAsync("git-operation-progress", new GitOperationProgressEvent
+            {
+                RepoId = repoId,
+                Operation = operation,
+                Status = "completed",
+                Message = $"Git {operation} abgeschlossen"
+            });
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await hub.Clients.All.SendAsync("git-operation-progress", new GitOperationProgressEvent
+            {
+                RepoId = repoId,
+                Operation = operation,
+                Status = "error",
+                Message = ex.Message
+            });
+            if (ex.Message.Contains("nicht gefunden", StringComparison.OrdinalIgnoreCase))
+                return NotFound(new { error = ex.Message });
+
             return BadRequest(new { error = ex.Message });
         }
     }

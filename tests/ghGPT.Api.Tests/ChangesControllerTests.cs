@@ -1,7 +1,9 @@
 using ghGPT.Api.Controllers;
+using ghGPT.Api.Hubs;
 using ghGPT.Api.Models;
 using ghGPT.Core.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -10,11 +12,16 @@ namespace ghGPT.Api.Tests;
 public class ChangesControllerTests
 {
     private readonly IRepositoryService _service = Substitute.For<IRepositoryService>();
+    private readonly IHubContext<RepositoryHub> _hub = Substitute.For<IHubContext<RepositoryHub>>();
     private readonly ChangesController _controller;
 
     public ChangesControllerTests()
     {
-        _controller = new ChangesController(_service);
+        var clients = Substitute.For<IHubClients>();
+        var clientProxy = Substitute.For<IClientProxy>();
+        _hub.Clients.Returns(clients);
+        clients.All.Returns(clientProxy);
+        _controller = new ChangesController(_service, _hub);
     }
 
     // --- GetStatus ---
@@ -274,5 +281,34 @@ public class ChangesControllerTests
         _controller.Commit("id-1", new CommitRequest { Message = "feat: title", Description = "body text" });
 
         _service.Received(1).Commit("id-1", "feat: title", "body text");
+    }
+
+    [Fact]
+    public async Task Fetch_ReturnsNoContentOnSuccess()
+    {
+        var result = await _controller.Fetch("id-1");
+
+        Assert.IsType<NoContentResult>(result);
+        await _service.Received(1).FetchAsync("id-1", Arg.Any<IProgress<string>>());
+    }
+
+    [Fact]
+    public async Task Pull_ReturnsBadRequestWhenOperationFails()
+    {
+        _service.PullAsync("id-1", Arg.Any<IProgress<string>>())
+            .Returns(Task.FromException(new InvalidOperationException("conflict")));
+
+        var result = await _controller.Pull("id-1");
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Push_ReturnsNoContentOnSuccess()
+    {
+        var result = await _controller.Push("id-1");
+
+        Assert.IsType<NoContentResult>(result);
+        await _service.Received(1).PushAsync("id-1", Arg.Any<IProgress<string>>());
     }
 }

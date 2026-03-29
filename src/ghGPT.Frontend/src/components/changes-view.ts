@@ -198,6 +198,7 @@ export class ChangesView extends LitElement {
   `;
 
   @property() repoId = '';
+  @property({ type: Number }) refreshKey = 0;
   @query('.file-entries') private fileEntries?: HTMLDivElement;
 
   @state() private status: RepositoryStatusResult = { staged: [], unstaged: [] };
@@ -211,7 +212,7 @@ export class ChangesView extends LitElement {
   @state() private committing = false;
 
   updated(changed: Map<string, unknown>) {
-    if (changed.has('repoId') && this.repoId) {
+    if ((changed.has('repoId') || changed.has('refreshKey')) && this.repoId) {
       this.selectedFile = null;
       this.diff = '';
       this.diffError = '';
