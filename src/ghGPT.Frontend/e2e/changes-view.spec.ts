@@ -1,6 +1,6 @@
 import { execSync } from 'child_process';
 import { test, expect } from '@playwright/test';
-import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo } from './helpers';
+import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo, unstageAll } from './helpers';
 
 let repoDir = '';
 let repoId = '';
@@ -35,7 +35,7 @@ let modCounter = 0;
 
 test.beforeEach(async ({ page }) => {
   modCounter++;
-  await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
+  await unstageAll(repoId);
   modifyFile(repoDir, 'README.md',
     `# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf GEÄNDERT ${modCounter}\nZeile sechs\nZeile sieben\n`);
 

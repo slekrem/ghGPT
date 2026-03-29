@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
-import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo } from './helpers';
+import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo, unstageAll } from './helpers';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -82,7 +82,7 @@ test('05 - Repo-Dialog: Erstellen Tab', async ({ page }) => {
 });
 
 test('06 - Changes View: Unstaged Änderungen', async ({ page }) => {
-  await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
+  await unstageAll(repoId);
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
@@ -93,7 +93,7 @@ test('06 - Changes View: Unstaged Änderungen', async ({ page }) => {
 });
 
 test('07 - Changes View: Diff einer Datei', async ({ page }) => {
-  await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
+  await unstageAll(repoId);
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
@@ -106,7 +106,7 @@ test('07 - Changes View: Diff einer Datei', async ({ page }) => {
 });
 
 test('08 - Changes View: Datei gecheckt', async ({ page }) => {
-  await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
+  await unstageAll(repoId);
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
@@ -120,7 +120,7 @@ test('08 - Changes View: Datei gecheckt', async ({ page }) => {
 });
 
 test('09 - Changes View: Commit-Formular mit gemischten Änderungen', async ({ page }) => {
-  await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
+  await unstageAll(repoId);
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();

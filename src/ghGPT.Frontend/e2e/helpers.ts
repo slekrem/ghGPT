@@ -3,7 +3,11 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-const API = 'http://localhost:5000/api';
+const _settings = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../../ghGPT.Api/Properties/launchSettings.json'), 'utf-8')
+);
+const _baseUrl: string = _settings.profiles.http.applicationUrl.split(';')[0];
+export const API = `${_baseUrl}/api`;
 
 export function createTempRepo(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-test-'));
@@ -41,4 +45,8 @@ export async function setActiveRepo(id: string) {
 
 export async function deleteRepo(id: string) {
   await fetch(`${API}/repos/${id}`, { method: 'DELETE' });
+}
+
+export async function unstageAll(id: string) {
+  await fetch(`${API}/repos/${id}/unstage-all`, { method: 'POST' });
 }
