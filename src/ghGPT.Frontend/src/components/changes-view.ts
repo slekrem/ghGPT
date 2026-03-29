@@ -249,16 +249,16 @@ export class ChangesView extends LitElement {
     });
   }
 
-  private async toggleFile(entry: FileStatusEntry) {
+  private async toggleFile(entry: FileStatusEntry, selectAfterToggle = false) {
     await this.preserveFileListScroll(async () => {
-      const wasSelected = this.selectedFile?.filePath === entry.filePath;
+      const shouldSelect = selectAfterToggle || this.selectedFile?.filePath === entry.filePath;
       if (entry.isStaged) {
         await repositoryService.unstageFile(this.repoId, entry.filePath);
       } else {
         await repositoryService.stageFile(this.repoId, entry.filePath);
       }
       await this.loadStatus();
-      if (wasSelected) {
+      if (shouldSelect) {
         const updated = this.allFiles.find(f => f.filePath === entry.filePath);
         if (updated) await this.selectFile(updated);
       }
@@ -386,7 +386,7 @@ export class ChangesView extends LitElement {
         @click=${() => this.selectFile(entry)}>
         <input type="checkbox"
           .checked=${entry.isStaged}
-          @click=${(e: Event) => { e.stopPropagation(); this.toggleFile(entry); }} />
+          @click=${(e: Event) => { e.stopPropagation(); this.toggleFile(entry, true); }} />
         <span class="file-status status-${entry.status}">${this.statusChar(entry.status)}</span>
         <span class="file-name" title="${entry.filePath}">${entry.filePath}</span>
       </div>`;
