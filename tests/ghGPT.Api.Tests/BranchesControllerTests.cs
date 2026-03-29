@@ -87,6 +87,17 @@ public class BranchesControllerTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    [Fact]
+    public void Checkout_ReturnsBadRequestWhenLocalTrackingBranchAlreadyExists()
+    {
+        _service.When(s => s.CheckoutBranch("id-1", "origin/feature/x"))
+            .Throw(new InvalidOperationException("Lokaler Branch 'feature/x' existiert bereits."));
+
+        var result = _controller.Checkout("id-1", new CheckoutBranchRequest { Name = "origin/feature/x" });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
     // --- CreateBranch ---
 
     [Fact]

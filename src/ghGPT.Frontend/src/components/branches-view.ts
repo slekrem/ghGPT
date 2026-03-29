@@ -310,13 +310,13 @@ export class BranchesView extends LitElement {
 
   private renderBranchRow(b: BranchInfo) {
     return html`
-      <div class="branch-row ${b.isHead ? 'head' : ''}" @dblclick=${() => !b.isHead && !b.isRemote && this.checkout(b.name)}>
+      <div class="branch-row ${b.isHead ? 'head' : ''}" @dblclick=${() => !b.isHead && this.checkout(b.name)}>
         <span class="branch-icon">${b.isRemote ? '☁' : '🌿'}</span>
         <span class="branch-name">${b.name}</span>
         ${b.isHead ? html`<span class="head-badge">HEAD</span>` : ''}
         ${this.renderAheadBehind(b)}
         <div class="branch-actions">
-          ${!b.isHead && !b.isRemote ? html`
+          ${!b.isHead ? html`
             <button class="action-btn" @click=${(e: Event) => { e.stopPropagation(); this.checkout(b.name); }}>
               Checkout
             </button>
@@ -334,7 +334,7 @@ export class BranchesView extends LitElement {
   render() {
     const localBranches = this.localBranches;
     const remoteBranches = this.remoteBranches;
-    const localOptions = localBranches.map(b => b.name);
+    const allOptions = [...localBranches, ...remoteBranches].map(b => b.name);
 
     return html`
       <div class="toolbar">
@@ -384,7 +384,7 @@ export class BranchesView extends LitElement {
                 .value=${this.newBranchStartPoint}
                 @change=${(e: Event) => this.newBranchStartPoint = (e.target as HTMLSelectElement).value}
               >
-                ${localOptions.map(name => html`<option value=${name}>${name}</option>`)}
+                ${allOptions.map(name => html`<option value=${name}>${name}</option>`)}
               </select>
             </div>
 

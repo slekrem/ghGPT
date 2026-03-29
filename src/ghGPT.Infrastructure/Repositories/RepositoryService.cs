@@ -348,8 +348,25 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         var branch = repo.Branches[branchName]
             ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
 
-        Commands.Checkout(repo, branch);
-        info.CurrentBranch = branch.FriendlyName;
+        if (branch.IsRemote)
+        {
+            var localName = branch.FriendlyName.Contains('/')
+                ? branch.FriendlyName[(branch.FriendlyName.IndexOf('/') + 1)..]
+                : branch.FriendlyName;
+
+            if (repo.Branches[localName] is not null)
+                throw new InvalidOperationException($"Lokaler Branch '{localName}' existiert bereits.");
+
+            var localBranch = repo.CreateBranch(localName, branch.Tip);
+            repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
+            Commands.Checkout(repo, localBranch);
+            info.CurrentBranch = localBranch.FriendlyName;
+        }
+        else
+        {
+            Commands.Checkout(repo, branch);
+            info.CurrentBranch = branch.FriendlyName;
+        }
     }
 
     public BranchInfo CreateBranch(string id, string name, string? startPoint = null)
