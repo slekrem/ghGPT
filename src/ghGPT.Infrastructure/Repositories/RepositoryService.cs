@@ -136,6 +136,65 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             .ToList();
     }
 
+    public CommitListResult GetCommits(string id, string? branch = null, int skip = 0, int take = 100)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        var branchName = string.IsNullOrWhiteSpace(branch) ? repo.Head.FriendlyName : branch;
+        var selectedBranch = repo.Branches[branchName]
+            ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
+
+        var commits = selectedBranch.Commits
+            .Skip(Math.Max(skip, 0))
+            .Take(Math.Max(take, 1) + 1)
+            .Select(MapCommitListItem)
+            .ToList();
+
+        var hasMore = commits.Count > Math.Max(take, 1);
+        if (hasMore)
+            commits.RemoveAt(commits.Count - 1);
+
+        return new CommitListResult
+        {
+            Branch = selectedBranch.FriendlyName,
+            Commits = commits,
+            HasMore = hasMore
+        };
+    }
+
+    public CommitDetail GetCommitDetail(string id, string sha)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        var commit = repo.Lookup<Commit>(sha)
+            ?? throw new InvalidOperationException($"Commit '{sha}' nicht gefunden.");
+
+        var parentTree = commit.Parents.FirstOrDefault()?.Tree;
+        var patch = repo.Diff.Compare<Patch>(parentTree, commit.Tree);
+
+        return new CommitDetail
+        {
+            Sha = commit.Sha,
+            ShortSha = commit.Sha[..7],
+            Message = commit.MessageShort,
+            FullMessage = commit.Message,
+            AuthorName = commit.Author.Name,
+            AuthorEmail = commit.Author.Email,
+            AuthorDate = commit.Author.When,
+            Files = patch.Select(entry => new CommitFileChange
+            {
+                Path = entry.Path,
+                OldPath = entry.OldPath,
+                Status = entry.Status.ToString(),
+                Additions = entry.LinesAdded,
+                Deletions = entry.LinesDeleted,
+                Patch = entry.Patch
+            }).ToList()
+        };
+    }
+
     public string GetDiff(string id, string filePath, bool staged)
     {
         var info = GetRepoById(id);
@@ -180,6 +239,16 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         var body = string.Join('\n', lines.Select(line => $"+{line}"));
         return $"{header}@@ -0,0 +1,{lines.Length} @@\n{body}\n";
     }
+
+    private static CommitListItem MapCommitListItem(Commit commit) => new()
+    {
+        Sha = commit.Sha,
+        ShortSha = commit.Sha[..7],
+        Message = commit.MessageShort,
+        AuthorName = commit.Author.Name,
+        AuthorEmail = commit.Author.Email,
+        AuthorDate = commit.Author.When
+    };
 
     public void StageFile(string id, string filePath)
     {

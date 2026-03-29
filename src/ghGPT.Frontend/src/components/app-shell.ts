@@ -346,7 +346,7 @@ export class AppShell extends LitElement {
       case 'changes':
         return html`<changes-view .repoId=${this.activeRepoId ?? ''} @commit-created=${this.onCommitCreated}></changes-view>`;
       case 'history':
-        return html`<history-view .repoId=${this.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
+        return html`<history-view .repoId=${this.activeRepoId ?? ''} .branch=${this.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
         return html`<div class="placeholder"><span class="placeholder-icon">🌿</span><span>Keine Branches</span></div>`;
       case 'pull-requests':

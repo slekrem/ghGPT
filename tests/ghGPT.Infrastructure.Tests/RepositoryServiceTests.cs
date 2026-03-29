@@ -207,6 +207,44 @@ public class RepositoryServiceTests : IDisposable
         Assert.Equal(7, history[0].ShortSha.Length);
     }
 
+    [Fact]
+    public void GetCommits_ReturnsPagedBranchHistory()
+    {
+        var path = CreateGitRepo("commits-page-repo");
+        var service = ServiceWithRepo(path);
+
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Change 1\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: first");
+
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Change 2\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: second");
+
+        var page = service.GetCommits("id-1", "master", skip: 0, take: 1);
+
+        Assert.Single(page.Commits);
+        Assert.Equal("master", page.Branch);
+        Assert.Equal("feat: second", page.Commits[0].Message);
+        Assert.True(page.HasMore);
+    }
+
+    [Fact]
+    public void GetCommitDetail_ReturnsFilesAndPatch()
+    {
+        var path = CreateGitRepo("commit-detail-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Detailed Change\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: detail");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        var detail = service.GetCommitDetail("id-1", repo.Head.Tip.Sha);
+
+        Assert.Equal("feat: detail", detail.Message);
+        Assert.Contains(detail.Files, file => file.Path == "README.md" && file.Patch.Contains("+# Detailed Change"));
+    }
+
     // --- Diff ---
 
     [Fact]

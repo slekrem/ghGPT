@@ -21,6 +21,36 @@ public class ChangesController(IRepositoryService service) : ControllerBase
         }
     }
 
+    [HttpGet("commits")]
+    public ActionResult<CommitListResult> GetCommits(
+        string id,
+        [FromQuery] string? branch = null,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 100)
+    {
+        try
+        {
+            return Ok(service.GetCommits(id, branch, skip, take));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("commits/{sha}")]
+    public ActionResult<CommitDetail> GetCommitDetail(string id, string sha)
+    {
+        try
+        {
+            return Ok(service.GetCommitDetail(id, sha));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
     [HttpGet("history")]
     public ActionResult<IReadOnlyList<CommitHistoryEntry>> GetHistory(string id, [FromQuery] int limit = 50)
     {

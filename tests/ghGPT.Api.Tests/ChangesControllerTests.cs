@@ -46,6 +46,64 @@ public class ChangesControllerTests
     }
 
     [Fact]
+    public void GetCommits_ReturnsOkWithCommitPage()
+    {
+        _service.GetCommits("id-1", "main", 10, 25).Returns(new CommitListResult
+        {
+            Branch = "main",
+            Commits = [new CommitListItem { Sha = "abcdef", ShortSha = "abcdef1", Message = "feat: test" }],
+            HasMore = true
+        });
+
+        var result = _controller.GetCommits("id-1", "main", 10, 25);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var page = Assert.IsType<CommitListResult>(ok.Value);
+        Assert.Equal("main", page.Branch);
+        Assert.True(page.HasMore);
+    }
+
+    [Fact]
+    public void GetCommits_ReturnsNotFoundForUnknownRepo()
+    {
+        _service.When(s => s.GetCommits("bad", Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<int>()))
+            .Throw(new InvalidOperationException("not found"));
+
+        var result = _controller.GetCommits("bad");
+
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public void GetCommitDetail_ReturnsOkWithCommitDetail()
+    {
+        _service.GetCommitDetail("id-1", "abcdef").Returns(new CommitDetail
+        {
+            Sha = "abcdef",
+            ShortSha = "abcdef1",
+            Message = "feat: test",
+            Files = [new CommitFileChange { Path = "README.md", Status = "Modified" }]
+        });
+
+        var result = _controller.GetCommitDetail("id-1", "abcdef");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var detail = Assert.IsType<CommitDetail>(ok.Value);
+        Assert.Single(detail.Files);
+    }
+
+    [Fact]
+    public void GetCommitDetail_ReturnsNotFoundForUnknownCommit()
+    {
+        _service.When(s => s.GetCommitDetail("id-1", "bad"))
+            .Throw(new InvalidOperationException("not found"));
+
+        var result = _controller.GetCommitDetail("id-1", "bad");
+
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    [Fact]
     public void GetHistory_ReturnsOkWithCommits()
     {
         _service.GetHistory("id-1", 50).Returns([

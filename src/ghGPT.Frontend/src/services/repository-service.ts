@@ -30,6 +30,41 @@ export interface CommitHistoryEntry {
   authorDate: string;
 }
 
+export interface CommitListItem {
+  sha: string;
+  shortSha: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  authorDate: string;
+}
+
+export interface CommitListResult {
+  branch: string;
+  commits: CommitListItem[];
+  hasMore: boolean;
+}
+
+export interface CommitFileChange {
+  path: string;
+  oldPath?: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string;
+}
+
+export interface CommitDetail {
+  sha: string;
+  shortSha: string;
+  message: string;
+  fullMessage: string;
+  authorName: string;
+  authorEmail: string;
+  authorDate: string;
+  files: CommitFileChange[];
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -43,6 +78,16 @@ export const repositoryService = {
 
   getStatus: (id: string) =>
     api.get<RepositoryStatusResult>(`/repos/${id}/status`),
+  getCommits: (id: string, branch?: string, skip = 0, take = 100) => {
+    const params = new URLSearchParams({
+      skip: String(skip),
+      take: String(take),
+    });
+    if (branch) params.set('branch', branch);
+    return api.get<CommitListResult>(`/repos/${id}/commits?${params.toString()}`);
+  },
+  getCommitDetail: (id: string, sha: string) =>
+    api.get<CommitDetail>(`/repos/${id}/commits/${encodeURIComponent(sha)}`),
   getHistory: (id: string, limit = 50) =>
     api.get<CommitHistoryEntry[]>(`/repos/${id}/history?limit=${limit}`),
   getDiff: (id: string, file: string, staged: boolean) =>
