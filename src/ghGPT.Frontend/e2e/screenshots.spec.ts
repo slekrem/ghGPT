@@ -24,6 +24,8 @@ test.beforeAll(async () => {
   modifyFile(repoDir, 'new-file.txt', 'new file content\n');
   fs.unlinkSync(path.join(repoDir, 'main.ts'));
 
+  execSync('git branch feature/example', { cwd: repoDir });
+
   const repo = await importRepo(repoDir);
   repoId = repo.id;
   await setActiveRepo(repoId);
@@ -129,4 +131,38 @@ test('09 - Changes View: Commit-Formular mit gemischten Änderungen', async ({ p
 
   await page.locator('changes-view').locator('.commit-input[type="text"]').fill('feat: neue Funktion');
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '09-commit-form.png'), fullPage: true });
+});
+
+test('10 - Branches View: Branch-Übersicht', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('branches-view').waitFor();
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '10-branches-overview.png'), fullPage: true });
+});
+
+test('11 - Branches View: Neuer Branch Dialog', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('branches-view').waitFor();
+  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
+  await page.locator('branches-view .dialog').waitFor();
+  await page.locator('branches-view .dialog input[type="text"]').fill('feature/mein-feature');
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '11-branches-new-dialog.png'), fullPage: true });
+});
+
+test('12 - Branches View: Hover auf Branch-Zeile', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('branches-view').waitFor();
+  await page.locator('branches-view .branch-row:not(.head)').first().hover();
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '12-branches-row-hover.png'), fullPage: true });
 });
