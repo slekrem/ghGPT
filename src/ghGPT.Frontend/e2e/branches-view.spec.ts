@@ -41,6 +41,28 @@ async function gotoBranchesView(page: import('@playwright/test').Page) {
   await page.locator('branches-view').waitFor();
 }
 
+// --- Toolbar ---
+
+test('toolbar branch button navigates to branches view', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+
+  await page.locator('.toolbar-branch').click();
+  await page.locator('branches-view').waitFor();
+  await expect(page.locator('branches-view')).toBeVisible();
+});
+
+test('toolbar branch button shows current branch name', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+
+  await expect(page.locator('.toolbar-branch')).toContainText(/master|main/);
+});
+
 // --- Anzeige ---
 
 test('shows branches section title in toolbar', async ({ page }) => {
