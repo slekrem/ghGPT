@@ -238,16 +238,17 @@ export class ChangesView extends LitElement {
   }
 
   private async toggleFile(entry: FileStatusEntry) {
+    const wasSelected = this.selectedFile?.filePath === entry.filePath;
     if (entry.isStaged) {
       await repositoryService.unstageFile(this.repoId, entry.filePath);
     } else {
       await repositoryService.stageFile(this.repoId, entry.filePath);
     }
-    if (this.selectedFile?.filePath === entry.filePath) {
-      this.selectedFile = null;
-      this.diff = '';
-    }
     await this.loadStatus();
+    if (wasSelected) {
+      const updated = this.allFiles.find(f => f.filePath === entry.filePath);
+      if (updated) await this.selectFile(updated);
+    }
   }
 
   private async toggleAll(checked: boolean) {

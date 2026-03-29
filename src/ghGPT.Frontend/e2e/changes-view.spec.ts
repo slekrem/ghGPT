@@ -148,6 +148,24 @@ test('commit works when only deleted files are staged', async ({ page }) => {
   await expect(changesView.locator('.commit-btn')).toContainText('Commit (0', { timeout: 5000 });
 });
 
+test('diff stays visible after toggling checkbox', async ({ page }) => {
+  const changesView = page.locator('changes-view');
+
+  // Click file to show diff
+  await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first().click();
+  await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+
+  // Toggle checkbox — diff must stay visible
+  await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first()
+    .locator('input[type="checkbox"]').click();
+  await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+
+  // Toggle back — diff still visible
+  await changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first()
+    .locator('input[type="checkbox"]').click();
+  await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+});
+
 test('clears diff when switching to a different repository', async ({ page }) => {
   const changesView = page.locator('changes-view');
 
