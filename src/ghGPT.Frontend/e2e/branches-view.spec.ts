@@ -43,13 +43,15 @@ async function gotoBranchesView(page: import('@playwright/test').Page) {
 
 // --- Toolbar ---
 
-test('toolbar branch button navigates to branches view', async ({ page }) => {
+test('toolbar "Branch verwalten" navigates to branches view', async ({ page }) => {
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
 
   await page.locator('.toolbar-branch').click();
+  await expect(page.locator('.branch-dropdown')).toBeVisible();
+  await page.locator('.branch-dropdown-footer').click();
   await page.locator('branches-view').waitFor();
   await expect(page.locator('branches-view')).toBeVisible();
 });
