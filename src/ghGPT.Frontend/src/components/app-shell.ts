@@ -315,7 +315,7 @@ export class AppShell extends LitElement {
 
       <main class="main">
         <div class="toolbar">
-          <button class="toolbar-branch">
+          <button class="toolbar-branch" ?disabled=${!this.activeRepo} @click=${() => this.activeView = 'branches'}>
             🌿 ${this.activeRepo?.currentBranch ?? '–'} ▾
           </button>
           <div class="toolbar-spacer"></div>
