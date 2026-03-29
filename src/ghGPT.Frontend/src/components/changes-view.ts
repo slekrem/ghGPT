@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { repositoryService, type FileStatusEntry, type RepositoryStatusResult } from '../services/repository-service';
 
 @customElement('changes-view')
@@ -197,8 +198,10 @@ export class ChangesView extends LitElement {
   `;
 
   @property() repoId = '';
+  @query('.file-entries') private fileEntries?: HTMLDivElement;
 
   @state() private status: RepositoryStatusResult = { staged: [], unstaged: [] };
+  private _orderedPaths: string[] = [];
   @state() private selectedFile: FileStatusEntry | null = null;
   @state() private diff = '';
   @state() private diffError = '';
@@ -212,6 +215,7 @@ export class ChangesView extends LitElement {
       this.selectedFile = null;
       this.diff = '';
       this.diffError = '';
+      this._orderedPaths = [];
       this.loadStatus();
     }
   }
@@ -219,47 +223,69 @@ export class ChangesView extends LitElement {
   private async loadStatus() {
     if (!this.repoId) return;
     try {
-      this.status = await repositoryService.getStatus(this.repoId);
+      const newStatus = await repositoryService.getStatus(this.repoId);
+      const newPaths = this.getStablePaths(newStatus);
+      const kept = this._orderedPaths.filter(p => newPaths.includes(p));
+      const added = newPaths.filter(p => !this._orderedPaths.includes(p));
+      this._orderedPaths = [...kept, ...added];
+      this.status = newStatus;
     } catch {
       this.status = { staged: [], unstaged: [] };
+      this._orderedPaths = [];
     }
   }
 
   private async selectFile(entry: FileStatusEntry) {
-    this.selectedFile = entry;
-    this.diff = '';
-    this.diffError = '';
-    if (entry.status === 'Untracked') return;
-    try {
-      this.diff = await repositoryService.getDiff(this.repoId, entry.filePath, entry.isStaged);
-    } catch (e: unknown) {
-      this.diffError = e instanceof Error ? e.message : 'Fehler beim Laden des Diffs';
-    }
+    await this.preserveFileListScroll(async () => {
+      this.selectedFile = entry;
+      this.diff = '';
+      this.diffError = '';
+      if (entry.status === 'Untracked') return;
+      try {
+        this.diff = await repositoryService.getDiff(this.repoId, entry.filePath, entry.isStaged);
+      } catch (e: unknown) {
+        this.diffError = e instanceof Error ? e.message : 'Fehler beim Laden des Diffs';
+      }
+    });
   }
 
   private async toggleFile(entry: FileStatusEntry) {
-    const wasSelected = this.selectedFile?.filePath === entry.filePath;
-    if (entry.isStaged) {
-      await repositoryService.unstageFile(this.repoId, entry.filePath);
-    } else {
-      await repositoryService.stageFile(this.repoId, entry.filePath);
-    }
-    await this.loadStatus();
-    if (wasSelected) {
-      const updated = this.allFiles.find(f => f.filePath === entry.filePath);
-      if (updated) await this.selectFile(updated);
-    }
+    await this.preserveFileListScroll(async () => {
+      const wasSelected = this.selectedFile?.filePath === entry.filePath;
+      if (entry.isStaged) {
+        await repositoryService.unstageFile(this.repoId, entry.filePath);
+      } else {
+        await repositoryService.stageFile(this.repoId, entry.filePath);
+      }
+      await this.loadStatus();
+      if (wasSelected) {
+        const updated = this.allFiles.find(f => f.filePath === entry.filePath);
+        if (updated) await this.selectFile(updated);
+      }
+    });
   }
 
   private async toggleAll(checked: boolean) {
-    if (checked) {
-      await repositoryService.stageAll(this.repoId);
-    } else {
-      await repositoryService.unstageAll(this.repoId);
+    await this.preserveFileListScroll(async () => {
+      if (checked) {
+        await repositoryService.stageAll(this.repoId);
+      } else {
+        await repositoryService.unstageAll(this.repoId);
+      }
+      this.selectedFile = null;
+      this.diff = '';
+      await this.loadStatus();
+    });
+  }
+
+  private async preserveFileListScroll<T>(action: () => Promise<T> | T): Promise<T> {
+    const scrollTop = this.fileEntries?.scrollTop ?? 0;
+    const result = await action();
+    await this.updateComplete;
+    if (this.fileEntries) {
+      this.fileEntries.scrollTop = scrollTop;
     }
-    this.selectedFile = null;
-    this.diff = '';
-    await this.loadStatus();
+    return result;
   }
 
   private async doCommit() {
@@ -282,6 +308,11 @@ export class ChangesView extends LitElement {
 
   private statusChar(s: string) {
     return s === 'Modified' ? 'M' : s === 'Added' ? 'A' : s === 'Deleted' ? 'D' : s === 'Renamed' ? 'R' : '?';
+  }
+
+  private getStablePaths(status: RepositoryStatusResult): string[] {
+    return [...new Set([...status.staged, ...status.unstaged].map(f => f.filePath))]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }
 
   private renderDiff() {
@@ -336,7 +367,8 @@ export class ChangesView extends LitElement {
   }
 
   private get allFiles(): FileStatusEntry[] {
-    return [...this.status.staged, ...this.status.unstaged];
+    const map = new Map([...this.status.staged, ...this.status.unstaged].map(f => [f.filePath, f]));
+    return this._orderedPaths.map(p => map.get(p)).filter(Boolean) as FileStatusEntry[];
   }
 
   private get allChecked(): boolean {
@@ -377,7 +409,7 @@ export class ChangesView extends LitElement {
         <div class="file-entries">
           ${totalCount === 0
             ? html`<div class="empty-hint">Keine Änderungen</div>`
-            : this.allFiles.map(e => this.renderFileEntry(e))}
+            : repeat(this.allFiles, e => e.filePath, e => this.renderFileEntry(e))}
         </div>
 
         <div class="commit-form">
