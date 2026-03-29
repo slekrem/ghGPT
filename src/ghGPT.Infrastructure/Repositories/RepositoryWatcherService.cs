@@ -60,12 +60,13 @@ public class RepositoryWatcherService(
 
         var cts = new CancellationTokenSource();
         _debounce[repoId] = cts;
+        var token = cts.Token; // vor möglicher Disposal durch nächsten Call abgreifen
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(300, cts.Token);
+                await Task.Delay(300, token);
 
                 var isBranchChange = changedPath.Contains("HEAD")
                     || changedPath.Contains(Path.DirectorySeparatorChar + "refs" + Path.DirectorySeparatorChar);
