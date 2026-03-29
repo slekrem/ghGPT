@@ -81,6 +81,12 @@ export interface GitOperationProgressEvent {
   message: string;
 }
 
+export interface AccountInfo {
+  login: string;
+  name: string;
+  avatarUrl: string;
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -131,4 +137,8 @@ export const repositoryService = {
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),
+
+  getAccount: () => api.get<AccountInfo>('/account'),
+  saveToken: (token: string) => api.post<AccountInfo>('/account/token', { token }),
+  removeAccount: () => api.delete<void>('/account'),
 };

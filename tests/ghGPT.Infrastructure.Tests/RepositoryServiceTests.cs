@@ -1,4 +1,5 @@
 using ghGPT.Core.Repositories;
+using ghGPT.Infrastructure.Account;
 using ghGPT.Infrastructure.Repositories;
 using NSubstitute;
 
@@ -8,6 +9,7 @@ public class RepositoryServiceTests : IDisposable
 {
     private readonly string _tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
     private readonly IRepositoryStore _store = Substitute.For<IRepositoryStore>();
+    private readonly ITokenStore _tokenStore = Substitute.For<ITokenStore>();
 
     public RepositoryServiceTests()
     {
@@ -90,7 +92,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "repo", LocalPath = path, CurrentBranch = "master" };
         _store.Load().Returns([info]);
-        return new RepositoryService(_store);
+        return new RepositoryService(_store, _tokenStore);
     }
 
     // --- Create / Import ---
@@ -99,7 +101,7 @@ public class RepositoryServiceTests : IDisposable
     public async Task CreateAsync_InitializesGitRepo()
     {
         var path = Path.Combine(_tempPath, "new-repo");
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(_store, _tokenStore);
 
         var result = await service.CreateAsync(path, "new-repo");
 
@@ -115,7 +117,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var path = Path.Combine(_tempPath, "not-a-repo");
         Directory.CreateDirectory(path);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(_store, _tokenStore);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ImportAsync(path));
     }
@@ -126,7 +128,7 @@ public class RepositoryServiceTests : IDisposable
         var path = Path.Combine(_tempPath, "existing-repo");
         var existing = new RepositoryInfo { Id = "id-1", Name = "existing-repo", LocalPath = path, CurrentBranch = "main" };
         _store.Load().Returns([existing]);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(_store, _tokenStore);
 
         Directory.CreateDirectory(path);
         LibGit2Sharp.Repository.Init(path);
@@ -142,7 +144,7 @@ public class RepositoryServiceTests : IDisposable
             new() { Id = "id-1", Name = "repo-a", LocalPath = "/a", CurrentBranch = "main" },
         };
         _store.Load().Returns(repos);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(_store, _tokenStore);
 
         var result = service.GetAll();
 
@@ -155,7 +157,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void GetActive_ReturnsNullInitially()
     {
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(_store, _tokenStore);
         Assert.Null(service.GetActive());
     }
 
@@ -173,7 +175,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void SetActive_ThrowsForUnknownId()
     {
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(_store, _tokenStore);
         Assert.Throws<InvalidOperationException>(() => service.SetActive("unknown"));
     }
 
@@ -184,7 +186,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "r", LocalPath = "/x", CurrentBranch = "main" };
         _store.Load().Returns([info]);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(_store, _tokenStore);
 
         service.Remove("id-1");
 
