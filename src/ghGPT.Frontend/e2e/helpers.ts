@@ -54,3 +54,30 @@ export async function deleteRepo(id: string) {
 export async function unstageAll(id: string) {
   await fetch(`${API}/repos/${id}/unstage-all`, { method: 'POST' });
 }
+
+export function createTempRepoWithRemote(): { localDir: string; remoteDir: string } {
+  const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-remote-'));
+  execSync('git init --bare', { cwd: remoteDir });
+
+  const localDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-test-'));
+  execSync(`git clone "${remoteDir}" .`, { cwd: localDir });
+  execSync('git config user.email "test@ghgpt.test"', { cwd: localDir });
+  execSync('git config user.name "ghGPT Test"', { cwd: localDir });
+
+  fs.writeFileSync(path.join(localDir, 'README.md'), '# Test Repo\n');
+  execSync('git add .', { cwd: localDir });
+  execSync('git commit -m "initial commit"', { cwd: localDir });
+  execSync('git push origin HEAD', { cwd: localDir });
+
+  execSync('git checkout -b feature/remote-branch', { cwd: localDir });
+  fs.writeFileSync(path.join(localDir, 'feature.ts'), 'export const x = 1;\n');
+  execSync('git add feature.ts', { cwd: localDir });
+  execSync('git commit -m "feat: remote feature"', { cwd: localDir });
+  execSync('git push origin feature/remote-branch', { cwd: localDir });
+
+  try { execSync('git checkout master', { cwd: localDir, stdio: 'pipe' }); }
+  catch { execSync('git checkout main', { cwd: localDir, stdio: 'pipe' }); }
+  execSync('git branch -D feature/remote-branch', { cwd: localDir, stdio: 'pipe' });
+
+  return { localDir, remoteDir };
+}
