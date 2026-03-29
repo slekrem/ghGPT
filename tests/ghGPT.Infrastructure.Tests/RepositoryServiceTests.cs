@@ -191,6 +191,22 @@ public class RepositoryServiceTests : IDisposable
         Assert.Empty(status.Unstaged);
     }
 
+    [Fact]
+    public void GetHistory_ReturnsNewestCommitFirst()
+    {
+        var path = CreateGitRepo("history-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+        service.Commit("id-1", "feat: history test");
+
+        var history = service.GetHistory("id-1");
+
+        Assert.NotEmpty(history);
+        Assert.Equal("feat: history test", history[0].Message);
+        Assert.Equal(7, history[0].ShortSha.Length);
+    }
+
     // --- Diff ---
 
     [Fact]
@@ -218,6 +234,19 @@ public class RepositoryServiceTests : IDisposable
 
         Assert.False(string.IsNullOrWhiteSpace(diff));
         Assert.Contains("@@", diff);
+    }
+
+    [Fact]
+    public void GetDiff_ReturnsDiffForUntrackedFile()
+    {
+        var path = CreateGitRepo("diff-untracked-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "new-file.txt"), "new file content\n");
+
+        var diff = service.GetDiff("id-1", "new-file.txt", staged: false);
+
+        Assert.False(string.IsNullOrWhiteSpace(diff));
+        Assert.Contains("new file content", diff);
     }
 
     // --- Stage / Unstage ---
@@ -279,6 +308,64 @@ public class RepositoryServiceTests : IDisposable
         var status = service.GetStatus("id-1");
         Assert.Empty(status.Staged);
         Assert.Contains(status.Unstaged, f => f.FilePath == "README.md");
+    }
+
+    // --- Commit ---
+
+    [Fact]
+    public void Commit_CreatesCommitWithStagedFiles()
+    {
+        var path = CreateGitRepo("commit-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+
+        service.Commit("id-1", "test: first commit");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        Assert.Equal("test: first commit", repo.Head.Tip.Message.Trim());
+        Assert.Empty(service.GetStatus("id-1").Staged);
+    }
+
+    [Fact]
+    public void Commit_IncludesDescriptionInMessage()
+    {
+        var path = CreateGitRepo("commit-desc-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
+        service.StageFile("id-1", "README.md");
+
+        service.Commit("id-1", "feat: title", "some description");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        Assert.Contains("feat: title", repo.Head.Tip.Message);
+        Assert.Contains("some description", repo.Head.Tip.Message);
+    }
+
+    [Fact]
+    public void Commit_ThrowsWhenNothingStaged()
+    {
+        var path = CreateGitRepo("commit-empty-repo");
+        var service = ServiceWithRepo(path);
+
+        Assert.Throws<InvalidOperationException>(() => service.Commit("id-1", "should fail"));
+    }
+
+    [Fact]
+    public void Commit_SucceedsWhenOnlyDeletionsAreStaged()
+    {
+        var path = CreateGitRepo("commit-delete-repo");
+        var service = ServiceWithRepo(path);
+
+        // Delete the tracked README.md and stage the deletion
+        File.Delete(Path.Combine(path, "README.md"));
+        service.StageFile("id-1", "README.md");
+
+        // Should not throw even though the deleted file is removed from the index
+        service.Commit("id-1", "chore: remove readme");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        Assert.Equal("chore: remove readme", repo.Head.Tip.Message.Trim());
     }
 
     public void Dispose()

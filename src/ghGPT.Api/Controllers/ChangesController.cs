@@ -1,3 +1,4 @@
+using ghGPT.Api.Models;
 using ghGPT.Core.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,6 +14,19 @@ public class ChangesController(IRepositoryService service) : ControllerBase
         try
         {
             return Ok(service.GetStatus(id));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("history")]
+    public ActionResult<IReadOnlyList<CommitHistoryEntry>> GetHistory(string id, [FromQuery] int limit = 50)
+    {
+        try
+        {
+            return Ok(service.GetHistory(id, limit));
         }
         catch (InvalidOperationException ex)
         {
@@ -87,6 +101,23 @@ public class ChangesController(IRepositoryService service) : ControllerBase
         catch (InvalidOperationException ex)
         {
             return NotFound(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("commit")]
+    public ActionResult Commit(string id, [FromBody] CommitRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Message))
+            return BadRequest(new { error = "Commit-Nachricht darf nicht leer sein." });
+
+        try
+        {
+            service.Commit(id, request.Message, request.Description);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
     }
 }

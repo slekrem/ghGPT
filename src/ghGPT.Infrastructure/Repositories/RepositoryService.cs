@@ -117,10 +117,32 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         return new RepositoryStatusResult { Staged = staged, Unstaged = unstaged };
     }
 
+    public IReadOnlyList<CommitHistoryEntry> GetHistory(string id, int limit = 50)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        return repo.Commits
+            .Take(limit)
+            .Select(commit => new CommitHistoryEntry
+            {
+                Sha = commit.Sha,
+                ShortSha = commit.Sha[..7],
+                Message = commit.MessageShort,
+                AuthorName = commit.Author.Name,
+                AuthorEmail = commit.Author.Email,
+                AuthorDate = commit.Author.When
+            })
+            .ToList();
+    }
+
     public string GetDiff(string id, string filePath, bool staged)
     {
         var info = GetRepoById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (!staged && IsUntrackedFile(repo, filePath))
+            return BuildUntrackedFileDiff(info.LocalPath, filePath);
 
         Patch patch;
         if (staged)
@@ -134,6 +156,29 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         }
 
         return string.Concat(patch.Select(e => e.Patch));
+    }
+
+    private static bool IsUntrackedFile(LibGit2Sharp.Repository repo, string filePath) =>
+        repo.RetrieveStatus()
+            .Any(entry => entry.FilePath == filePath && entry.State.HasFlag(FileStatus.NewInWorkdir));
+
+    private static string BuildUntrackedFileDiff(string repoPath, string filePath)
+    {
+        var fullPath = Path.Combine(repoPath, filePath);
+        if (!File.Exists(fullPath))
+            return string.Empty;
+
+        var content = File.ReadAllText(fullPath).Replace("\r\n", "\n");
+        var lines = content.Split('\n');
+        if (lines.Length > 0 && lines[^1] == string.Empty)
+            lines = lines[..^1];
+
+        var header = $"diff --git a/{filePath} b/{filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/{filePath}\n";
+        if (lines.Length == 0)
+            return $"{header}@@ -0,0 +1,0 @@\n";
+
+        var body = string.Join('\n', lines.Select(line => $"+{line}"));
+        return $"{header}@@ -0,0 +1,{lines.Length} @@\n{body}\n";
     }
 
     public void StageFile(string id, string filePath)
@@ -162,6 +207,32 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         var info = GetRepoById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
         Commands.Unstage(repo, "*");
+    }
+
+    public void Commit(string id, string message, string? description = null)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        var hasStagedChanges = repo.RetrieveStatus().Any(e =>
+            e.State.HasFlag(FileStatus.NewInIndex) ||
+            e.State.HasFlag(FileStatus.ModifiedInIndex) ||
+            e.State.HasFlag(FileStatus.DeletedFromIndex) ||
+            e.State.HasFlag(FileStatus.RenamedInIndex));
+
+        if (!hasStagedChanges)
+            throw new InvalidOperationException("Keine gestagten Änderungen vorhanden.");
+
+        var fullMessage = string.IsNullOrWhiteSpace(description)
+            ? message
+            : $"{message}\n\n{description}";
+
+        var config = repo.Config;
+        var name = config.Get<string>("user.name")?.Value ?? "ghGPT User";
+        var email = config.Get<string>("user.email")?.Value ?? "ghgpt@local";
+        var author = new Signature(name, email, DateTimeOffset.Now);
+
+        repo.Commit(fullMessage, author, author);
     }
 
     public void Remove(string id)

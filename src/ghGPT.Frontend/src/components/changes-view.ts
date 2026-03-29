@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { repositoryService, type FileStatusEntry, type RepositoryStatusResult } from '../services/repository-service';
 
 @customElement('changes-view')
@@ -20,16 +21,10 @@ export class ChangesView extends LitElement {
       overflow: hidden;
     }
 
-    .section {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .section-header {
+    .list-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 0.5rem;
       padding: 0.4rem 0.75rem;
       font-size: 0.7rem;
       text-transform: uppercase;
@@ -40,22 +35,7 @@ export class ChangesView extends LitElement {
       flex-shrink: 0;
     }
 
-    .section-actions {
-      display: flex;
-      gap: 0.25rem;
-    }
-
-    .action-btn {
-      background: none;
-      border: none;
-      color: #6c7086;
-      cursor: pointer;
-      font-size: 0.7rem;
-      padding: 0.1rem 0.3rem;
-      border-radius: 3px;
-    }
-
-    .action-btn:hover { color: #cdd6f4; background: #313244; }
+    .list-header input[type="checkbox"] { cursor: pointer; }
 
     .file-entries {
       overflow-y: auto;
@@ -65,15 +45,24 @@ export class ChangesView extends LitElement {
     .file-entry {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
       padding: 0.3rem 0.75rem;
       cursor: pointer;
       font-size: 0.8rem;
       color: #cdd6f4;
+      user-select: none;
     }
 
     .file-entry:hover { background: #313244; }
     .file-entry.selected { background: #45475a; }
+
+    .file-entry input[type="checkbox"] {
+      cursor: pointer;
+      flex-shrink: 0;
+      accent-color: #89b4fa;
+      width: 14px;
+      height: 14px;
+    }
 
     .file-status {
       font-size: 0.65rem;
@@ -151,7 +140,6 @@ export class ChangesView extends LitElement {
 
     .diff-line.added   { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
     .diff-line.removed { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
-    .diff-line.hunk    { background: rgba(203, 166, 247, 0.1);  color: #cba6f7; }
 
     .diff-placeholder {
       display: flex;
@@ -161,19 +149,73 @@ export class ChangesView extends LitElement {
       color: #45475a;
       font-size: 0.875rem;
     }
+
+    .commit-form {
+      flex-shrink: 0;
+      padding: 0.6rem 0.75rem;
+      border-top: 1px solid #313244;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      background: #1e1e2e;
+    }
+
+    .commit-input {
+      background: #181825;
+      border: 1px solid #313244;
+      border-radius: 4px;
+      color: #cdd6f4;
+      font-size: 0.8rem;
+      padding: 0.35rem 0.5rem;
+      width: 100%;
+      box-sizing: border-box;
+      font-family: inherit;
+      resize: none;
+    }
+
+    .commit-input:focus { outline: none; border-color: #89b4fa; }
+    .commit-input::placeholder { color: #45475a; }
+
+    .commit-btn {
+      background: #89b4fa;
+      border: none;
+      border-radius: 4px;
+      color: #1e1e2e;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.35rem 0.75rem;
+      width: 100%;
+    }
+
+    .commit-btn:disabled { background: #313244; color: #45475a; cursor: default; }
+    .commit-btn:not(:disabled):hover { background: #b4d0ff; }
+
+    .commit-error {
+      font-size: 0.72rem;
+      color: #f38ba8;
+    }
   `;
 
   @property() repoId = '';
+  @query('.file-entries') private fileEntries?: HTMLDivElement;
 
   @state() private status: RepositoryStatusResult = { staged: [], unstaged: [] };
+  private _orderedPaths: string[] = [];
   @state() private selectedFile: FileStatusEntry | null = null;
   @state() private diff = '';
   @state() private diffError = '';
+  @state() private commitMessage = '';
+  @state() private commitDescription = '';
+  @state() private commitError = '';
+  @state() private committing = false;
+
   updated(changed: Map<string, unknown>) {
     if (changed.has('repoId') && this.repoId) {
       this.selectedFile = null;
       this.diff = '';
       this.diffError = '';
+      this._orderedPaths = [];
       this.loadStatus();
     }
   }
@@ -181,58 +223,101 @@ export class ChangesView extends LitElement {
   private async loadStatus() {
     if (!this.repoId) return;
     try {
-      this.status = await repositoryService.getStatus(this.repoId);
+      const newStatus = await repositoryService.getStatus(this.repoId);
+      const newPaths = this.getStablePaths(newStatus);
+      const kept = this._orderedPaths.filter(p => newPaths.includes(p));
+      const added = newPaths.filter(p => !this._orderedPaths.includes(p));
+      this._orderedPaths = [...kept, ...added];
+      this.status = newStatus;
     } catch {
       this.status = { staged: [], unstaged: [] };
+      this._orderedPaths = [];
     }
   }
 
   private async selectFile(entry: FileStatusEntry) {
-    this.selectedFile = entry;
-    this.diff = '';
-    this.diffError = '';
-    if (entry.status === 'Untracked') return;
-    try {
-      this.diff = await repositoryService.getDiff(this.repoId, entry.filePath, entry.isStaged);
-    } catch (e: unknown) {
-      this.diffError = e instanceof Error ? e.message : 'Fehler beim Laden des Diffs';
+    await this.preserveFileListScroll(async () => {
+      this.selectedFile = entry;
+      this.diff = '';
+      this.diffError = '';
+      try {
+        this.diff = await repositoryService.getDiff(this.repoId, entry.filePath, entry.isStaged);
+      } catch (e: unknown) {
+        this.diffError = e instanceof Error ? e.message : 'Fehler beim Laden des Diffs';
+      }
+    });
+  }
+
+  private async toggleFile(entry: FileStatusEntry, selectAfterToggle = false) {
+    await this.preserveFileListScroll(async () => {
+      const shouldSelect = selectAfterToggle || this.selectedFile?.filePath === entry.filePath;
+      if (entry.isStaged) {
+        await repositoryService.unstageFile(this.repoId, entry.filePath);
+      } else {
+        await repositoryService.stageFile(this.repoId, entry.filePath);
+      }
+      await this.loadStatus();
+      if (shouldSelect) {
+        const updated = this.allFiles.find(f => f.filePath === entry.filePath);
+        if (updated) await this.selectFile(updated);
+      }
+    });
+  }
+
+  private async toggleAll(checked: boolean) {
+    await this.preserveFileListScroll(async () => {
+      if (checked) {
+        await repositoryService.stageAll(this.repoId);
+      } else {
+        await repositoryService.unstageAll(this.repoId);
+      }
+      this.selectedFile = null;
+      this.diff = '';
+      await this.loadStatus();
+    });
+  }
+
+  private async preserveFileListScroll<T>(action: () => Promise<T> | T): Promise<T> {
+    const scrollTop = this.fileEntries?.scrollTop ?? 0;
+    const result = await action();
+    await this.updateComplete;
+    if (this.fileEntries) {
+      this.fileEntries.scrollTop = scrollTop;
     }
+    return result;
   }
 
-  private async stageFile(entry: FileStatusEntry) {
-    await repositoryService.stageFile(this.repoId, entry.filePath);
-    if (this.selectedFile?.filePath === entry.filePath) this.selectedFile = null;
-    await this.loadStatus();
-  }
-
-  private async unstageFile(entry: FileStatusEntry) {
-    await repositoryService.unstageFile(this.repoId, entry.filePath);
-    if (this.selectedFile?.filePath === entry.filePath) this.selectedFile = null;
-    await this.loadStatus();
-  }
-
-  private async stageAll() {
-    await repositoryService.stageAll(this.repoId);
-    this.selectedFile = null;
-    await this.loadStatus();
-  }
-
-  private async unstageAll() {
-    await repositoryService.unstageAll(this.repoId);
-    this.selectedFile = null;
-    await this.loadStatus();
+  private async doCommit() {
+    if (!this.commitMessage.trim() || this.status.staged.length === 0) return;
+    this.committing = true;
+    this.commitError = '';
+    try {
+      await repositoryService.commit(this.repoId, this.commitMessage.trim(), this.commitDescription.trim() || undefined);
+      this.commitMessage = '';
+      this.commitDescription = '';
+      this.selectedFile = null;
+      this.diff = '';
+      await this.loadStatus();
+      this.dispatchEvent(new CustomEvent('commit-created', { bubbles: true, composed: true }));
+    } catch (e: unknown) {
+      this.commitError = e instanceof Error ? e.message : 'Commit fehlgeschlagen';
+    } finally {
+      this.committing = false;
+    }
   }
 
   private statusChar(s: string) {
     return s === 'Modified' ? 'M' : s === 'Added' ? 'A' : s === 'Deleted' ? 'D' : s === 'Renamed' ? 'R' : '?';
   }
 
+  private getStablePaths(status: RepositoryStatusResult): string[] {
+    return [...new Set([...status.staged, ...status.unstaged].map(f => f.filePath))]
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  }
+
   private renderDiff() {
     if (!this.selectedFile) {
       return html`<div class="diff-placeholder">Datei auswählen</div>`;
-    }
-    if (this.selectedFile.status === 'Untracked') {
-      return html`<div class="diff-placeholder">Kein Diff für ungetrackte Dateien</div>`;
     }
     if (this.diffError) {
       return html`<div class="diff-placeholder" style="color:#f38ba8">${this.diffError}</div>`;
@@ -255,7 +340,6 @@ export class ChangesView extends LitElement {
     return html`
       <div class="diff-content">
         ${lines.map(line => {
-          // Parse hunk header to get correct starting line numbers, then skip rendering
           if (line.startsWith('@@')) {
             const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
             if (match) { oldLineNum = parseInt(match[1]) - 1; newLineNum = parseInt(match[2]) - 1; }
@@ -279,48 +363,65 @@ export class ChangesView extends LitElement {
       </div>`;
   }
 
-  private renderFileEntry(entry: FileStatusEntry, staged: boolean) {
+  private get allFiles(): FileStatusEntry[] {
+    const map = new Map([...this.status.staged, ...this.status.unstaged].map(f => [f.filePath, f]));
+    return this._orderedPaths.map(p => map.get(p)).filter(Boolean) as FileStatusEntry[];
+  }
+
+  private get allChecked(): boolean {
+    return this.allFiles.length > 0 && this.status.unstaged.length === 0;
+  }
+
+  private get someChecked(): boolean {
+    return this.status.staged.length > 0 && this.status.unstaged.length > 0;
+  }
+
+  private renderFileEntry(entry: FileStatusEntry) {
+    const isSelected = this.selectedFile?.filePath === entry.filePath;
     return html`
-      <div class="file-entry ${this.selectedFile?.filePath === entry.filePath && this.selectedFile?.isStaged === entry.isStaged ? 'selected' : ''}"
+      <div class="file-entry ${isSelected ? 'selected' : ''}"
         @click=${() => this.selectFile(entry)}>
+        <input type="checkbox"
+          .checked=${entry.isStaged}
+          @click=${(e: Event) => { e.stopPropagation(); this.toggleFile(entry, true); }} />
         <span class="file-status status-${entry.status}">${this.statusChar(entry.status)}</span>
         <span class="file-name" title="${entry.filePath}">${entry.filePath}</span>
-        <button class="action-btn" title="${staged ? 'Unstagen' : 'Stagen'}"
-          @click=${(e: Event) => { e.stopPropagation(); staged ? this.unstageFile(entry) : this.stageFile(entry); }}>
-          ${staged ? '↓' : '↑'}
-        </button>
       </div>`;
   }
 
   render() {
+    const stagedCount = this.status.staged.length;
+    const totalCount = this.allFiles.length;
+
     return html`
       <div class="file-list">
-        <div class="section" style="flex:0 0 auto; max-height:50%">
-          <div class="section-header">
-            <span>Staged (${this.status.staged.length})</span>
-            <div class="section-actions">
-              <button class="action-btn" title="Alle unstagen" @click=${this.unstageAll}>↓ Alle</button>
-            </div>
-          </div>
-          <div class="file-entries">
-            ${this.status.staged.length === 0
-              ? html`<div class="empty-hint">Keine gestagten Änderungen</div>`
-              : this.status.staged.map(e => this.renderFileEntry(e, true))}
-          </div>
+        <div class="list-header">
+          <input type="checkbox"
+            .checked=${this.allChecked}
+            .indeterminate=${this.someChecked}
+            @change=${(e: Event) => this.toggleAll((e.target as HTMLInputElement).checked)} />
+          <span>Änderungen (${totalCount})</span>
         </div>
 
-        <div class="section" style="flex:1; min-height:0">
-          <div class="section-header">
-            <span>Änderungen (${this.status.unstaged.length})</span>
-            <div class="section-actions">
-              <button class="action-btn" title="Alle stagen" @click=${this.stageAll}>↑ Alle</button>
-            </div>
-          </div>
-          <div class="file-entries">
-            ${this.status.unstaged.length === 0
-              ? html`<div class="empty-hint">Keine Änderungen</div>`
-              : this.status.unstaged.map(e => this.renderFileEntry(e, false))}
-          </div>
+        <div class="file-entries">
+          ${totalCount === 0
+            ? html`<div class="empty-hint">Keine Änderungen</div>`
+            : repeat(this.allFiles, e => e.filePath, e => this.renderFileEntry(e))}
+        </div>
+
+        <div class="commit-form">
+          <input class="commit-input" type="text" placeholder="Commit-Titel (Pflichtfeld)"
+            .value=${this.commitMessage}
+            @input=${(e: Event) => { this.commitMessage = (e.target as HTMLInputElement).value; }} />
+          <textarea class="commit-input" rows="2" placeholder="Beschreibung (optional)"
+            .value=${this.commitDescription}
+            @input=${(e: Event) => { this.commitDescription = (e.target as HTMLTextAreaElement).value; }}></textarea>
+          ${this.commitError ? html`<div class="commit-error">${this.commitError}</div>` : ''}
+          <button class="commit-btn"
+            ?disabled=${!this.commitMessage.trim() || stagedCount === 0 || this.committing}
+            @click=${this.doCommit}>
+            ${this.committing ? 'Committing…' : `Commit (${stagedCount} Datei${stagedCount !== 1 ? 'en' : ''})`}
+          </button>
         </div>
       </div>
 

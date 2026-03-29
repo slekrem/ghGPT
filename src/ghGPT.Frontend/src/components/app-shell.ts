@@ -4,6 +4,7 @@ import { repositoryService, type RepositoryInfo } from '../services/repository-s
 import { startHub } from '../services/hub-client';
 import './repo-dialog';
 import './changes-view';
+import './history-view';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests';
 
@@ -219,6 +220,7 @@ export class AppShell extends LitElement {
   @state() private repos: RepositoryInfo[] = [];
   @state() private activeRepoId: string | null = null;
   @state() private showDialog = false;
+  @state() private historyRefreshKey = 0;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -251,6 +253,10 @@ export class AppShell extends LitElement {
     this.repos = [...this.repos, e.detail];
     await this.activateRepo(e.detail.id);
   }
+
+  private onCommitCreated = () => {
+    this.historyRefreshKey++;
+  };
 
   render() {
     return html`
@@ -338,9 +344,9 @@ export class AppShell extends LitElement {
   private renderView() {
     switch (this.activeView) {
       case 'changes':
-        return html`<changes-view .repoId=${this.activeRepoId ?? ''}></changes-view>`;
+        return html`<changes-view .repoId=${this.activeRepoId ?? ''} @commit-created=${this.onCommitCreated}></changes-view>`;
       case 'history':
-        return html`<div class="placeholder"><span class="placeholder-icon">🕐</span><span>Keine Commits</span></div>`;
+        return html`<history-view .repoId=${this.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
         return html`<div class="placeholder"><span class="placeholder-icon">🌿</span><span>Keine Branches</span></div>`;
       case 'pull-requests':
