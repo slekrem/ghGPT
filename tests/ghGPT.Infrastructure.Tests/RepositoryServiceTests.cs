@@ -322,6 +322,23 @@ public class RepositoryServiceTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => service.Commit("id-1", "should fail"));
     }
 
+    [Fact]
+    public void Commit_SucceedsWhenOnlyDeletionsAreStaged()
+    {
+        var path = CreateGitRepo("commit-delete-repo");
+        var service = ServiceWithRepo(path);
+
+        // Delete the tracked README.md and stage the deletion
+        File.Delete(Path.Combine(path, "README.md"));
+        service.StageFile("id-1", "README.md");
+
+        // Should not throw even though the deleted file is removed from the index
+        service.Commit("id-1", "chore: remove readme");
+
+        using var repo = new LibGit2Sharp.Repository(path);
+        Assert.Equal("chore: remove readme", repo.Head.Tip.Message.Trim());
+    }
+
     public void Dispose()
     {
         if (!Directory.Exists(_tempPath)) return;

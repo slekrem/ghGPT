@@ -169,7 +169,13 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         var info = GetRepoById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
-        if (!repo.RetrieveStatus().IsDirty || !repo.Index.Any())
+        var hasStagedChanges = repo.RetrieveStatus().Any(e =>
+            e.State.HasFlag(FileStatus.NewInIndex) ||
+            e.State.HasFlag(FileStatus.ModifiedInIndex) ||
+            e.State.HasFlag(FileStatus.DeletedFromIndex) ||
+            e.State.HasFlag(FileStatus.RenamedInIndex));
+
+        if (!hasStagedChanges)
             throw new InvalidOperationException("Keine gestagten Änderungen vorhanden.");
 
         var fullMessage = string.IsNullOrWhiteSpace(description)
