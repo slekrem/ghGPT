@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
 import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo } from './helpers';
 import * as path from 'path';
@@ -14,16 +14,17 @@ test.beforeAll(async () => {
   repoDir = createTempRepo();
 
   // Create a multi-line file and commit it, then modify a line in the middle
-  // so the hunk starts at line > 1 — this validates correct line numbering
   const multiLine =
     '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf\nZeile sechs\nZeile sieben\n';
   modifyFile(repoDir, 'README.md', multiLine);
   execSync('git add README.md', { cwd: repoDir });
   execSync('git commit -m "add multi-line readme"', { cwd: repoDir });
 
-  // Now modify only line 5 (unstaged)
+  // Simulate mixed changes: modified file, new file, deleted file
   modifyFile(repoDir, 'README.md',
     '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf GEÄNDERT\nZeile sechs\nZeile sieben\n');
+  modifyFile(repoDir, 'new-file.txt', 'new file content\n');
+  fs.unlinkSync(path.join(repoDir, 'main.ts')); // delete tracked file
 
   const repo = await importRepo(repoDir);
   repoId = repo.id;
@@ -104,7 +105,7 @@ test('07 - Changes View: Diff einer Datei', async ({ page }) => {
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '07-changes-diff.png'), fullPage: true });
 });
 
-test('08 - Changes View: Datei gestaget', async ({ page }) => {
+test('08 - Changes View: Datei gecheckt', async ({ page }) => {
   await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
@@ -112,12 +113,13 @@ test('08 - Changes View: Datei gestaget', async ({ page }) => {
   await page.locator('app-shell').waitFor();
   await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
-  await page.locator('changes-view').locator('.file-entry').filter({ hasText: 'README.md' }).first().locator('.action-btn').click();
-  await page.locator('changes-view').locator('.section-header').filter({ hasText: 'Staged (1)' }).waitFor({ timeout: 5000 });
+  await page.locator('changes-view').locator('.file-entry').filter({ hasText: 'README.md' }).first()
+    .locator('input[type="checkbox"]').click();
+  await expect(page.locator('changes-view').locator('.commit-btn')).toContainText('Commit (1', { timeout: 5000 });
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '08-changes-staged.png'), fullPage: true });
 });
 
-test('09 - Changes View: Commit-Formular', async ({ page }) => {
+test('09 - Changes View: Commit-Formular mit gemischten Änderungen', async ({ page }) => {
   await fetch(`http://localhost:5000/api/repos/${repoId}/unstage-all`, { method: 'POST' });
   await page.goto('/');
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
@@ -125,8 +127,11 @@ test('09 - Changes View: Commit-Formular', async ({ page }) => {
   await page.locator('app-shell').waitFor();
   await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
-  await page.locator('changes-view').locator('.file-entry').filter({ hasText: 'README.md' }).first().locator('.action-btn').click();
-  await page.locator('changes-view').locator('.section-header').filter({ hasText: 'Staged (1)' }).waitFor({ timeout: 5000 });
+
+  // Check all via header checkbox
+  await page.locator('changes-view').locator('.list-header input[type="checkbox"]').click();
+  await expect(page.locator('changes-view').locator('.commit-btn')).toContainText(/Commit \([1-9]/, { timeout: 5000 });
+
   await page.locator('changes-view').locator('.commit-input[type="text"]').fill('feat: neue Funktion');
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '09-commit-form.png'), fullPage: true });
 });
