@@ -1,10 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function getApiBaseUrl(): string {
+  const raw = readFileSync(resolve(__dirname, '../ghGPT.Api/Properties/launchSettings.json'), 'utf-8')
+    .replace(/^\uFEFF/, '');
   const settings = JSON.parse(
-    readFileSync(resolve(__dirname, '../ghGPT.Api/Properties/launchSettings.json'), 'utf-8')
+    raw
   );
   const url: string = settings.profiles.http.applicationUrl;
   return url.split(';')[0];

@@ -240,7 +240,6 @@ export class ChangesView extends LitElement {
       this.selectedFile = entry;
       this.diff = '';
       this.diffError = '';
-      if (entry.status === 'Untracked') return;
       try {
         this.diff = await repositoryService.getDiff(this.repoId, entry.filePath, entry.isStaged);
       } catch (e: unknown) {
@@ -318,9 +317,6 @@ export class ChangesView extends LitElement {
   private renderDiff() {
     if (!this.selectedFile) {
       return html`<div class="diff-placeholder">Datei auswählen</div>`;
-    }
-    if (this.selectedFile.status === 'Untracked') {
-      return html`<div class="diff-placeholder">Kein Diff für ungetrackte Dateien</div>`;
     }
     if (this.diffError) {
       return html`<div class="diff-placeholder" style="color:#f38ba8">${this.diffError}</div>`;

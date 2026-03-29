@@ -2,9 +2,13 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const _settings = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../../ghGPT.Api/Properties/launchSettings.json'), 'utf-8')
+    .replace(/^\uFEFF/, '')
 );
 const _baseUrl: string = _settings.profiles.http.applicationUrl.split(';')[0];
 export const API = `${_baseUrl}/api`;

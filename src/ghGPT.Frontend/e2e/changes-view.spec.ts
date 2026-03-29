@@ -60,6 +60,24 @@ test('shows diff when clicking a modified file', async ({ page }) => {
   await expect(changesView.locator('.diff-line.added')).not.toHaveCount(0);
 });
 
+test('shows diff when clicking a new untracked file', async ({ page }) => {
+  const fileName = `new-file-${modCounter}.txt`;
+  modifyFile(repoDir, fileName, `new file content ${modCounter}\n`);
+
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+
+  const changesView = page.locator('changes-view');
+  await changesView.waitFor();
+  await expect(changesView.locator('.file-entry').filter({ hasText: fileName })).toBeVisible({ timeout: 5000 });
+
+  await changesView.locator('.file-entry').filter({ hasText: fileName }).first().click();
+  await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+  await expect(changesView.locator('.diff-line.added')).not.toHaveCount(0);
+  await expect(changesView.locator('.diff-line-content').filter({ hasText: `+new file content ${modCounter}` })).toBeVisible();
+});
+
 test('stages a file via checkbox', async ({ page }) => {
   const changesView = page.locator('changes-view');
   const entry = changesView.locator('.file-entry').filter({ hasText: 'README.md' }).first();

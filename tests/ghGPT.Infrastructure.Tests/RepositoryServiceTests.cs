@@ -220,6 +220,19 @@ public class RepositoryServiceTests : IDisposable
         Assert.Contains("@@", diff);
     }
 
+    [Fact]
+    public void GetDiff_ReturnsDiffForUntrackedFile()
+    {
+        var path = CreateGitRepo("diff-untracked-repo");
+        var service = ServiceWithRepo(path);
+        File.WriteAllText(Path.Combine(path, "new-file.txt"), "new file content\n");
+
+        var diff = service.GetDiff("id-1", "new-file.txt", staged: false);
+
+        Assert.False(string.IsNullOrWhiteSpace(diff));
+        Assert.Contains("new file content", diff);
+    }
+
     // --- Stage / Unstage ---
 
     [Fact]

@@ -122,6 +122,9 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         var info = GetRepoById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
+        if (!staged && IsUntrackedFile(repo, filePath))
+            return BuildUntrackedFileDiff(info.LocalPath, filePath);
+
         Patch patch;
         if (staged)
         {
@@ -134,6 +137,29 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         }
 
         return string.Concat(patch.Select(e => e.Patch));
+    }
+
+    private static bool IsUntrackedFile(LibGit2Sharp.Repository repo, string filePath) =>
+        repo.RetrieveStatus()
+            .Any(entry => entry.FilePath == filePath && entry.State.HasFlag(FileStatus.NewInWorkdir));
+
+    private static string BuildUntrackedFileDiff(string repoPath, string filePath)
+    {
+        var fullPath = Path.Combine(repoPath, filePath);
+        if (!File.Exists(fullPath))
+            return string.Empty;
+
+        var content = File.ReadAllText(fullPath).Replace("\r\n", "\n");
+        var lines = content.Split('\n');
+        if (lines.Length > 0 && lines[^1] == string.Empty)
+            lines = lines[..^1];
+
+        var header = $"diff --git a/{filePath} b/{filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/{filePath}\n";
+        if (lines.Length == 0)
+            return $"{header}@@ -0,0 +1,0 @@\n";
+
+        var body = string.Join('\n', lines.Select(line => $"+{line}"));
+        return $"{header}@@ -0,0 +1,{lines.Length} @@\n{body}\n";
     }
 
     public void StageFile(string id, string filePath)
