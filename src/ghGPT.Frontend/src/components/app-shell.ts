@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { repositoryService, type RepositoryInfo, type BranchInfo, type GitOperationProgressEvent } from '../services/repository-service';
+import { repositoryService, type RepositoryInfo, type BranchInfo, type GitOperationProgressEvent, type AccountInfo } from '../services/repository-service';
 import { onHubEvent, offHubEvent } from '../services/hub-client';
 import { startHub } from '../services/hub-client';
 import './repo-dialog';
@@ -130,9 +130,194 @@ export class AppShell extends LitElement {
       align-items: center;
       gap: 0.5rem;
       cursor: pointer;
+      user-select: none;
     }
 
     .sidebar-footer:hover { color: #cdd6f4; }
+
+    .account-avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .account-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .account-badge {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      background: #a6e3a133;
+      color: #a6e3a1;
+      flex-shrink: 0;
+    }
+
+    .account-badge.error {
+      background: #f38ba833;
+      color: #f38ba8;
+    }
+
+    .account-dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 12, 18, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      padding: 1.5rem;
+    }
+
+    .account-dialog {
+      width: min(480px, 100%);
+      background: #1e1e2e;
+      border: 1px solid #45475a;
+      border-radius: 12px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+
+    .account-dialog-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid #313244;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .account-dialog-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #cdd6f4;
+    }
+
+    .account-dialog-close {
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid #45475a;
+      background: transparent;
+      color: #cdd6f4;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .account-dialog-close:hover { background: #313244; }
+
+    .account-dialog-body {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .account-connected {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: #181825;
+      border: 1px solid #313244;
+    }
+
+    .account-connected-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+
+    .account-connected-info {
+      flex: 1;
+    }
+
+    .account-connected-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #cdd6f4;
+    }
+
+    .account-connected-login {
+      font-size: 0.78rem;
+      color: #6c7086;
+    }
+
+    .account-dialog-label {
+      font-size: 0.8rem;
+      color: #a6adc8;
+      margin-bottom: 0.35rem;
+    }
+
+    .account-dialog-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #45475a;
+      background: #181825;
+      color: #cdd6f4;
+      font-size: 0.875rem;
+      box-sizing: border-box;
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+    }
+
+    .account-dialog-input:focus {
+      outline: none;
+      border-color: #89b4fa;
+    }
+
+    .account-dialog-error {
+      font-size: 0.8rem;
+      color: #f38ba8;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      background: #f38ba811;
+      border: 1px solid #f38ba844;
+    }
+
+    .account-dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    .account-dialog-btn {
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      border: 1px solid #45475a;
+      background: transparent;
+      color: #cdd6f4;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    .account-dialog-btn:hover { background: #313244; }
+
+    .account-dialog-btn.primary {
+      background: #89b4fa22;
+      border-color: #89b4fa;
+      color: #89b4fa;
+    }
+
+    .account-dialog-btn.primary:hover { background: #89b4fa44; }
+
+    .account-dialog-btn.danger {
+      background: #f38ba811;
+      border-color: #f38ba8;
+      color: #f38ba8;
+    }
+
+    .account-dialog-btn.danger:hover { background: #f38ba833; }
+
+    .account-dialog-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
 
     .main {
       flex: 1;
@@ -404,12 +589,18 @@ export class AppShell extends LitElement {
   @state() private gitOperationLines: string[] = [];
   @state() private gitOperationError = '';
   @state() private gitOperationStatus = '';
+  @state() private account: AccountInfo | null = null;
+  @state() private showAccountDialog = false;
+  @state() private patInput = '';
+  @state() private accountError = '';
+  @state() private accountLoading = false;
 
   async connectedCallback() {
     super.connectedCallback();
     startHub().catch(err => console.warn('SignalR connection failed:', err));
     onHubEvent<GitOperationProgressEvent>('git-operation-progress', this.onGitOperationProgress);
     await this.loadRepos();
+    await this.loadAccount();
     document.addEventListener('click', this._onDocClick);
   }
 
@@ -422,6 +613,41 @@ export class AppShell extends LitElement {
   private _onDocClick = () => {
     if (this.showBranchDropdown) this.showBranchDropdown = false;
   };
+
+  private async loadAccount() {
+    try {
+      this.account = await repositoryService.getAccount();
+    } catch {
+      this.account = null;
+    }
+  }
+
+  private async saveToken() {
+    if (!this.patInput.trim()) return;
+    this.accountLoading = true;
+    this.accountError = '';
+    try {
+      this.account = await repositoryService.saveToken(this.patInput.trim());
+      this.patInput = '';
+      this.showAccountDialog = false;
+    } catch (err) {
+      this.accountError = (err as Error).message;
+    } finally {
+      this.accountLoading = false;
+    }
+  }
+
+  private async removeAccount() {
+    this.accountLoading = true;
+    try {
+      await repositoryService.removeAccount();
+      this.account = null;
+      this.patInput = '';
+      this.accountError = '';
+    } finally {
+      this.accountLoading = false;
+    }
+  }
 
   private async loadRepos() {
     this.repos = await repositoryService.getAll();
@@ -597,9 +823,17 @@ export class AppShell extends LitElement {
           </div>
         </div>
 
-        <div class="sidebar-footer">
-          <span>👤</span>
-          <span>Kein Account verbunden</span>
+        <div class="sidebar-footer" @click=${() => { this.showAccountDialog = true; this.accountError = ''; }}>
+          ${this.account
+            ? html`
+              <img class="account-avatar" src="${this.account.avatarUrl}" alt="${this.account.login}" />
+              <span class="account-name">${this.account.name}</span>
+              <span class="account-badge">✓</span>
+            `
+            : html`
+              <span>👤</span>
+              <span class="account-name">Nicht verbunden</span>
+            `}
         </div>
       </aside>
 
@@ -665,6 +899,52 @@ export class AppShell extends LitElement {
           @close=${() => this.showDialog = false}
           @repo-added=${this.onRepoAdded}>
         </repo-dialog>
+      ` : ''}
+
+      ${this.showAccountDialog ? html`
+        <div class="account-dialog-overlay" @click=${() => { this.showAccountDialog = false; this.accountError = ''; }}>
+          <div class="account-dialog" @click=${(e: Event) => e.stopPropagation()}>
+            <div class="account-dialog-header">
+              <span class="account-dialog-title">GitHub Account</span>
+              <button class="account-dialog-close" @click=${() => { this.showAccountDialog = false; this.accountError = ''; }}>✕</button>
+            </div>
+            <div class="account-dialog-body">
+              ${this.account ? html`
+                <div class="account-connected">
+                  <img class="account-connected-avatar" src="${this.account.avatarUrl}" alt="${this.account.login}" />
+                  <div class="account-connected-info">
+                    <div class="account-connected-name">${this.account.name}</div>
+                    <div class="account-connected-login">@${this.account.login}</div>
+                  </div>
+                </div>
+                <div class="account-dialog-actions">
+                  <button class="account-dialog-btn danger" ?disabled=${this.accountLoading} @click=${() => this.removeAccount()}>
+                    Account trennen
+                  </button>
+                </div>
+              ` : html`
+                <div>
+                  <div class="account-dialog-label">Personal Access Token (PAT)</div>
+                  <input
+                    class="account-dialog-input"
+                    type="password"
+                    placeholder="ghp_…"
+                    .value=${this.patInput}
+                    @input=${(e: Event) => { this.patInput = (e.target as HTMLInputElement).value; this.accountError = ''; }}
+                    @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.saveToken()}
+                  />
+                </div>
+                ${this.accountError ? html`<div class="account-dialog-error">${this.accountError}</div>` : ''}
+                <div class="account-dialog-actions">
+                  <button class="account-dialog-btn" @click=${() => { this.showAccountDialog = false; this.accountError = ''; }}>Abbrechen</button>
+                  <button class="account-dialog-btn primary" ?disabled=${this.accountLoading || !this.patInput.trim()} @click=${() => this.saveToken()}>
+                    ${this.accountLoading ? 'Verbinde…' : 'Verbinden'}
+                  </button>
+                </div>
+              `}
+            </div>
+          </div>
+        </div>
       ` : ''}
 
       ${this.gitOperation ? html`
