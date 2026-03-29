@@ -211,6 +211,20 @@ test('deletes a non-active branch', async ({ page }) => {
   await expect(view.locator('.branch-row').filter({ hasText: 'e2e-delete-me' })).not.toBeVisible({ timeout: 5000 });
 });
 
+test('toolbar shows updated branch name after checkout', async ({ page }) => {
+  await gotoBranchesView(page);
+  const view = page.locator('branches-view');
+
+  const developRow = view.locator('.branch-row:not(.head)').filter({ hasText: 'develop' }).first();
+  await developRow.hover();
+  await developRow.locator('.action-btn', { hasText: 'Checkout' }).click();
+
+  await expect(view.locator('.branch-row.head').filter({ hasText: 'develop' })).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.toolbar-branch')).toContainText('develop', { timeout: 5000 });
+
+  checkoutDefaultBranch(repoDir);
+});
+
 test('active branch has no delete button', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');

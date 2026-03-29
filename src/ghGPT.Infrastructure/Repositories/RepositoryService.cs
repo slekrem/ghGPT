@@ -349,6 +349,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
 
         Commands.Checkout(repo, branch);
+        info.CurrentBranch = branch.FriendlyName;
     }
 
     public BranchInfo CreateBranch(string id, string name, string? startPoint = null)
@@ -372,6 +373,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             : repo.CreateBranch(name);
 
         Commands.Checkout(repo, newBranch);
+        info.CurrentBranch = newBranch.FriendlyName;
 
         return new BranchInfo
         {
