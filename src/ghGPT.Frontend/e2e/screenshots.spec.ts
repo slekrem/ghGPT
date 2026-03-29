@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
-import { createTempRepo, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo, unstageAll } from './helpers';
+import { createTempRepo, createTempRepoWithRemote, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo, unstageAll } from './helpers';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -165,4 +165,61 @@ test('12 - Branches View: Hover auf Branch-Zeile', async ({ page }) => {
   await page.locator('branches-view').waitFor();
   await page.locator('branches-view .branch-row:not(.head)').first().hover();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '12-branches-row-hover.png'), fullPage: true });
+});
+
+// --- Remote Branches ---
+
+let remoteLocalDir = '';
+let remoteRepoDir = '';
+let remoteRepoId = '';
+
+test.beforeAll(async () => {
+  ({ localDir: remoteLocalDir, remoteDir: remoteRepoDir } = createTempRepoWithRemote());
+  const repo = await importRepo(remoteLocalDir);
+  remoteRepoId = repo.id;
+});
+
+test.afterAll(async () => {
+  await deleteRepo(remoteRepoId);
+  removeTempRepo(remoteLocalDir);
+  removeTempRepo(remoteRepoDir);
+});
+
+test('13 - Branches View: Übersicht mit Remote-Branches', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), remoteRepoId);
+  await setActiveRepo(remoteRepoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('branches-view').waitFor();
+  await expect(page.locator('branches-view .section-title').filter({ hasText: /Remote/i })).toBeVisible();
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '13-branches-remote-overview.png'), fullPage: true });
+});
+
+test('14 - Branches View: Neuer Branch Dialog mit Remote als Basis', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), remoteRepoId);
+  await setActiveRepo(remoteRepoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('branches-view').waitFor();
+  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
+  await page.locator('branches-view .dialog').waitFor();
+  await page.locator('branches-view .dialog input[type="text"]').fill('feature/from-remote');
+  await page.locator('branches-view .dialog select').selectOption({ label: 'origin/feature/remote-branch' });
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '14-branches-remote-new-dialog.png'), fullPage: true });
+});
+
+test('15 - Branches View: Hover auf Remote-Branch-Zeile', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), remoteRepoId);
+  await setActiveRepo(remoteRepoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('branches-view').waitFor();
+  await page.locator('branches-view .branch-row').filter({ hasText: 'origin/feature/remote-branch' }).hover();
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '15-branches-remote-row-hover.png'), fullPage: true });
 });
