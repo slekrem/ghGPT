@@ -29,6 +29,21 @@ public class RepositoryServiceTests : IDisposable
         return path;
     }
 
+    private string CreateGitRepoWithCommitCount(string name, int additionalCommits)
+    {
+        var path = CreateGitRepo(name);
+        var filePath = Path.Combine(path, "README.md");
+
+        for (var i = 1; i <= additionalCommits; i++)
+        {
+            File.WriteAllText(filePath, $"# Commit {i}\n");
+            Run("git add README.md", path);
+            Run($"git commit -m commit-{i}", path);
+        }
+
+        return path;
+    }
+
     private static void Run(string cmd, string cwd)
     {
         var parts = cmd.Split(' ', 2);
@@ -243,6 +258,25 @@ public class RepositoryServiceTests : IDisposable
 
         Assert.Equal("feat: detail", detail.Message);
         Assert.Contains(detail.Files, file => file.Path == "README.md" && file.Patch.Contains("+# Detailed Change"));
+    }
+
+    [Fact]
+    public void GetCommits_CanPageThroughLargeHistory()
+    {
+        var path = CreateGitRepoWithCommitCount("large-history-repo", 220);
+        var service = ServiceWithRepo(path);
+
+        var firstPage = service.GetCommits("id-1", "master", skip: 0, take: 100);
+        var thirdPage = service.GetCommits("id-1", "master", skip: 200, take: 100);
+
+        Assert.Equal(100, firstPage.Commits.Count);
+        Assert.True(firstPage.HasMore);
+        Assert.Equal(21, thirdPage.Commits.Count);
+        Assert.False(thirdPage.HasMore);
+        Assert.Equal("commit-220", firstPage.Commits[0].Message);
+        Assert.DoesNotContain(firstPage.Commits.Select(commit => commit.Sha), sha => thirdPage.Commits.Any(other => other.Sha == sha));
+        Assert.Equal("initial", thirdPage.Commits[^1].Message);
+        Assert.All(thirdPage.Commits.Take(thirdPage.Commits.Count - 1), commit => Assert.StartsWith("commit-", commit.Message));
     }
 
     // --- Diff ---
