@@ -3,13 +3,13 @@ using Octokit;
 
 namespace ghGPT.Infrastructure.Account;
 
-public class AccountService : IAccountService
+public class AccountService(ITokenStore tokenStore) : IAccountService
 {
     private const string GitHubProductHeader = "ghGPT";
 
     public async Task<AccountInfo?> GetAccountAsync()
     {
-        var token = WindowsCredentialManager.Load();
+        var token = tokenStore.Load();
         if (token is null)
             return null;
 
@@ -39,13 +39,13 @@ public class AccountService : IAccountService
             throw new InvalidOperationException($"GitHub-Verbindung fehlgeschlagen: {ex.Message}");
         }
 
-        WindowsCredentialManager.Save(token);
+        tokenStore.Save(token);
         return info;
     }
 
     public void RemoveAccount()
     {
-        WindowsCredentialManager.Delete();
+        tokenStore.Delete();
     }
 
     private static async Task<AccountInfo> FetchAccountInfoAsync(string token)

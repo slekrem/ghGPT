@@ -1,11 +1,14 @@
 using ghGPT.Core.Repositories;
+using ghGPT.Infrastructure.Account;
 using LibGit2Sharp;
+using LibGit2Sharp.Handlers;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
 
 namespace ghGPT.Infrastructure.Repositories;
 
-public class RepositoryService(IRepositoryStore store) : IRepositoryService
+public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) : IRepositoryService
 {
     private readonly List<RepositoryInfo> _repos = [.. store.Load()];
     private string? _activeRepoId;
@@ -56,6 +59,10 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             throw new InvalidOperationException($"'{localPath}' existiert bereits.");
 
         var options = new CloneOptions();
+
+        CredentialsHandler? credentialsHandler = BuildCredentialsHandler();
+        if (credentialsHandler is not null)
+            options.FetchOptions.CredentialsProvider = credentialsHandler;
 
         if (progress is not null)
         {
@@ -428,6 +435,28 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         repo.Branches.Remove(branch);
     }
 
+    private CredentialsHandler? BuildCredentialsHandler()
+    {
+        var token = tokenStore.Load();
+        if (token is null) return null;
+        return (_, _, _) => new UsernamePasswordCredentials
+        {
+            Username = "x-oauth-basic",
+            Password = token
+        };
+    }
+
+    private void InjectGitHubCredentials(ProcessStartInfo psi)
+    {
+        var token = tokenStore.Load();
+        if (token is null) return;
+
+        var encoded = Convert.ToBase64String(Encoding.ASCII.GetBytes($"x-oauth-basic:{token}"));
+        psi.Environment["GIT_CONFIG_COUNT"] = "1";
+        psi.Environment["GIT_CONFIG_KEY_0"] = "http.extraheader";
+        psi.Environment["GIT_CONFIG_VALUE_0"] = $"Authorization: Basic {encoded}";
+    }
+
     private RepositoryInfo GetRepoById(string id) =>
         _repos.FirstOrDefault(r => r.Id == id)
         ?? throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
@@ -445,6 +474,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        InjectGitHubCredentials(psi);
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var outputLines = new List<string>();

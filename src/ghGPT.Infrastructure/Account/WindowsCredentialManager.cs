@@ -43,6 +43,9 @@ internal static class WindowsCredentialManager
 
     public static void Save(string token)
     {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            throw new PlatformNotSupportedException("Token-Speicherung ist nur unter Windows verfügbar.");
+
         var tokenBytes = Encoding.Unicode.GetBytes(token);
         var handle = GCHandle.Alloc(tokenBytes, GCHandleType.Pinned);
         try
@@ -67,6 +70,8 @@ internal static class WindowsCredentialManager
 
     public static string? Load()
     {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return null;
         if (!CredReadW(TargetName, CRED_TYPE.Generic, 0, out var ptr))
             return null;
         try
@@ -86,6 +91,8 @@ internal static class WindowsCredentialManager
 
     public static void Delete()
     {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return;
         CredDeleteW(TargetName, CRED_TYPE.Generic, 0);
     }
 }

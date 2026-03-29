@@ -16,4 +16,9 @@
     <ProjectReference Include="..\ghGPT.Infrastructure\ghGPT.Infrastructure.csproj" />
   </ItemGroup>
 
+  <Target Name="BuildFrontend" BeforeTargets="Build">
+    <Exec Command="npm install" WorkingDirectory="../ghGPT.Frontend" />
+    <Exec Command="npm run build" WorkingDirectory="../ghGPT.Frontend" />
+  </Target>
+
 </Project>
