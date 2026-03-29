@@ -7,6 +7,7 @@ import './repo-dialog';
 import './changes-view';
 import './history-view';
 import './branches-view';
+import './pull-requests-view';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests';
 
@@ -881,7 +882,7 @@ export class AppShell extends LitElement {
           <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('push')}>↑ Push</button>
         </div>
 
-        <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' ? 'padded' : ''}">
+        <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' ? 'padded' : ''}">
           ${this.activeRepo ? this.renderView() : html`
             <div class="placeholder">
               <span class="placeholder-icon">📂</span>
@@ -985,7 +986,7 @@ export class AppShell extends LitElement {
       case 'branches':
         return html`<branches-view .repoId=${this.activeRepoId ?? ''} @branch-changed=${this.onBranchChanged}></branches-view>`;
       case 'pull-requests':
-        return html`<div class="placeholder"><span class="placeholder-icon">🔀</span><span>Keine Pull Requests</span></div>`;
+        return html`<pull-requests-view .repoId=${this.activeRepoId ?? ''}></pull-requests-view>`;
     }
   }
 }

@@ -87,6 +87,57 @@ export interface AccountInfo {
   avatarUrl: string;
 }
 
+export interface PullRequestListItem {
+  number: number;
+  title: string;
+  state: string;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  headBranch: string;
+  baseBranch: string;
+  isDraft: boolean;
+  mergeableState: string | null;
+  labels: string[];
+  createdAt: string;
+  updatedAt: string;
+  htmlUrl: string;
+}
+
+export interface PullRequestReview {
+  reviewerLogin: string;
+  reviewerAvatarUrl: string;
+  state: string;
+  submittedAt: string;
+}
+
+export interface PullRequestFile {
+  fileName: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+}
+
+export interface PullRequestDetail {
+  number: number;
+  title: string;
+  state: string;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  headBranch: string;
+  baseBranch: string;
+  isDraft: boolean;
+  body: string;
+  labels: string[];
+  reviews: PullRequestReview[];
+  files: PullRequestFile[];
+  ciPassing: boolean;
+  ciHasCombinedStatus: boolean;
+  htmlUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -134,6 +185,11 @@ export const repositoryService = {
     api.post<BranchInfo>(`/repos/${id}/branches`, { name, startPoint }),
   deleteBranch: (id: string, name: string) =>
     api.delete<void>(`/repos/${id}/branches/${encodeURIComponent(name)}`),
+
+  getPullRequests: (id: string, state: 'open' | 'closed' | 'all' = 'open') =>
+    api.get<PullRequestListItem[]>(`/repos/${id}/pull-requests?state=${state}`),
+  getPullRequestDetail: (id: string, number: number) =>
+    api.get<PullRequestDetail>(`/repos/${id}/pull-requests/${number}`),
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),
