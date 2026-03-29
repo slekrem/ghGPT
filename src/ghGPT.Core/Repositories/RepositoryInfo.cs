@@ -6,5 +6,5 @@ public class RepositoryInfo
     public string Name { get; init; } = string.Empty;
     public string LocalPath { get; init; } = string.Empty;
     public string? RemoteUrl { get; init; }
-    public string CurrentBranch { get; init; } = string.Empty;
+    public string CurrentBranch { get; set; } = string.Empty;
 }

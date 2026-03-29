@@ -1,10 +1,11 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { repositoryService, type RepositoryInfo } from '../services/repository-service';
+import { repositoryService, type RepositoryInfo, type BranchInfo } from '../services/repository-service';
 import { startHub } from '../services/hub-client';
 import './repo-dialog';
 import './changes-view';
 import './history-view';
+import './branches-view';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests';
 
@@ -164,6 +165,72 @@ export class AppShell extends LitElement {
 
     .toolbar-branch:hover { background-color: #313244; }
 
+    .branch-dropdown-wrapper {
+      position: relative;
+    }
+
+    .branch-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 220px;
+      background: #1e1e2e;
+      border: 1px solid #45475a;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 200;
+      overflow: hidden;
+    }
+
+    .branch-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.875rem;
+      color: #cdd6f4;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .branch-dropdown-item:hover { background-color: #313244; }
+
+    .branch-dropdown-item.active {
+      color: #89b4fa;
+      background-color: #89b4fa11;
+    }
+
+    .branch-dropdown-item .check { font-size: 0.75rem; flex-shrink: 0; }
+
+    .branch-dropdown-separator {
+      height: 1px;
+      background: #313244;
+      margin: 0.25rem 0;
+    }
+
+    .branch-dropdown-section {
+      padding: 0.25rem 0.75rem 0.1rem;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6c7086;
+    }
+
+    .branch-dropdown-footer {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.8rem;
+      color: #6c7086;
+      cursor: pointer;
+      border-top: 1px solid #313244;
+    }
+
+    .branch-dropdown-footer:hover { background-color: #313244; color: #cdd6f4; }
+
     .toolbar-spacer { flex: 1; }
 
     .toolbar-btn {
@@ -221,12 +288,24 @@ export class AppShell extends LitElement {
   @state() private activeRepoId: string | null = null;
   @state() private showDialog = false;
   @state() private historyRefreshKey = 0;
+  @state() private showBranchDropdown = false;
+  @state() private branches: BranchInfo[] = [];
 
   async connectedCallback() {
     super.connectedCallback();
     startHub().catch(err => console.warn('SignalR connection failed:', err));
     await this.loadRepos();
+    document.addEventListener('click', this._onDocClick);
   }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener('click', this._onDocClick);
+  }
+
+  private _onDocClick = () => {
+    if (this.showBranchDropdown) this.showBranchDropdown = false;
+  };
 
   private async loadRepos() {
     this.repos = await repositoryService.getAll();
@@ -257,6 +336,31 @@ export class AppShell extends LitElement {
   private onCommitCreated = () => {
     this.historyRefreshKey++;
   };
+
+  private onBranchChanged = async () => {
+    this.repos = await repositoryService.getAll();
+    if (this.activeRepoId) {
+      this.branches = await repositoryService.getBranches(this.activeRepoId);
+    }
+  };
+
+  private async openBranchDropdown() {
+    if (!this.activeRepoId) return;
+    this.branches = await repositoryService.getBranches(this.activeRepoId);
+    this.showBranchDropdown = true;
+  }
+
+  private async checkoutFromDropdown(branchName: string) {
+    if (!this.activeRepoId) return;
+    this.showBranchDropdown = false;
+    try {
+      await repositoryService.checkoutBranch(this.activeRepoId, branchName);
+      this.repos = await repositoryService.getAll();
+      this.branches = await repositoryService.getBranches(this.activeRepoId);
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  }
 
   render() {
     return html`
@@ -310,16 +414,48 @@ export class AppShell extends LitElement {
 
       <main class="main">
         <div class="toolbar">
-          <button class="toolbar-branch">
-            🌿 ${this.activeRepo?.currentBranch ?? '–'} ▾
-          </button>
+          <div class="branch-dropdown-wrapper">
+            <button class="toolbar-branch" ?disabled=${!this.activeRepo}
+              @click=${() => this.showBranchDropdown ? this.showBranchDropdown = false : this.openBranchDropdown()}>
+              🌿 ${this.activeRepo?.currentBranch ?? '–'} ▾
+            </button>
+            ${this.showBranchDropdown ? html`
+              <div class="branch-dropdown" @click=${(e: Event) => e.stopPropagation()}>
+                ${this.branches.filter(b => !b.isRemote).length > 0 ? html`
+                  <div class="branch-dropdown-section">Lokale Branches</div>
+                  ${this.branches.filter(b => !b.isRemote).map(b => html`
+                    <div class="branch-dropdown-item ${b.isHead ? 'active' : ''}"
+                      @click=${() => !b.isHead && this.checkoutFromDropdown(b.name)}>
+                      <span class="check">${b.isHead ? '✓' : ' '}</span>
+                      <span>${b.name}</span>
+                    </div>
+                  `)}
+                ` : ''}
+                ${this.branches.filter(b => b.isRemote).length > 0 ? html`
+                  <div class="branch-dropdown-separator"></div>
+                  <div class="branch-dropdown-section">Remote Branches</div>
+                  ${this.branches.filter(b => b.isRemote).map(b => html`
+                    <div class="branch-dropdown-item"
+                      @click=${() => this.checkoutFromDropdown(b.name)}>
+                      <span class="check"> </span>
+                      <span>☁ ${b.name}</span>
+                    </div>
+                  `)}
+                ` : ''}
+                <div class="branch-dropdown-footer"
+                  @click=${() => { this.showBranchDropdown = false; this.activeView = 'branches'; }}>
+                  ⚙ Branch verwalten…
+                </div>
+              </div>
+            ` : ''}
+          </div>
           <div class="toolbar-spacer"></div>
           <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↓ Fetch</button>
           <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↓ Pull</button>
           <button class="toolbar-btn" ?disabled=${!this.activeRepo}>↑ Push</button>
         </div>
 
-        <div class="content ${this.activeView !== 'changes' ? 'padded' : ''}">
+        <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' ? 'padded' : ''}">
           ${this.activeRepo ? this.renderView() : html`
             <div class="placeholder">
               <span class="placeholder-icon">📂</span>
@@ -348,7 +484,7 @@ export class AppShell extends LitElement {
       case 'history':
         return html`<history-view .repoId=${this.activeRepoId ?? ''} .branch=${this.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
-        return html`<div class="placeholder"><span class="placeholder-icon">🌿</span><span>Keine Branches</span></div>`;
+        return html`<branches-view .repoId=${this.activeRepoId ?? ''} @branch-changed=${this.onBranchChanged}></branches-view>`;
       case 'pull-requests':
         return html`<div class="placeholder"><span class="placeholder-icon">🔀</span><span>Keine Pull Requests</span></div>`;
     }
