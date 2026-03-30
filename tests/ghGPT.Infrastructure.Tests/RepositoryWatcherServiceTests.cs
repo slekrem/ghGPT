@@ -37,6 +37,32 @@ public class RepositoryWatcherServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task OnStartup_RefreshesCurrentBranchForAllRepos()
+    {
+        var path = CreateGitRepo("startup-repo");
+        Run("git checkout -b feature", path);
+
+        var repoId = "startup-id";
+        var info = new RepositoryInfo { Id = repoId, Name = "repo", LocalPath = path, CurrentBranch = "master" };
+
+        var store = Substitute.For<IRepositoryStore>();
+        store.Load().Returns([info]);
+
+        var repositoryService = Substitute.For<IRepositoryService>();
+        var notifier = Substitute.For<IRepositoryEventNotifier>();
+
+        var sut = new RepositoryWatcherService(store, repositoryService, notifier,
+            NullLogger<RepositoryWatcherService>.Instance);
+
+        await sut.StartAsync(CancellationToken.None);
+
+        repositoryService.Received(1).RefreshCurrentBranch(repoId);
+
+        await sut.StopAsync(CancellationToken.None);
+        sut.Dispose();
+    }
+
+    [Fact]
     public async Task OnExternalBranchChange_RefreshesCurrentBranchBeforeNotifying()
     {
         var path = CreateGitRepo("watcher-repo");
@@ -72,7 +98,8 @@ public class RepositoryWatcherServiceTests : IDisposable
         repositoryService.Received().RefreshCurrentBranch(repoId);
         await notifier.Received().NotifyBranchChangedAsync(repoId);
 
-        Assert.Equal(["refresh", "notify"], callOrder);
+        // "refresh" tritt zweimal auf: einmal beim Start, einmal beim externen Branch-Wechsel
+        Assert.Equal(["refresh", "refresh", "notify"], callOrder);
 
         await sut.StopAsync(CancellationToken.None);
         sut.Dispose();
