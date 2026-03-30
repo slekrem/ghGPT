@@ -243,9 +243,11 @@ test('16 - Changes View: Partial Staging - Zeilen selektiert', async ({ page }) 
   await page.locator('changes-view .file-entry').filter({ hasText: 'partial-staging.txt' }).first().click();
   await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
 
-  await page.locator('changes-view .diff-line.added').nth(0).click();
-  await page.locator('changes-view .diff-line.added').nth(1).click({ modifiers: ['Shift'] });
-  await expect(page.locator('changes-view .stage-lines-btn')).toBeVisible({ timeout: 3000 });
+  const lineChecks = page.locator('changes-view .diff-line.added .diff-line-check input');
+  await expect(lineChecks).toHaveCount(3);
+  await lineChecks.nth(0).click();
+  await expect(lineChecks.nth(0)).toBeChecked({ timeout: 5000 });
+  await expect(lineChecks.nth(1)).not.toBeChecked();
 
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '16-partial-staging-lines-selected.png'), fullPage: true });
 });
@@ -266,11 +268,12 @@ test('17 - Changes View: Partial Staging - Nach dem Stagen', async ({ page }) =>
   await page.locator('changes-view .file-entry').filter({ hasText: 'partial-staging.txt' }).first().click();
   await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
 
-  await page.locator('changes-view .diff-line.added').nth(0).click();
-  await page.locator('changes-view .diff-line.added').nth(1).click({ modifiers: ['Shift'] });
-  await page.locator('changes-view .stage-lines-btn').click();
+  const lineChecks = page.locator('changes-view .diff-line.added .diff-line-check input');
+  await expect(lineChecks).toHaveCount(3);
+  await lineChecks.nth(0).click();
+  await expect(lineChecks.nth(0)).toBeChecked({ timeout: 5000 });
+  await lineChecks.nth(1).click();
+  await expect(lineChecks.nth(1)).toBeChecked({ timeout: 5000 });
 
-  await expect(page.locator('changes-view .stage-lines-btn')).not.toBeVisible({ timeout: 5000 });
-  await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '17-partial-staging-after-stage.png'), fullPage: true });
 });
