@@ -19,6 +19,7 @@ public class RepositoryWatcherService(
         var repos = store.Load();
         foreach (var repo in repos)
         {
+            repositoryService.RefreshCurrentBranch(repo.Id);
             StartWatcher(repo);
         }
 
