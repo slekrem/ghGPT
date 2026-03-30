@@ -282,6 +282,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
 
     public void StageLines(string id, string filePath, string patch)
     {
+        ValidatePatch(patch);
         var info = GetRepoById(id);
         var tempFile = Path.GetTempFileName();
         try
@@ -462,6 +463,19 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             throw new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden.");
 
         repo.Branches.Remove(branch);
+    }
+
+    private static void ValidatePatch(string patch)
+    {
+        if (!patch.Contains("@@"))
+            throw new InvalidOperationException("Ungültiges Patch-Format: kein Hunk-Header (@@) gefunden.");
+        if (!patch.Contains("---") || !patch.Contains("+++"))
+            throw new InvalidOperationException("Ungültiges Patch-Format: fehlende Datei-Header (--- / +++).");
+        var lines = patch.Split('\n');
+        var hasChange = lines.Any(l => l.StartsWith('+') && !l.StartsWith("+++"))
+                     || lines.Any(l => l.StartsWith('-') && !l.StartsWith("---"));
+        if (!hasChange)
+            throw new InvalidOperationException("Patch enthält keine Änderungen.");
     }
 
     private CredentialsHandler? BuildCredentialsHandler()
