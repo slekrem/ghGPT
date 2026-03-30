@@ -154,7 +154,12 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var selectedBranch = repo.Branches[branchName]
             ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
 
-        var commits = selectedBranch.Commits
+        var filter = new LibGit2Sharp.CommitFilter
+        {
+            IncludeReachableFrom = selectedBranch,
+            SortBy = LibGit2Sharp.CommitSortStrategies.Topological | LibGit2Sharp.CommitSortStrategies.Time
+        };
+        var commits = repo.Commits.QueryBy(filter)
             .Skip(Math.Max(skip, 0))
             .Take(Math.Max(take, 1) + 1)
             .Select(MapCommitListItem)
