@@ -475,6 +475,58 @@ public class RepositoryServiceTests : IDisposable
                 "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n+some line\n"));
     }
 
+    // --- UnstageLines ---
+
+    [Fact]
+    public void UnstageLines_RemovesOnlySelectedPartialPatchFromIndex()
+    {
+        var path = CreateGitRepo("unstagelines-repo");
+        var service = ServiceWithRepo(path);
+
+        File.WriteAllText(Path.Combine(path, "feature.txt"), "Line one\nLine two\nLine three\n");
+        Run("git add feature.txt", path);
+        Run("git commit -m add-feature", path);
+
+        File.WriteAllText(Path.Combine(path, "feature.txt"),
+            "Line one\nLine one-and-half\nLine two\nLine two-and-half\nLine three\n");
+        Run("git add feature.txt", path);
+
+        var patch =
+            "diff --git a/feature.txt b/feature.txt\n" +
+            "--- a/feature.txt\n" +
+            "+++ b/feature.txt\n" +
+            "@@ -1,4 +1,5 @@\n" +
+            " Line one\n" +
+            "+Line one-and-half\n" +
+            " Line two\n" +
+            " Line two-and-half\n" +
+            " Line three\n";
+
+        service.UnstageLines("id-1", "feature.txt", patch);
+
+        var status = service.GetStatus("id-1");
+        Assert.Contains(status.Staged, f => f.FilePath == "feature.txt");
+        Assert.Contains(status.Unstaged, f => f.FilePath == "feature.txt");
+
+        var stagedDiff = service.GetDiff("id-1", "feature.txt", staged: true);
+        var unstagedDiff = service.GetDiff("id-1", "feature.txt", staged: false);
+
+        Assert.DoesNotContain("+Line one-and-half", stagedDiff);
+        Assert.Contains("+Line two-and-half", stagedDiff);
+        Assert.Contains("+Line one-and-half", unstagedDiff);
+        Assert.DoesNotContain("+Line two-and-half", unstagedDiff);
+    }
+
+    [Fact]
+    public void UnstageLines_ThrowsOnInvalidPatch()
+    {
+        var path = CreateGitRepo("unstagelines-invalid-repo");
+        var service = ServiceWithRepo(path);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            service.UnstageLines("id-1", "README.md", "this is not a valid patch"));
+    }
+
     // --- Commit ---
 
     [Fact]

@@ -10,11 +10,13 @@ public interface IRepositoryService
     CommitDetail GetCommitDetail(string id, string sha);
     IReadOnlyList<CommitHistoryEntry> GetHistory(string id, int limit = 50);
     string GetDiff(string id, string filePath, bool staged);
+    string GetCombinedDiff(string id, string filePath);
     void StageFile(string id, string filePath);
     void UnstageFile(string id, string filePath);
     void StageAll(string id);
     void UnstageAll(string id);
     void StageLines(string id, string filePath, string patch);
+    void UnstageLines(string id, string filePath, string patch);
     void Commit(string id, string message, string? description = null);
     Task FetchAsync(string id, IProgress<string>? progress = null);
     Task PullAsync(string id, IProgress<string>? progress = null);

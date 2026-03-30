@@ -228,72 +228,59 @@ test.describe('partial staging', () => {
     await expect(page.locator('changes-view .diff-content')).toBeVisible({ timeout: 5000 });
   });
 
-  test('clicking an added line selects it and shows stage button', async ({ page }) => {
+  test('checking one line stages it and keeps other line checkboxes visible', async ({ page }) => {
     const changesView = page.locator('changes-view');
+    const lineChecks = changesView.locator('.diff-line.added .diff-line-check input');
 
-    await changesView.locator('.diff-line.added').first().click();
+    await expect(lineChecks).toHaveCount(2);
+    await expect(lineChecks.nth(0)).not.toBeChecked();
+    await expect(lineChecks.nth(1)).not.toBeChecked();
 
-    await expect(changesView.locator('.diff-line.added').first()).toHaveClass(/selected/);
-    await expect(changesView.locator('.stage-lines-btn')).toBeVisible();
-    await expect(changesView.locator('.stage-lines-btn')).toContainText('1 Zeile');
+    await lineChecks.nth(0).click();
+
+    await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+    await expect(lineChecks).toHaveCount(2);
+    await expect(lineChecks.nth(0)).toBeChecked();
+    await expect(lineChecks.nth(1)).not.toBeChecked();
+    await expect(changesView.locator('.commit-btn')).toContainText('Commit (1', { timeout: 5000 });
   });
 
-  test('clicking a selected line again deselects it', async ({ page }) => {
+  test('checking a second line after the first succeeds without losing the diff', async ({ page }) => {
     const changesView = page.locator('changes-view');
+    const lineChecks = changesView.locator('.diff-line.added .diff-line-check input');
 
-    await changesView.locator('.diff-line.added').first().click();
-    await expect(changesView.locator('.stage-lines-btn')).toBeVisible();
+    await lineChecks.nth(0).click();
+    await expect(lineChecks.nth(0)).toBeChecked({ timeout: 5000 });
 
-    await changesView.locator('.diff-line.added').first().click();
-    await expect(changesView.locator('.stage-lines-btn')).not.toBeVisible();
+    await lineChecks.nth(1).click();
+
+    await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+    await expect(lineChecks).toHaveCount(2);
+    await expect(lineChecks.nth(0)).toBeChecked();
+    await expect(lineChecks.nth(1)).toBeChecked();
   });
 
-  test('shift-click selects multiple lines and updates button count', async ({ page }) => {
+  test('unchecking a staged line unstages only that line in the same diff view', async ({ page }) => {
     const changesView = page.locator('changes-view');
+    const lineChecks = changesView.locator('.diff-line.added .diff-line-check input');
 
-    await changesView.locator('.diff-line.added').first().click();
-    await changesView.locator('.diff-line.added').last().click({ modifiers: ['Shift'] });
+    await lineChecks.nth(0).click();
+    await lineChecks.nth(1).click();
+    await expect(lineChecks.nth(0)).toBeChecked({ timeout: 5000 });
+    await expect(lineChecks.nth(1)).toBeChecked({ timeout: 5000 });
 
-    await expect(changesView.locator('.stage-lines-btn')).toContainText('2 Zeilen');
+    await lineChecks.nth(0).click();
+
+    await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+    await expect(lineChecks).toHaveCount(2);
+    await expect(lineChecks.nth(0)).not.toBeChecked();
+    await expect(lineChecks.nth(1)).toBeChecked();
   });
 
-  test('context lines are not selectable', async ({ page }) => {
+  test('context lines have no checkbox', async ({ page }) => {
     const changesView = page.locator('changes-view');
     const contextLine = changesView.locator('.diff-line:not(.added):not(.removed)').first();
 
-    await contextLine.click();
-
-    await expect(changesView.locator('.stage-lines-btn')).not.toBeVisible();
-  });
-
-  test('staging selected lines removes them from the unstaged diff', async ({ page }) => {
-    const changesView = page.locator('changes-view');
-
-    await changesView.locator('.diff-line.added').first().click();
-    await changesView.locator('.stage-lines-btn').click();
-
-    await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
-    await expect(changesView.locator('.diff-line-content').filter({ hasText: '+Zeile NEU_2' })).toBeVisible({ timeout: 5000 });
-    await expect(changesView.locator('.diff-line-content').filter({ hasText: '+Zeile NEU_1' })).not.toBeVisible();
-  });
-
-  test('file stays selected after staging lines', async ({ page }) => {
-    const changesView = page.locator('changes-view');
-
-    await changesView.locator('.diff-line.added').first().click();
-    await changesView.locator('.stage-lines-btn').click();
-
-    await expect(changesView.locator('.diff-placeholder')).not.toBeVisible({ timeout: 3000 });
-    await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
-    await expect(changesView.locator('.diff-header-path')).toContainText('partial.txt');
-  });
-
-  test('commit button reflects staged file count after staging lines', async ({ page }) => {
-    const changesView = page.locator('changes-view');
-
-    await changesView.locator('.diff-line.added').first().click();
-    await changesView.locator('.stage-lines-btn').click();
-
-    await expect(changesView.locator('.commit-btn')).toContainText('Commit (1', { timeout: 5000 });
+    await expect(contextLine.locator('.diff-line-check input')).toHaveCount(0);
   });
 });

@@ -80,6 +80,20 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
         }
     }
 
+    [HttpGet("combined-diff")]
+    public ActionResult<string> GetCombinedDiff(string id, [FromQuery] string file)
+    {
+        try
+        {
+            var diff = service.GetCombinedDiff(id, file);
+            return Ok(diff);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("stage")]
     public ActionResult StageFile(string id, [FromQuery] string file)
     {
@@ -116,6 +130,22 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
         try
         {
             service.StageLines(id, request.FilePath, request.Patch);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("unstage-lines")]
+    public ActionResult UnstageLines(string id, [FromBody] StageLinesRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Patch))
+            return BadRequest(new { error = "Patch darf nicht leer sein." });
+        try
+        {
+            service.UnstageLines(id, request.FilePath, request.Patch);
             return NoContent();
         }
         catch (InvalidOperationException ex)

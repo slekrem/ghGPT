@@ -226,6 +226,36 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         return string.Concat(patch.Select(e => e.Patch));
     }
 
+    public string GetCombinedDiff(string id, string filePath)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (IsUntrackedFile(repo, filePath))
+            return BuildUntrackedFileDiff(info.LocalPath, filePath);
+
+        var psi = new ProcessStartInfo("git", $"diff HEAD -- \"{filePath}\"")
+        {
+            WorkingDirectory = info.LocalPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"Diff konnte nicht geladen werden: {error.Trim()}");
+
+        return output.Replace("\r\n", "\n");
+    }
+
     private static bool IsUntrackedFile(LibGit2Sharp.Repository repo, string filePath) =>
         repo.RetrieveStatus()
             .Any(entry => entry.FilePath == filePath && entry.State.HasFlag(FileStatus.NewInWorkdir));
@@ -303,6 +333,36 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             if (process.ExitCode != 0)
                 throw new InvalidOperationException(
                     $"Patch konnte nicht angewendet werden: {error.Trim()}");
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    public void UnstageLines(string id, string filePath, string patch)
+    {
+        ValidatePatch(patch);
+        var info = GetRepoById(id);
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, patch, Encoding.UTF8);
+            var psi = new ProcessStartInfo("git", $"apply --cached --reverse \"{tempFile}\"")
+            {
+                WorkingDirectory = info.LocalPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi)
+                ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
+            var error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"Patch konnte nicht rückgängig gemacht werden: {error.Trim()}");
         }
         finally
         {

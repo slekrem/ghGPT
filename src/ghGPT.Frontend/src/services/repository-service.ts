@@ -170,12 +170,16 @@ export const repositoryService = {
     api.get<CommitHistoryEntry[]>(`/repos/${id}/history?limit=${limit}`),
   getDiff: (id: string, file: string, staged: boolean) =>
     api.get<string>(`/repos/${id}/diff?file=${encodeURIComponent(file)}&staged=${staged}`),
+  getCombinedDiff: (id: string, file: string) =>
+    api.get<string>(`/repos/${id}/combined-diff?file=${encodeURIComponent(file)}`),
   stageFile: (id: string, file: string) =>
     api.post<void>(`/repos/${id}/stage?file=${encodeURIComponent(file)}`),
   unstageFile: (id: string, file: string) =>
     api.post<void>(`/repos/${id}/unstage?file=${encodeURIComponent(file)}`),
   stageLines: (id: string, req: StageLinesRequest) =>
     api.post<void>(`/repos/${id}/stage-lines`, req),
+  unstageLines: (id: string, req: StageLinesRequest) =>
+    api.post<void>(`/repos/${id}/unstage-lines`, req),
   stageAll: (id: string) => api.post<void>(`/repos/${id}/stage-all`),
   unstageAll: (id: string) => api.post<void>(`/repos/${id}/unstage-all`),
   commit: (id: string, message: string, description?: string) =>
