@@ -3,6 +3,20 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { repositoryService, type FileStatusEntry, type RepositoryStatusResult } from '../services/repository-service';
 
+interface ParsedHunk {
+  oldStart: number;
+  newStart: number;
+  lines: ParsedDiffLine[];
+}
+
+interface ParsedDiffLine {
+  type: 'added' | 'removed' | 'context';
+  content: string;
+  oldNum: number | '';
+  newNum: number | '';
+  globalIndex: number;
+}
+
 @customElement('changes-view')
 export class ChangesView extends LitElement {
   static styles = css`
@@ -101,15 +115,23 @@ export class ChangesView extends LitElement {
     }
 
     .diff-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       padding: 0.5rem 1rem;
       font-size: 0.8rem;
       color: #a6adc8;
       border-bottom: 1px solid #313244;
       background: #1e1e2e;
       flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .diff-header-path {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      flex: 1;
     }
 
     .diff-content {
@@ -141,6 +163,21 @@ export class ChangesView extends LitElement {
     .diff-line.added   { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
     .diff-line.removed { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
 
+    .diff-line.added:hover,
+    .diff-line.removed:hover { cursor: pointer; filter: brightness(1.3); }
+
+    .diff-line.added.selected {
+      background: rgba(166, 227, 161, 0.35);
+      outline: 1px solid #a6e3a1;
+      outline-offset: -1px;
+    }
+
+    .diff-line.removed.selected {
+      background: rgba(243, 139, 168, 0.35);
+      outline: 1px solid #f38ba8;
+      outline-offset: -1px;
+    }
+
     .diff-placeholder {
       display: flex;
       align-items: center;
@@ -149,6 +186,21 @@ export class ChangesView extends LitElement {
       color: #45475a;
       font-size: 0.875rem;
     }
+
+    .stage-lines-btn {
+      background: #a6e3a1;
+      border: none;
+      border-radius: 4px;
+      color: #1e1e2e;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .stage-lines-btn:hover { background: #c3f0c0; }
 
     .commit-form {
       flex-shrink: 0;
@@ -210,14 +262,30 @@ export class ChangesView extends LitElement {
   @state() private commitDescription = '';
   @state() private commitError = '';
   @state() private committing = false;
+  @state() private selectedLineIndices = new Set<number>();
+  private lastSelectedLineIndex: number | null = null;
+  private parsedHunks: ParsedHunk[] = [];
 
   updated(changed: Map<string, unknown>) {
-    if ((changed.has('repoId') || changed.has('refreshKey')) && this.repoId) {
+    if (changed.has('repoId') && this.repoId) {
       this.selectedFile = null;
       this.diff = '';
       this.diffError = '';
       this._orderedPaths = [];
       this.loadStatus();
+    } else if (changed.has('refreshKey') && this.repoId) {
+      const prevFile = this.selectedFile;
+      this.loadStatus().then(async () => {
+        if (!prevFile) return;
+        const updated = this.allFiles.find(f => f.filePath === prevFile.filePath);
+        if (updated) {
+          await this.selectFile(updated);
+        } else {
+          this.selectedFile = null;
+          this.diff = '';
+          this.diffError = '';
+        }
+      });
     }
   }
 
@@ -241,6 +309,9 @@ export class ChangesView extends LitElement {
       this.selectedFile = entry;
       this.diff = '';
       this.diffError = '';
+      this.selectedLineIndices = new Set();
+      this.lastSelectedLineIndex = null;
+      this.parsedHunks = [];
       try {
         this.diff = await repositoryService.getDiff(this.repoId, entry.filePath, entry.isStaged);
       } catch (e: unknown) {
@@ -307,6 +378,141 @@ export class ChangesView extends LitElement {
     }
   }
 
+  private toggleLineSelection(globalIndex: number, shiftKey: boolean) {
+    const next = new Set(this.selectedLineIndices);
+    if (shiftKey && this.lastSelectedLineIndex !== null) {
+      const from = Math.min(this.lastSelectedLineIndex, globalIndex);
+      const to = Math.max(this.lastSelectedLineIndex, globalIndex);
+      // collect all selectable indices in this range
+      const selectableInRange = this.parsedHunks
+        .flatMap(h => h.lines)
+        .filter(l => l.globalIndex >= from && l.globalIndex <= to && l.type !== 'context');
+      const allSelected = selectableInRange.every(l => next.has(l.globalIndex));
+      for (const l of selectableInRange) {
+        if (allSelected) next.delete(l.globalIndex);
+        else next.add(l.globalIndex);
+      }
+    } else {
+      if (next.has(globalIndex)) next.delete(globalIndex);
+      else next.add(globalIndex);
+    }
+    this.lastSelectedLineIndex = globalIndex;
+    this.selectedLineIndices = next;
+  }
+
+  private buildPartialPatch(): string {
+    if (!this.selectedFile || this.parsedHunks.length === 0) return '';
+
+    const fp = this.selectedFile.filePath;
+    let patchBody = '';
+
+    for (const hunk of this.parsedHunks) {
+      const resultLines: string[] = [];
+
+      for (const line of hunk.lines) {
+        if (line.type === 'context') {
+          resultLines.push(line.content);
+        } else if (line.type === 'added') {
+          if (this.selectedLineIndices.has(line.globalIndex)) {
+            resultLines.push(line.content); // keep as '+'
+          }
+          // unselected '+' → dropped entirely
+        } else if (line.type === 'removed') {
+          if (this.selectedLineIndices.has(line.globalIndex)) {
+            resultLines.push(line.content); // keep as '-'
+          } else {
+            // unselected '-' → becomes context (stays in both old and new)
+            resultLines.push(' ' + line.content.slice(1));
+          }
+        }
+      }
+
+      // Skip hunk if nothing actionable remains
+      const hasChanges = resultLines.some(l => l.startsWith('+') || l.startsWith('-'));
+      if (!hasChanges) continue;
+
+      const oldCount = resultLines.filter(l => !l.startsWith('+')).length;
+      const newCount = resultLines.filter(l => !l.startsWith('-')).length;
+      patchBody += `@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@\n`;
+      patchBody += resultLines.join('\n') + '\n';
+    }
+
+    if (!patchBody) return '';
+
+    return `diff --git a/${fp} b/${fp}\n--- a/${fp}\n+++ b/${fp}\n${patchBody}`;
+  }
+
+  private async stageSelectedLines() {
+    if (!this.selectedFile) return;
+    const patch = this.buildPartialPatch();
+    if (!patch) return;
+    try {
+      await repositoryService.stageLines(this.repoId, {
+        filePath: this.selectedFile.filePath,
+        patch,
+      });
+      this.selectedLineIndices = new Set();
+      this.lastSelectedLineIndex = null;
+      await this.loadStatus();
+      const updated = this.allFiles.find(f => f.filePath === this.selectedFile?.filePath);
+      if (updated) await this.selectFile(updated);
+    } catch (e: unknown) {
+      this.diffError = e instanceof Error ? e.message : 'Fehler beim Stagen der Zeilen';
+    }
+  }
+
+  private parseDiff(): ParsedHunk[] {
+    if (!this.diff) return [];
+
+    const isMetadata = (l: string) =>
+      l.startsWith('diff --git') || l.startsWith('index ') ||
+      l.startsWith('--- ') || l.startsWith('+++ ') ||
+      l.startsWith('\\ No newline') ||
+      l.startsWith('new file mode') || l.startsWith('deleted file mode') ||
+      l.startsWith('old mode') || l.startsWith('new mode');
+
+    const raw = this.diff.split('\n');
+    if (raw[raw.length - 1] === '') raw.pop();
+
+    const hunks: ParsedHunk[] = [];
+    let currentHunk: ParsedHunk | null = null;
+    let oldLineNum = 0;
+    let newLineNum = 0;
+    let globalIndex = 0;
+
+    for (const line of raw) {
+      if (isMetadata(line)) continue;
+
+      if (line.startsWith('@@')) {
+        const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        if (match) {
+          oldLineNum = parseInt(match[1]) - 1;
+          newLineNum = parseInt(match[2]) - 1;
+          currentHunk = { oldStart: parseInt(match[1]), newStart: parseInt(match[2]), lines: [] };
+          hunks.push(currentHunk);
+        }
+        continue;
+      }
+
+      if (!currentHunk) continue;
+
+      if (line.startsWith('+')) {
+        newLineNum++;
+        currentHunk.lines.push({ type: 'added', content: line, oldNum: '', newNum: newLineNum, globalIndex });
+      } else if (line.startsWith('-')) {
+        oldLineNum++;
+        currentHunk.lines.push({ type: 'removed', content: line, oldNum: oldLineNum, newNum: '', globalIndex });
+      } else {
+        oldLineNum++;
+        newLineNum++;
+        currentHunk.lines.push({ type: 'context', content: line, oldNum: oldLineNum, newNum: newLineNum, globalIndex });
+      }
+      globalIndex++;
+    }
+
+    return hunks;
+  }
+
   private statusChar(s: string) {
     return s === 'Modified' ? 'M' : s === 'Added' ? 'A' : s === 'Deleted' ? 'D' : s === 'Renamed' ? 'R' : '?';
   }
@@ -327,40 +533,26 @@ export class ChangesView extends LitElement {
       return html`<div class="diff-placeholder">Kein Diff verfügbar</div>`;
     }
 
-    const isMetadata = (l: string) =>
-      l.startsWith('diff --git') || l.startsWith('index ') ||
-      l.startsWith('--- ') || l.startsWith('+++ ') ||
-      l.startsWith('\\ No newline');
-
-    const raw = this.diff.split('\n');
-    if (raw[raw.length - 1] === '') raw.pop();
-    const lines = raw.filter(l => !isMetadata(l));
-    let oldLineNum = 0;
-    let newLineNum = 0;
+    this.parsedHunks = this.parseDiff();
 
     return html`
       <div class="diff-content">
-        ${lines.map(line => {
-          if (line.startsWith('@@')) {
-            const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-            if (match) { oldLineNum = parseInt(match[1]) - 1; newLineNum = parseInt(match[2]) - 1; }
-            return '';
-          }
-
-          let cls = '';
-          let oldNum: number | '' = '';
-          let newNum: number | '' = '';
-          if (line.startsWith('+')) { cls = 'added'; newLineNum++; newNum = newLineNum; }
-          else if (line.startsWith('-')) { cls = 'removed'; oldLineNum++; oldNum = oldLineNum; }
-          else { oldLineNum++; newLineNum++; oldNum = oldLineNum; newNum = newLineNum; }
+        ${this.parsedHunks.flatMap(hunk => hunk.lines.map(line => {
+          const isSelected = this.selectedLineIndices.has(line.globalIndex);
+          const selectable = line.type !== 'context';
+          const cls = `${line.type} ${isSelected ? 'selected' : ''}`;
 
           return html`
-            <div class="diff-line ${cls}">
-              <span class="diff-line-num">${oldNum}</span>
-              <span class="diff-line-num">${newNum}</span>
-              <span class="diff-line-content">${line}</span>
+            <div
+              class="diff-line ${cls}"
+              @click=${selectable
+                ? (e: MouseEvent) => this.toggleLineSelection(line.globalIndex, e.shiftKey)
+                : null}>
+              <span class="diff-line-num">${line.oldNum}</span>
+              <span class="diff-line-num">${line.newNum}</span>
+              <span class="diff-line-content">${line.content}</span>
             </div>`;
-        })}
+        }))}
       </div>`;
   }
 
@@ -393,6 +585,10 @@ export class ChangesView extends LitElement {
   render() {
     const stagedCount = this.status.staged.length;
     const totalCount = this.allFiles.length;
+    const showStageLinesBtn =
+      this.selectedLineIndices.size > 0 &&
+      this.selectedFile !== null &&
+      !this.selectedFile.isStaged;
 
     return html`
       <div class="file-list">
@@ -428,7 +624,11 @@ export class ChangesView extends LitElement {
 
       <div class="diff-panel">
         <div class="diff-header">
-          ${this.selectedFile ? this.selectedFile.filePath : 'Kein Diff'}
+          <span class="diff-header-path">${this.selectedFile ? this.selectedFile.filePath : 'Kein Diff'}</span>
+          ${showStageLinesBtn ? html`
+            <button class="stage-lines-btn" @click=${this.stageSelectedLines}>
+              ${this.selectedLineIndices.size} Zeile${this.selectedLineIndices.size !== 1 ? 'n' : ''} stagen
+            </button>` : ''}
         </div>
         ${this.renderDiff()}
       </div>

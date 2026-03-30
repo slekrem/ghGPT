@@ -14,6 +14,7 @@ public interface IRepositoryService
     void UnstageFile(string id, string filePath);
     void StageAll(string id);
     void UnstageAll(string id);
+    void StageLines(string id, string filePath, string patch);
     void Commit(string id, string message, string? description = null);
     Task FetchAsync(string id, IProgress<string>? progress = null);
     Task PullAsync(string id, IProgress<string>? progress = null);

@@ -16,8 +16,9 @@ test.beforeAll(async () => {
   const multiLine =
     '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf\nZeile sechs\nZeile sieben\n';
   modifyFile(repoDir, 'README.md', multiLine);
-  execSync('git add README.md', { cwd: repoDir });
-  execSync('git commit -m "add multi-line readme"', { cwd: repoDir });
+  modifyFile(repoDir, 'partial-staging.txt', '// feature module\n');
+  execSync('git add README.md partial-staging.txt', { cwd: repoDir });
+  execSync('git commit -m "add multi-line readme and partial-staging.txt"', { cwd: repoDir });
 
   modifyFile(repoDir, 'README.md',
     '# Test Repo\n\nZeile drei\nZeile vier\nZeile fünf GEÄNDERT\nZeile sechs\nZeile sieben\n');
@@ -222,4 +223,54 @@ test('15 - Branches View: Hover auf Remote-Branch-Zeile', async ({ page }) => {
   await page.locator('branches-view').waitFor();
   await page.locator('branches-view .branch-row').filter({ hasText: 'origin/feature/remote-branch' }).hover();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '15-branches-remote-row-hover.png'), fullPage: true });
+});
+
+// --- Partial Staging ---
+
+test('16 - Changes View: Partial Staging - Zeilen selektiert', async ({ page }) => {
+  await unstageAll(repoId);
+  modifyFile(repoDir, 'partial-staging.txt',
+    '// feature module\nexport function featureA() {}\nexport function featureB() {}\nexport function featureC() {}\n');
+
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await setActiveRepo(repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('changes-view').waitFor();
+
+  await page.locator('changes-view .file-entry').filter({ hasText: 'partial-staging.txt' }).first().click();
+  await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
+
+  await page.locator('changes-view .diff-line.added').nth(0).click();
+  await page.locator('changes-view .diff-line.added').nth(1).click({ modifiers: ['Shift'] });
+  await expect(page.locator('changes-view .stage-lines-btn')).toBeVisible({ timeout: 3000 });
+
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '16-partial-staging-lines-selected.png'), fullPage: true });
+});
+
+test('17 - Changes View: Partial Staging - Nach dem Stagen', async ({ page }) => {
+  await unstageAll(repoId);
+  modifyFile(repoDir, 'partial-staging.txt',
+    '// feature module\nexport function featureA() {}\nexport function featureB() {}\nexport function featureC() {}\n');
+
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
+  await setActiveRepo(repoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('changes-view').waitFor();
+
+  await page.locator('changes-view .file-entry').filter({ hasText: 'partial-staging.txt' }).first().click();
+  await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
+
+  await page.locator('changes-view .diff-line.added').nth(0).click();
+  await page.locator('changes-view .diff-line.added').nth(1).click({ modifiers: ['Shift'] });
+  await page.locator('changes-view .stage-lines-btn').click();
+
+  await expect(page.locator('changes-view .stage-lines-btn')).not.toBeVisible({ timeout: 5000 });
+  await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '17-partial-staging-after-stage.png'), fullPage: true });
 });

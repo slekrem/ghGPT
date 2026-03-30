@@ -223,6 +223,40 @@ public class ChangesControllerTests
         Assert.IsType<NotFoundObjectResult>(result);
     }
 
+    // --- StageLines ---
+
+    [Fact]
+    public void StageLines_ReturnsNoContent()
+    {
+        var request = new StageLinesRequest("src/foo.ts", "@@ -1,3 +1,4 @@\n line\n+new\n line\n line\n");
+
+        var result = _controller.StageLines("id-1", request);
+
+        Assert.IsType<NoContentResult>(result);
+        _service.Received(1).StageLines("id-1", "src/foo.ts", request.Patch);
+    }
+
+    [Fact]
+    public void StageLines_ReturnsBadRequestWhenPatchIsEmpty()
+    {
+        var result = _controller.StageLines("id-1", new StageLinesRequest("src/foo.ts", ""));
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        _service.DidNotReceive().StageLines(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void StageLines_ReturnsBadRequestOnServiceError()
+    {
+        var request = new StageLinesRequest("src/foo.ts", "@@ -1 +1 @@\n+new\n");
+        _service.When(s => s.StageLines("id-1", Arg.Any<string>(), Arg.Any<string>()))
+            .Throw(new InvalidOperationException("Patch konnte nicht angewendet werden."));
+
+        var result = _controller.StageLines("id-1", request);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
     // --- UnstageAll ---
 
     [Fact]
