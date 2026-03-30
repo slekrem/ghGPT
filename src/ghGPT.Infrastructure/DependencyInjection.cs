@@ -5,6 +5,7 @@ using ghGPT.Infrastructure.Account;
 using ghGPT.Infrastructure.PullRequests;
 using ghGPT.Infrastructure.Repositories;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using System.Runtime.InteropServices;
 
 namespace ghGPT.Infrastructure;
@@ -24,6 +25,7 @@ public static class DependencyInjection
         services.AddSingleton<IRepositoryService, RepositoryService>();
         services.AddSingleton<IAccountService, AccountService>();
         services.AddSingleton<IPullRequestService, PullRequestService>();
+        services.AddHostedService<RepositoryWatcherService>();
         return services;
     }
 }

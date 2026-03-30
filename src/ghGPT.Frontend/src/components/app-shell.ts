@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { repositoryService, type RepositoryInfo, type BranchInfo, type GitOperationProgressEvent, type AccountInfo } from '../services/repository-service';
-import { onHubEvent, offHubEvent } from '../services/hub-client';
+import { onHubEvent, offHubEvent, onHubStateChange, getHubState, type HubConnectionStatus } from '../services/hub-client';
 import { startHub } from '../services/hub-client';
 import './repo-dialog';
 import './changes-view';
@@ -576,6 +576,17 @@ export class AppShell extends LitElement {
     }
 
     .placeholder-btn:hover { background-color: #313244; }
+
+    .hub-status {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .hub-status--connected    { background: #a6e3a1; }
+    .hub-status--reconnecting { background: #f9e2af; }
+    .hub-status--disconnected { background: #f38ba8; }
   `;
 
   @state() private activeView: View = 'changes';
@@ -595,11 +606,17 @@ export class AppShell extends LitElement {
   @state() private patInput = '';
   @state() private accountError = '';
   @state() private accountLoading = false;
+  @state() private hubState: HubConnectionStatus = 'disconnected';
 
   async connectedCallback() {
     super.connectedCallback();
-    startHub().catch(err => console.warn('SignalR connection failed:', err));
+    onHubStateChange(state => { this.hubState = state; });
+    startHub()
+      .then(() => { this.hubState = getHubState(); })
+      .catch(err => console.warn('SignalR connection failed:', err));
     onHubEvent<GitOperationProgressEvent>('git-operation-progress', this.onGitOperationProgress);
+    onHubEvent<{ repoId: string }>('status-changed', this.onStatusChanged);
+    onHubEvent<{ repoId: string }>('branch-changed', this.onHubBranchChanged);
     await this.loadRepos();
     await this.loadAccount();
     document.addEventListener('click', this._onDocClick);
@@ -608,6 +625,8 @@ export class AppShell extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     offHubEvent<GitOperationProgressEvent>('git-operation-progress', this.onGitOperationProgress);
+    offHubEvent('status-changed', this.onStatusChanged);
+    offHubEvent('branch-changed', this.onHubBranchChanged);
     document.removeEventListener('click', this._onDocClick);
   }
 
@@ -685,6 +704,18 @@ export class AppShell extends LitElement {
     if (this.activeRepoId) {
       this.branches = await repositoryService.getBranches(this.activeRepoId);
     }
+  };
+
+  private onStatusChanged = (event: { repoId: string }) => {
+    if (event.repoId !== this.activeRepoId) return;
+    this.changesRefreshKey++;
+  };
+
+  private onHubBranchChanged = (event: { repoId: string }) => {
+    if (event.repoId !== this.activeRepoId) return;
+    this.onBranchChanged();
+    this.historyRefreshKey++;
+    this.changesRefreshKey++;
   };
 
   private onGitOperationProgress = (event: GitOperationProgressEvent) => {
@@ -786,6 +817,7 @@ export class AppShell extends LitElement {
         <div class="sidebar-header">
           <span>⚡</span>
           <span>ghGPT</span>
+          <span class="hub-status hub-status--${this.hubState}" title="${this.hubState}"></span>
         </div>
 
         <div class="sidebar-section">
@@ -984,7 +1016,7 @@ export class AppShell extends LitElement {
       case 'history':
         return html`<history-view .repoId=${this.activeRepoId ?? ''} .branch=${this.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
-        return html`<branches-view .repoId=${this.activeRepoId ?? ''} @branch-changed=${this.onBranchChanged}></branches-view>`;
+        return html`<branches-view .repoId=${this.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this.onBranchChanged}></branches-view>`;
       case 'pull-requests':
         return html`<pull-requests-view .repoId=${this.activeRepoId ?? ''}></pull-requests-view>`;
     }
