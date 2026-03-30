@@ -412,6 +412,69 @@ public class RepositoryServiceTests : IDisposable
         Assert.Contains(status.Unstaged, f => f.FilePath == "README.md");
     }
 
+    // --- StageLines ---
+
+    [Fact]
+    public void StageLines_AppliesPartialPatchToIndex()
+    {
+        var path = CreateGitRepo("stagelines-repo");
+        var service = ServiceWithRepo(path);
+
+        // Commit a base file with 3 lines
+        File.WriteAllText(Path.Combine(path, "feature.txt"), "Line one\nLine two\nLine three\n");
+        Run("git add feature.txt", path);
+        Run("git commit -m add-feature", path);
+
+        // Modify: insert a new line after each existing line (2 additions)
+        File.WriteAllText(Path.Combine(path, "feature.txt"),
+            "Line one\nLine one-and-half\nLine two\nLine two-and-half\nLine three\n");
+
+        // Partial patch: stage only the first addition
+        var patch =
+            "diff --git a/feature.txt b/feature.txt\n" +
+            "--- a/feature.txt\n" +
+            "+++ b/feature.txt\n" +
+            "@@ -1,3 +1,4 @@\n" +
+            " Line one\n" +
+            "+Line one-and-half\n" +
+            " Line two\n" +
+            " Line three\n";
+
+        service.StageLines("id-1", "feature.txt", patch);
+
+        var status = service.GetStatus("id-1");
+        Assert.Contains(status.Staged, f => f.FilePath == "feature.txt");
+        Assert.Contains(status.Unstaged, f => f.FilePath == "feature.txt");
+
+        var stagedDiff = service.GetDiff("id-1", "feature.txt", staged: true);
+        var unstagedDiff = service.GetDiff("id-1", "feature.txt", staged: false);
+
+        Assert.Contains("+Line one-and-half", stagedDiff);
+        Assert.DoesNotContain("+Line one-and-half", unstagedDiff); // appears as context, not as addition
+        Assert.Contains("+Line two-and-half", unstagedDiff);
+    }
+
+    [Fact]
+    public void StageLines_ThrowsOnInvalidPatch()
+    {
+        var path = CreateGitRepo("stagelines-invalid-repo");
+        var service = ServiceWithRepo(path);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            service.StageLines("id-1", "README.md", "this is not a valid patch"));
+    }
+
+    [Fact]
+    public void StageLines_ThrowsWhenPatchHasNoHunkHeader()
+    {
+        var path = CreateGitRepo("stagelines-nohunk-repo");
+        var service = ServiceWithRepo(path);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            service.StageLines("id-1", "README.md",
+                "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n+some line\n"));
+    }
+
     // --- Commit ---
 
     [Fact]
