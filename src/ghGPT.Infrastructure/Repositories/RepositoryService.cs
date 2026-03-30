@@ -475,6 +475,8 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             Commands.Checkout(repo, branch);
             info.CurrentBranch = branch.FriendlyName;
         }
+
+        store.Save(_repos);
     }
 
     public BranchInfo CreateBranch(string id, string name, string? startPoint = null)
@@ -499,6 +501,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
 
         Commands.Checkout(repo, newBranch);
         info.CurrentBranch = newBranch.FriendlyName;
+        store.Save(_repos);
 
         return new BranchInfo
         {
