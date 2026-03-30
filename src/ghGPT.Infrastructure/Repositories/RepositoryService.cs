@@ -511,6 +511,13 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         };
     }
 
+    public void RefreshCurrentBranch(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        info.CurrentBranch = repo.Head.FriendlyName;
+    }
+
     public void DeleteBranch(string id, string branchName)
     {
         var info = GetRepoById(id);
