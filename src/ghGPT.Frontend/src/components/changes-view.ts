@@ -267,12 +267,25 @@ export class ChangesView extends LitElement {
   private parsedHunks: ParsedHunk[] = [];
 
   updated(changed: Map<string, unknown>) {
-    if ((changed.has('repoId') || changed.has('refreshKey')) && this.repoId) {
+    if (changed.has('repoId') && this.repoId) {
       this.selectedFile = null;
       this.diff = '';
       this.diffError = '';
       this._orderedPaths = [];
       this.loadStatus();
+    } else if (changed.has('refreshKey') && this.repoId) {
+      const prevFile = this.selectedFile;
+      this.loadStatus().then(async () => {
+        if (!prevFile) return;
+        const updated = this.allFiles.find(f => f.filePath === prevFile.filePath);
+        if (updated) {
+          await this.selectFile(updated);
+        } else {
+          this.selectedFile = null;
+          this.diff = '';
+          this.diffError = '';
+        }
+      });
     }
   }
 
