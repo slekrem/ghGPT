@@ -612,7 +612,6 @@ export class AppShell extends LitElement {
     onHubEvent<{ repoId: string }>('branch-changed', this.onHubBranchChanged);
     await this.loadRepos();
     await this.loadAccount();
-    document.addEventListener('click', this._onDocClick);
   }
 
   disconnectedCallback() {
@@ -620,11 +619,15 @@ export class AppShell extends LitElement {
     offHubEvent<GitOperationProgressEvent>('git-operation-progress', this.onGitOperationProgress);
     offHubEvent('status-changed', this.onStatusChanged);
     offHubEvent('branch-changed', this.onHubBranchChanged);
-    document.removeEventListener('click', this._onDocClick);
   }
 
-  private _onDocClick = () => {
-    if (this.showBranchDropdown) this.showBranchDropdown = false;
+  private _onDocClick = (e: Event) => {
+    if (!this.showBranchDropdown) return;
+    const path = e.composedPath();
+    const wrapper = this.shadowRoot?.querySelector('.branch-dropdown-wrapper');
+    if (wrapper && !path.includes(wrapper)) {
+      this.showBranchDropdown = false;
+    }
   };
 
   private async loadAccount() {
@@ -806,7 +809,7 @@ export class AppShell extends LitElement {
 
   render() {
     return html`
-      <aside class="sidebar">
+      <aside class="sidebar" @click=${this._onDocClick}>
         <div class="sidebar-header">
           <span>⚡</span>
           <span>ghGPT</span>
@@ -862,7 +865,7 @@ export class AppShell extends LitElement {
         </div>
       </aside>
 
-      <main class="main">
+      <main class="main" @click=${this._onDocClick}>
         <div class="toolbar">
           <div class="branch-dropdown-wrapper">
             <button class="toolbar-branch" ?disabled=${!this.activeRepo}
@@ -870,7 +873,7 @@ export class AppShell extends LitElement {
               🌿 ${this.activeRepo?.currentBranch ?? '–'} ▾
             </button>
             ${this.showBranchDropdown ? html`
-              <div class="branch-dropdown" @click=${(e: Event) => e.stopPropagation()}>
+              <div class="branch-dropdown">
                 ${this.branches.filter(b => !b.isRemote).length > 0 ? html`
                   <div class="branch-dropdown-section">Lokale Branches</div>
                   ${this.branches.filter(b => !b.isRemote).map(b => html`
