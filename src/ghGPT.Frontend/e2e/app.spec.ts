@@ -1,5 +1,26 @@
 import { test, expect } from '@playwright/test';
 
+test.describe('Repository List', () => {
+  test('shows repo names in sidebar', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('app-shell').waitFor();
+
+    const repoItems = page.locator('.repo-item');
+    const count = await repoItems.count();
+
+    for (let i = 0; i < count; i++) {
+      await expect(repoItems.nth(i).locator('.repo-name')).toBeVisible();
+    }
+  });
+
+  test('does not show branch names in repo list', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('app-shell').waitFor();
+
+    await expect(page.locator('.repo-branch')).toHaveCount(0);
+  });
+});
+
 test.describe('App Shell', () => {
   test('loads and shows sidebar', async ({ page }) => {
     await page.goto('/');

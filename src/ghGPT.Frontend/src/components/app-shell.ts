@@ -115,13 +115,6 @@ export class AppShell extends LitElement {
       white-space: nowrap;
     }
 
-    .repo-branch {
-      font-size: 0.7rem;
-      color: #6c7086;
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-
     .sidebar-footer {
       padding: 0.75rem 1rem;
       border-top: 1px solid #313244;
@@ -831,7 +824,6 @@ export class AppShell extends LitElement {
               @click=${() => this.activateRepo(repo.id)}>
               <span>📁</span>
               <span class="repo-name">${repo.name}</span>
-              <span class="repo-branch">${repo.currentBranch}</span>
             </div>
           `)}
 
