@@ -108,6 +108,22 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
         }
     }
 
+    [HttpPost("stage-lines")]
+    public ActionResult StageLines(string id, [FromBody] StageLinesRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Patch))
+            return BadRequest(new { error = "Patch darf nicht leer sein." });
+        try
+        {
+            service.StageLines(id, request.FilePath, request.Patch);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("stage-all")]
     public ActionResult StageAll(string id)
     {

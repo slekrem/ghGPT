@@ -138,6 +138,11 @@ export interface PullRequestDetail {
   updatedAt: string;
 }
 
+export interface StageLinesRequest {
+  filePath: string;
+  patch: string;
+}
+
 export const repositoryService = {
   getAll: () => api.get<RepositoryInfo[]>('/repos'),
   getActive: () => api.get<RepositoryInfo | null>('/repos/active'),
@@ -169,6 +174,8 @@ export const repositoryService = {
     api.post<void>(`/repos/${id}/stage?file=${encodeURIComponent(file)}`),
   unstageFile: (id: string, file: string) =>
     api.post<void>(`/repos/${id}/unstage?file=${encodeURIComponent(file)}`),
+  stageLines: (id: string, req: StageLinesRequest) =>
+    api.post<void>(`/repos/${id}/stage-lines`, req),
   stageAll: (id: string) => api.post<void>(`/repos/${id}/stage-all`),
   unstageAll: (id: string) => api.post<void>(`/repos/${id}/unstage-all`),
   commit: (id: string, message: string, description?: string) =>

@@ -280,6 +280,35 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         Commands.Stage(repo, "*");
     }
 
+    public void StageLines(string id, string filePath, string patch)
+    {
+        var info = GetRepoById(id);
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, patch, Encoding.UTF8);
+            var psi = new ProcessStartInfo("git", $"apply --cached \"{tempFile}\"")
+            {
+                WorkingDirectory = info.LocalPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi)
+                ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
+            var error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"Patch konnte nicht angewendet werden: {error.Trim()}");
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
     public void UnstageAll(string id)
     {
         var info = GetRepoById(id);
