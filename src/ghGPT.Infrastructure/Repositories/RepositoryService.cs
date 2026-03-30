@@ -475,6 +475,8 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             Commands.Checkout(repo, branch);
             info.CurrentBranch = branch.FriendlyName;
         }
+
+        store.Save(_repos);
     }
 
     public BranchInfo CreateBranch(string id, string name, string? startPoint = null)
@@ -499,6 +501,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
 
         Commands.Checkout(repo, newBranch);
         info.CurrentBranch = newBranch.FriendlyName;
+        store.Save(_repos);
 
         return new BranchInfo
         {
@@ -509,6 +512,13 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             BehindBy = 0,
             TrackingBranch = null
         };
+    }
+
+    public void RefreshCurrentBranch(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        info.CurrentBranch = repo.Head.FriendlyName;
     }
 
     public void DeleteBranch(string id, string branchName)
