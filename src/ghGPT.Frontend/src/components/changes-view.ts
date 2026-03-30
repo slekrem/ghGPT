@@ -386,7 +386,7 @@ export class ChangesView extends LitElement {
       // collect all selectable indices in this range
       const selectableInRange = this.parsedHunks
         .flatMap(h => h.lines)
-        .filter(l => l.globalIndex >= from && l.globalIndex <= to);
+        .filter(l => l.globalIndex >= from && l.globalIndex <= to && l.type !== 'context');
       const allSelected = selectableInRange.every(l => next.has(l.globalIndex));
       for (const l of selectableInRange) {
         if (allSelected) next.delete(l.globalIndex);

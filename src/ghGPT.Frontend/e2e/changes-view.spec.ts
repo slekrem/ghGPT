@@ -209,3 +209,91 @@ test('clears diff when switching to a different repository', async ({ page }) =>
   await expect(changesView.locator('.diff-content')).not.toBeVisible({ timeout: 3000 });
   await expect(changesView.locator('.diff-placeholder')).toBeVisible();
 });
+
+test.describe('partial staging', () => {
+  test.beforeAll(async () => {
+    modifyFile(repoDir, 'partial.txt', 'Zeile A\nZeile B\nZeile C\n');
+    execSync('git add partial.txt', { cwd: repoDir });
+    execSync('git commit -m "add partial.txt"', { cwd: repoDir });
+  });
+
+  test.beforeEach(async ({ page }) => {
+    // outer beforeEach already navigated; modify partial.txt and reload
+    modifyFile(repoDir, 'partial.txt', 'Zeile A\nZeile NEU_1\nZeile B\nZeile NEU_2\nZeile C\n');
+    await page.reload();
+    await page.locator('app-shell').waitFor();
+    await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+    await page.locator('changes-view').waitFor();
+    await page.locator('changes-view .file-entry').filter({ hasText: 'partial.txt' }).first().click();
+    await expect(page.locator('changes-view .diff-content')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('clicking an added line selects it and shows stage button', async ({ page }) => {
+    const changesView = page.locator('changes-view');
+
+    await changesView.locator('.diff-line.added').first().click();
+
+    await expect(changesView.locator('.diff-line.added').first()).toHaveClass(/selected/);
+    await expect(changesView.locator('.stage-lines-btn')).toBeVisible();
+    await expect(changesView.locator('.stage-lines-btn')).toContainText('1 Zeile');
+  });
+
+  test('clicking a selected line again deselects it', async ({ page }) => {
+    const changesView = page.locator('changes-view');
+
+    await changesView.locator('.diff-line.added').first().click();
+    await expect(changesView.locator('.stage-lines-btn')).toBeVisible();
+
+    await changesView.locator('.diff-line.added').first().click();
+    await expect(changesView.locator('.stage-lines-btn')).not.toBeVisible();
+  });
+
+  test('shift-click selects multiple lines and updates button count', async ({ page }) => {
+    const changesView = page.locator('changes-view');
+
+    await changesView.locator('.diff-line.added').first().click();
+    await changesView.locator('.diff-line.added').last().click({ modifiers: ['Shift'] });
+
+    await expect(changesView.locator('.stage-lines-btn')).toContainText('2 Zeilen');
+  });
+
+  test('context lines are not selectable', async ({ page }) => {
+    const changesView = page.locator('changes-view');
+    const contextLine = changesView.locator('.diff-line:not(.added):not(.removed)').first();
+
+    await contextLine.click();
+
+    await expect(changesView.locator('.stage-lines-btn')).not.toBeVisible();
+  });
+
+  test('staging selected lines removes them from the unstaged diff', async ({ page }) => {
+    const changesView = page.locator('changes-view');
+
+    await changesView.locator('.diff-line.added').first().click();
+    await changesView.locator('.stage-lines-btn').click();
+
+    await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+    await expect(changesView.locator('.diff-line-content').filter({ hasText: '+Zeile NEU_2' })).toBeVisible({ timeout: 5000 });
+    await expect(changesView.locator('.diff-line-content').filter({ hasText: '+Zeile NEU_1' })).not.toBeVisible();
+  });
+
+  test('file stays selected after staging lines', async ({ page }) => {
+    const changesView = page.locator('changes-view');
+
+    await changesView.locator('.diff-line.added').first().click();
+    await changesView.locator('.stage-lines-btn').click();
+
+    await expect(changesView.locator('.diff-placeholder')).not.toBeVisible({ timeout: 3000 });
+    await expect(changesView.locator('.diff-content')).toBeVisible({ timeout: 5000 });
+    await expect(changesView.locator('.diff-header-path')).toContainText('partial.txt');
+  });
+
+  test('commit button reflects staged file count after staging lines', async ({ page }) => {
+    const changesView = page.locator('changes-view');
+
+    await changesView.locator('.diff-line.added').first().click();
+    await changesView.locator('.stage-lines-btn').click();
+
+    await expect(changesView.locator('.commit-btn')).toContainText('Commit (1', { timeout: 5000 });
+  });
+});
