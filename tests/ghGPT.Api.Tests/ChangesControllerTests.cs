@@ -158,6 +158,28 @@ public class ChangesControllerTests
         Assert.IsType<NotFoundObjectResult>(result.Result);
     }
 
+    [Fact]
+    public void GetCombinedDiff_ReturnsOkWithDiffString()
+    {
+        _service.GetCombinedDiff("id-1", "README.md").Returns("@@ -1 +1 @@\n-old\n+new");
+
+        var result = _controller.GetCombinedDiff("id-1", "README.md");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.IsType<string>(ok.Value);
+    }
+
+    [Fact]
+    public void GetCombinedDiff_ReturnsNotFoundForUnknownRepo()
+    {
+        _service.When(s => s.GetCombinedDiff("bad", Arg.Any<string>()))
+            .Throw(new InvalidOperationException("not found"));
+
+        var result = _controller.GetCombinedDiff("bad", "file.txt");
+
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
     // --- StageFile ---
 
     [Fact]
@@ -253,6 +275,40 @@ public class ChangesControllerTests
             .Throw(new InvalidOperationException("Patch konnte nicht angewendet werden."));
 
         var result = _controller.StageLines("id-1", request);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    // --- UnstageLines ---
+
+    [Fact]
+    public void UnstageLines_ReturnsNoContent()
+    {
+        var request = new StageLinesRequest("src/foo.ts", "@@ -1,3 +1,4 @@\n line\n+new\n line\n line\n");
+
+        var result = _controller.UnstageLines("id-1", request);
+
+        Assert.IsType<NoContentResult>(result);
+        _service.Received(1).UnstageLines("id-1", "src/foo.ts", request.Patch);
+    }
+
+    [Fact]
+    public void UnstageLines_ReturnsBadRequestWhenPatchIsEmpty()
+    {
+        var result = _controller.UnstageLines("id-1", new StageLinesRequest("src/foo.ts", ""));
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        _service.DidNotReceive().UnstageLines(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void UnstageLines_ReturnsBadRequestOnServiceError()
+    {
+        var request = new StageLinesRequest("src/foo.ts", "@@ -1 +1 @@\n+new\n");
+        _service.When(s => s.UnstageLines("id-1", Arg.Any<string>(), Arg.Any<string>()))
+            .Throw(new InvalidOperationException("Patch konnte nicht rückgängig gemacht werden."));
+
+        var result = _controller.UnstageLines("id-1", request);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
