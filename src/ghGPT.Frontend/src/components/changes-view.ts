@@ -467,7 +467,9 @@ export class ChangesView extends LitElement {
     const isMetadata = (l: string) =>
       l.startsWith('diff --git') || l.startsWith('index ') ||
       l.startsWith('--- ') || l.startsWith('+++ ') ||
-      l.startsWith('\\ No newline');
+      l.startsWith('\\ No newline') ||
+      l.startsWith('new file mode') || l.startsWith('deleted file mode') ||
+      l.startsWith('old mode') || l.startsWith('new mode');
 
     const raw = this.diff.split('\n');
     if (raw[raw.length - 1] === '') raw.pop();
