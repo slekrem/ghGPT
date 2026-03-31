@@ -564,14 +564,11 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         };
     }
 
-    private string BuildAuthenticatedArguments(string arguments, string localPath, IProgress<string>? progress)
+    private string BuildAuthenticatedArguments(string arguments, string localPath)
     {
         var token = tokenStore.Load();
         if (token is null)
-        {
-            progress?.Report("[Auth] Kein Token gefunden – nicht angemeldet?");
             return arguments;
-        }
 
         string? remoteUrl;
         try
@@ -579,26 +576,15 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             using var repo = new LibGit2Sharp.Repository(localPath);
             remoteUrl = repo.Network.Remotes["origin"]?.Url;
         }
-        catch (Exception ex)
+        catch
         {
-            progress?.Report($"[Auth] Remote-URL konnte nicht gelesen werden: {ex.Message}");
             return arguments;
         }
 
-        if (remoteUrl is null)
-        {
-            progress?.Report("[Auth] Kein origin-Remote konfiguriert.");
+        if (remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
             return arguments;
-        }
-
-        if (!remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
-        {
-            progress?.Report($"[Auth] Remote-URL ist kein HTTPS-GitHub-Remote: {remoteUrl}");
-            return arguments;
-        }
 
         var authenticatedUrl = remoteUrl.Replace("https://github.com/", $"https://oauth2:{token}@github.com/", StringComparison.OrdinalIgnoreCase);
-        progress?.Report($"[Auth] Token injiziert (Token-Länge: {token.Length})");
 
         var parts = arguments.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         return parts.Length == 1
@@ -615,7 +601,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         progress?.Report($"> git {arguments}");
 
-        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.LocalPath, progress))
+        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.LocalPath))
         {
             WorkingDirectory = info.LocalPath,
             RedirectStandardOutput = true,
@@ -691,6 +677,12 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             line.Contains("Automatic merge failed", StringComparison.OrdinalIgnoreCase));
         if (mergeConflict is not null)
             return $"Merge-Konflikt beim Aktualisieren des Branches. {mergeConflict}";
+
+        var lines = outputLines.ToList();
+        var has403 = lines.Any(line => line.Contains("error: 403", StringComparison.OrdinalIgnoreCase) || line.Contains("returned error: 403", StringComparison.OrdinalIgnoreCase));
+        var hasPermissionDenied = lines.Any(line => line.Contains("Permission to", StringComparison.OrdinalIgnoreCase) && line.Contains("denied", StringComparison.OrdinalIgnoreCase));
+        if (has403 || hasPermissionDenied)
+            return "Push fehlgeschlagen (403): Der hinterlegte GitHub-Token hat keine Schreibberechtigung. Bitte stelle sicher, dass der PAT die Berechtigung 'Contents: Write' (Fine-grained) bzw. den Scope 'repo' (Classic) besitzt.";
 
         var authError = relevantLines.FirstOrDefault(line =>
             line.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase) ||
