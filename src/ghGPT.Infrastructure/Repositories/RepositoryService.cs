@@ -566,15 +566,12 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
 
     private void InjectGitHubCredentials(ProcessStartInfo psi)
     {
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+
         var token = tokenStore.Load();
         if (token is null) return;
 
-        psi.Environment["GIT_CONFIG_COUNT"] = "2";
-        psi.Environment["GIT_CONFIG_KEY_0"] = "http.extraheader";
-        psi.Environment["GIT_CONFIG_VALUE_0"] = $"AUTHORIZATION: bearer {token}";
-        psi.Environment["GIT_CONFIG_KEY_1"] = "credential.helper";
-        psi.Environment["GIT_CONFIG_VALUE_1"] = "";
-        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        psi.Arguments = $"-c \"http.extraheader=AUTHORIZATION: bearer {token}\" -c \"credential.helper=\" {psi.Arguments}";
     }
 
     private RepositoryInfo GetRepoById(string id) =>
