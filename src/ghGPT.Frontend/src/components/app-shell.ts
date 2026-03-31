@@ -680,6 +680,7 @@ export class AppShell extends LitElement {
     this.activeRepoId = id;
     repositoryService.saveActiveId(id);
     await repositoryService.setActive(id).catch(() => {});
+    this.branches = await repositoryService.getBranches(id).catch(() => []);
   }
 
   private get activeRepo(): RepositoryInfo | undefined {
@@ -791,6 +792,10 @@ export class AppShell extends LitElement {
     }
   }
 
+  private get headBranch(): BranchInfo | undefined {
+    return this.branches.find(branch => branch.isHead && !branch.isRemote);
+  }
+
   private renderAheadBehind(branch: BranchInfo) {
     if (!branch.trackingBranch) return null;
 
@@ -805,6 +810,26 @@ export class AppShell extends LitElement {
     return parts.length > 0
       ? html`<span class="branch-dropdown-ahead-behind">${parts}</span>`
       : null;
+  }
+
+  private renderPullButtonLabel() {
+    const headBranch = this.headBranch;
+    const showBehindCount = !!headBranch?.trackingBranch && headBranch.behindBy > 0;
+
+    return html`
+      <span>↓ Pull</span>
+      ${showBehindCount ? html` <span>↓${headBranch.behindBy}</span>` : ''}
+    `;
+  }
+
+  private renderPushButtonLabel() {
+    const headBranch = this.headBranch;
+    const showAheadCount = !!headBranch?.trackingBranch && headBranch.aheadBy > 0;
+
+    return html`
+      <span>↑ Push</span>
+      ${showAheadCount ? html` <span>↑${headBranch.aheadBy}</span>` : ''}
+    `;
   }
 
   render() {
@@ -905,8 +930,8 @@ export class AppShell extends LitElement {
           </div>
           <div class="toolbar-spacer"></div>
           <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('fetch')}>↓ Fetch</button>
-          <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('pull')}>↓ Pull</button>
-          <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('push')}>↑ Push</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('pull')}>${this.renderPullButtonLabel()}</button>
+          <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('push')}>${this.renderPushButtonLabel()}</button>
         </div>
 
         <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' ? 'padded' : ''}">

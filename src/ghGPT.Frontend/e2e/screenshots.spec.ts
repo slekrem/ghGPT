@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
-import { createTempRepo, createTempRepoWithRemote, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo, unstageAll } from './helpers';
+import { createTempRepo, createTempRepoWithRemote, createTempRepoWithRemotePeer, modifyFile, removeTempRepo, importRepo, setActiveRepo, deleteRepo, unstageAll } from './helpers';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -173,6 +173,11 @@ test('12 - Branches View: Hover auf Branch-Zeile', async ({ page }) => {
 let remoteLocalDir = '';
 let remoteRepoDir = '';
 let remoteRepoId = '';
+let pullLocalDir = '';
+let pullRemoteDir = '';
+let pullPeerDir = '';
+let pullDefaultBranch = '';
+let pullRepoId = '';
 
 test.beforeAll(async () => {
   ({ localDir: remoteLocalDir, remoteDir: remoteRepoDir } = createTempRepoWithRemote());
@@ -184,6 +189,24 @@ test.afterAll(async () => {
   await deleteRepo(remoteRepoId);
   removeTempRepo(remoteLocalDir);
   removeTempRepo(remoteRepoDir);
+});
+
+test.beforeAll(async () => {
+  ({
+    localDir: pullLocalDir,
+    remoteDir: pullRemoteDir,
+    peerDir: pullPeerDir,
+    defaultBranch: pullDefaultBranch,
+  } = createTempRepoWithRemotePeer());
+  const repo = await importRepo(pullLocalDir);
+  pullRepoId = repo.id;
+});
+
+test.afterAll(async () => {
+  await deleteRepo(pullRepoId);
+  removeTempRepo(pullLocalDir);
+  removeTempRepo(pullPeerDir);
+  removeTempRepo(pullRemoteDir);
 });
 
 test('13 - Branches View: Übersicht mit Remote-Branches', async ({ page }) => {
@@ -276,4 +299,37 @@ test('17 - Changes View: Partial Staging - Nach dem Stagen', async ({ page }) =>
   await expect(lineChecks.nth(1)).toBeChecked({ timeout: 5000 });
 
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '17-partial-staging-after-stage.png'), fullPage: true });
+});
+
+test('18 - Toolbar: Pull-Button mit Rueckstand', async ({ page }) => {
+  fs.writeFileSync(path.join(pullPeerDir, 'README.md'), '# Remote screenshot change\n');
+  execSync('git add README.md', { cwd: pullPeerDir });
+  execSync('git commit -m "peer screenshot change"', { cwd: pullPeerDir });
+  execSync(`git push origin ${pullDefaultBranch}`, { cwd: pullPeerDir });
+
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), pullRepoId);
+  await setActiveRepo(pullRepoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await page.getByRole('button', { name: /Fetch/i }).click();
+  await expect(page.locator('.git-overlay')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Pull/i })).toContainText('↓1');
+
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '18-toolbar-pull-behind.png'), fullPage: true });
+});
+
+test('19 - Toolbar: Push-Button mit Vorsprung', async ({ page }) => {
+  fs.writeFileSync(path.join(pullLocalDir, 'README.md'), '# Local screenshot change\n');
+  execSync('git add README.md', { cwd: pullLocalDir });
+  execSync('git commit -m "local screenshot change"', { cwd: pullLocalDir });
+
+  await page.goto('/');
+  await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), pullRepoId);
+  await setActiveRepo(pullRepoId);
+  await page.reload();
+  await page.locator('app-shell').waitFor();
+  await expect(page.getByRole('button', { name: /Push/i })).toContainText('↑1');
+
+  await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '19-toolbar-push-ahead.png'), fullPage: true });
 });
