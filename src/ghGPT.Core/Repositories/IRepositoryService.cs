@@ -26,6 +26,7 @@ public interface IRepositoryService
     void CheckoutBranch(string id, string branchName);
     BranchInfo CreateBranch(string id, string name, string? startPoint = null);
     void DeleteBranch(string id, string branchName);
+    void RefreshCurrentBranch(string id);
     Task<RepositoryInfo> CreateAsync(string localPath, string name);
     Task<RepositoryInfo> ImportAsync(string localPath);
     Task<RepositoryInfo> CloneAsync(string remoteUrl, string localPath, IProgress<string>? progress = null);

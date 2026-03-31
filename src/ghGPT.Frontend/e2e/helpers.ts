@@ -13,15 +13,31 @@ const _settings = JSON.parse(
 const _baseUrl: string = _settings.profiles.http.applicationUrl.split(';')[0];
 export const API = `${_baseUrl}/api`;
 
-export function createTempRepo(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-test-'));
-  execSync('git init', { cwd: dir });
+function configureTestRepo(dir: string) {
   execSync('git config user.email "test@ghgpt.test"', { cwd: dir });
   execSync('git config user.name "ghGPT Test"', { cwd: dir });
+  execSync('git config core.autocrlf false', { cwd: dir });
+}
+
+function createSeedRepo(prefix = 'ghgpt-seed-'): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  execSync('git init', { cwd: dir });
+  configureTestRepo(dir);
   fs.writeFileSync(path.join(dir, 'README.md'), '# Test Repo\n');
   fs.writeFileSync(path.join(dir, 'main.ts'), 'console.log("hello");\n');
   execSync('git add .', { cwd: dir });
   execSync('git commit -m "initial commit"', { cwd: dir });
+  return dir;
+}
+
+export function createTempRepo(): string {
+  return createSeedRepo('ghgpt-test-');
+}
+
+function cloneTestRepo(remoteDir: string, prefix: string): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  execSync(`git -c core.autocrlf=false clone "${remoteDir}" .`, { cwd: dir });
+  configureTestRepo(dir);
   return dir;
 }
 
@@ -83,15 +99,11 @@ export function createTempRepoWithRemote(): { localDir: string; remoteDir: strin
   const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-remote-'));
   execSync('git init --bare', { cwd: remoteDir });
 
-  const localDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-test-'));
-  execSync(`git clone "${remoteDir}" .`, { cwd: localDir });
-  execSync('git config user.email "test@ghgpt.test"', { cwd: localDir });
-  execSync('git config user.name "ghGPT Test"', { cwd: localDir });
+  const seedDir = createSeedRepo();
+  execSync(`git remote add origin "${remoteDir}"`, { cwd: seedDir });
+  execSync('git push origin HEAD', { cwd: seedDir });
 
-  fs.writeFileSync(path.join(localDir, 'README.md'), '# Test Repo\n');
-  execSync('git add .', { cwd: localDir });
-  execSync('git commit -m "initial commit"', { cwd: localDir });
-  execSync('git push origin HEAD', { cwd: localDir });
+  const localDir = cloneTestRepo(remoteDir, 'ghgpt-test-');
 
   execSync('git checkout -b feature/remote-branch', { cwd: localDir });
   fs.writeFileSync(path.join(localDir, 'feature.ts'), 'export const x = 1;\n');
@@ -102,6 +114,7 @@ export function createTempRepoWithRemote(): { localDir: string; remoteDir: strin
   try { execSync('git checkout master', { cwd: localDir, stdio: 'pipe' }); }
   catch { execSync('git checkout main', { cwd: localDir, stdio: 'pipe' }); }
   execSync('git branch -D feature/remote-branch', { cwd: localDir, stdio: 'pipe' });
+  removeTempRepo(seedDir);
 
   return { localDir, remoteDir };
 }
@@ -110,26 +123,15 @@ export function createTempRepoWithRemotePeer(): { localDir: string; remoteDir: s
   const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-remote-'));
   execSync('git init --bare', { cwd: remoteDir });
 
-  const seedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-seed-'));
-  execSync(`git clone "${remoteDir}" .`, { cwd: seedDir });
-  execSync('git config user.email "test@ghgpt.test"', { cwd: seedDir });
-  execSync('git config user.name "ghGPT Test"', { cwd: seedDir });
-  fs.writeFileSync(path.join(seedDir, 'README.md'), '# Test Repo\n');
-  execSync('git add README.md', { cwd: seedDir });
-  execSync('git commit -m "initial commit"', { cwd: seedDir });
+  const seedDir = createSeedRepo();
+  execSync(`git remote add origin "${remoteDir}"`, { cwd: seedDir });
   execSync('git push origin HEAD', { cwd: seedDir });
 
   const defaultBranch = execSync('git branch --show-current', { cwd: seedDir, encoding: 'utf-8' }).trim() || 'master';
 
-  const localDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-test-'));
-  execSync(`git clone "${remoteDir}" .`, { cwd: localDir });
-  execSync('git config user.email "test@ghgpt.test"', { cwd: localDir });
-  execSync('git config user.name "ghGPT Test"', { cwd: localDir });
+  const localDir = cloneTestRepo(remoteDir, 'ghgpt-test-');
 
-  const peerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghgpt-peer-'));
-  execSync(`git clone "${remoteDir}" .`, { cwd: peerDir });
-  execSync('git config user.email "test@ghgpt.test"', { cwd: peerDir });
-  execSync('git config user.name "ghGPT Test"', { cwd: peerDir });
+  const peerDir = cloneTestRepo(remoteDir, 'ghgpt-peer-');
 
   removeTempRepo(seedDir);
 

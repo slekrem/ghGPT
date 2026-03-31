@@ -7,6 +7,7 @@ namespace ghGPT.Infrastructure.Repositories;
 
 public class RepositoryWatcherService(
     IRepositoryStore store,
+    IRepositoryService repositoryService,
     IRepositoryEventNotifier notifier,
     ILogger<RepositoryWatcherService> logger) : BackgroundService
 {
@@ -18,6 +19,7 @@ public class RepositoryWatcherService(
         var repos = store.Load();
         foreach (var repo in repos)
         {
+            repositoryService.RefreshCurrentBranch(repo.Id);
             StartWatcher(repo);
         }
 
@@ -81,7 +83,11 @@ public class RepositoryWatcherService(
             || changedPath.Contains(Path.DirectorySeparatorChar + "refs" + Path.DirectorySeparatorChar);
 
         if (isBranchChange)
-            ScheduleDebounced(repoId, () => notifier.NotifyBranchChangedAsync(repoId));
+            ScheduleDebounced(repoId, async () =>
+            {
+                repositoryService.RefreshCurrentBranch(repoId);
+                await notifier.NotifyBranchChangedAsync(repoId);
+            });
         else
             ScheduleStatusNotification(repoId);
     }

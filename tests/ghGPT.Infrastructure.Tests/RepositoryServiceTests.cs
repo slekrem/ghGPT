@@ -643,6 +643,27 @@ public class RepositoryServiceTests : IDisposable
         Assert.Equal("local-push", remoteBranch.Tip.MessageShort);
     }
 
+    // --- RefreshCurrentBranch ---
+
+    [Fact]
+    public void RefreshCurrentBranch_UpdatesCurrentBranchAfterExternalCheckout()
+    {
+        var path = CreateGitRepo("refresh-branch-repo");
+        Run("git checkout -b feature", path);
+        Run("git checkout master || git checkout main", path);
+
+        var service = ServiceWithRepo(path);
+        // In-Memory hat noch "master"
+        Assert.Equal("master", service.GetAll().First().CurrentBranch);
+
+        // Extern auf feature wechseln
+        Run("git checkout feature", path);
+
+        service.RefreshCurrentBranch("id-1");
+
+        Assert.Equal("feature", service.GetAll().First().CurrentBranch);
+    }
+
     public void Dispose()
     {
         if (!Directory.Exists(_tempPath)) return;
