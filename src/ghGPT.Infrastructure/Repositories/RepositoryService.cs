@@ -571,7 +571,10 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var token = tokenStore.Load();
         if (token is null) return;
 
-        psi.Arguments = $"-c \"http.extraheader=AUTHORIZATION: bearer {token}\" -c \"credential.helper=\" {psi.Arguments}";
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add($"http.extraheader=AUTHORIZATION: bearer {token}");
+        psi.ArgumentList.Add("-c");
+        psi.ArgumentList.Add("credential.helper=");
     }
 
     private RepositoryInfo GetRepoById(string id) =>
@@ -583,7 +586,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         progress?.Report($"> git {arguments}");
 
-        var psi = new ProcessStartInfo("git", arguments)
+        var psi = new ProcessStartInfo("git")
         {
             WorkingDirectory = info.LocalPath,
             RedirectStandardOutput = true,
@@ -592,6 +595,8 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             CreateNoWindow = true,
         };
         InjectGitHubCredentials(psi);
+        foreach (var arg in arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            psi.ArgumentList.Add(arg);
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var outputLines = new List<string>();
