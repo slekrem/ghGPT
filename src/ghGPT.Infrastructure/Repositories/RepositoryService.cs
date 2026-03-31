@@ -564,11 +564,14 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         };
     }
 
-    private string BuildAuthenticatedArguments(string arguments, string localPath)
+    private string BuildAuthenticatedArguments(string arguments, string localPath, IProgress<string>? progress)
     {
         var token = tokenStore.Load();
         if (token is null)
+        {
+            progress?.Report("[Auth] Kein Token gefunden – nicht angemeldet?");
             return arguments;
+        }
 
         string? remoteUrl;
         try
@@ -576,15 +579,26 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             using var repo = new LibGit2Sharp.Repository(localPath);
             remoteUrl = repo.Network.Remotes["origin"]?.Url;
         }
-        catch
+        catch (Exception ex)
         {
+            progress?.Report($"[Auth] Remote-URL konnte nicht gelesen werden: {ex.Message}");
             return arguments;
         }
 
-        if (remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+        if (remoteUrl is null)
+        {
+            progress?.Report("[Auth] Kein origin-Remote konfiguriert.");
             return arguments;
+        }
+
+        if (!remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            progress?.Report($"[Auth] Remote-URL ist kein HTTPS-GitHub-Remote: {remoteUrl}");
+            return arguments;
+        }
 
         var authenticatedUrl = remoteUrl.Replace("https://github.com/", $"https://oauth2:{token}@github.com/", StringComparison.OrdinalIgnoreCase);
+        progress?.Report($"[Auth] Token injiziert (Token-Länge: {token.Length})");
 
         var parts = arguments.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         return parts.Length == 1
@@ -601,7 +615,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         progress?.Report($"> git {arguments}");
 
-        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.LocalPath))
+        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.LocalPath, progress))
         {
             WorkingDirectory = info.LocalPath,
             RedirectStandardOutput = true,
