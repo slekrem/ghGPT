@@ -113,6 +113,34 @@ export class AppShell extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      flex: 1;
+    }
+
+    .repo-remove-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      margin-left: auto;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      border: none;
+      background: none;
+      color: #6c7086;
+      cursor: pointer;
+      font-size: 0.75rem;
+      line-height: 1;
+      border-radius: 3px;
+      padding: 0;
+    }
+
+    .repo-item:hover .repo-remove-btn {
+      display: flex;
+    }
+
+    .repo-remove-btn:hover {
+      color: #f38ba8;
+      background-color: #45475a;
     }
 
     .sidebar-footer {
@@ -683,6 +711,21 @@ export class AppShell extends LitElement {
     this.branches = await repositoryService.getBranches(id).catch(() => []);
   }
 
+  private async removeRepo(id: string) {
+    await repositoryService.remove(id);
+    this.repos = this.repos.filter(r => r.id !== id);
+
+    if (this.activeRepoId === id) {
+      if (this.repos.length > 0) {
+        await this.activateRepo(this.repos[0].id);
+      } else {
+        this.activeRepoId = null;
+        this.branches = [];
+        localStorage.removeItem('ghgpt:activeRepoId');
+      }
+    }
+  }
+
   private get activeRepo(): RepositoryInfo | undefined {
     return this.repos.find(r => r.id === this.activeRepoId);
   }
@@ -852,6 +895,11 @@ export class AppShell extends LitElement {
               @click=${() => this.activateRepo(repo.id)}>
               <span>📁</span>
               <span class="repo-name">${repo.name}</span>
+              <button class="repo-remove-btn"
+                title="Aus Tracking entfernen"
+                @click=${(e: Event) => { e.stopPropagation(); this.removeRepo(repo.id); }}>
+                ×
+              </button>
             </div>
           `)}
 
