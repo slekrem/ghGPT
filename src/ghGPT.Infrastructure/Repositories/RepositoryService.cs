@@ -564,7 +564,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         };
     }
 
-    private string BuildAuthenticatedArguments(string arguments, string localPath)
+    internal string BuildAuthenticatedArguments(string arguments, string localPath)
     {
         var token = tokenStore.Load();
         if (token is null)
@@ -582,6 +582,9 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         }
 
         if (remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+            return arguments;
+
+        if (arguments.Split(' ').Any(a => a == "--all"))
             return arguments;
 
         var authenticatedUrl = remoteUrl.Replace("https://github.com/", $"https://oauth2:{token}@github.com/", StringComparison.OrdinalIgnoreCase);

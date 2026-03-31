@@ -608,6 +608,19 @@ public class RepositoryServiceTests : IDisposable
     }
 
     [Fact]
+    public void BuildAuthenticatedArguments_DoesNotInjectUrl_WhenAllFlagIsPresent()
+    {
+        var path = CreateGitRepo("fetch-all-repo");
+        Run("git remote add origin https://github.com/fake/repo.git", path);
+        _tokenStore.Load().Returns("fake-token");
+        var service = ServiceWithRepo(path);
+
+        var result = service.BuildAuthenticatedArguments("fetch --all --progress", path);
+
+        Assert.Equal("fetch --all --progress", result);
+    }
+
+    [Fact]
     public async Task PullAsync_UpdatesLocalBranchFromRemote()
     {
         var (_, localPath, peerPath) = CreateRemoteRepos("pull-repo");
