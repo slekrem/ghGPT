@@ -564,14 +564,27 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         };
     }
 
-    private string BuildAuthenticatedArguments(string arguments, string? remoteUrl)
+    private string BuildAuthenticatedArguments(string arguments, string localPath)
     {
         var token = tokenStore.Load();
-        if (token is null || remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+        if (token is null)
             return arguments;
 
-        var uri = new UriBuilder(remoteUrl) { UserName = "oauth2", Password = token };
-        var authenticatedUrl = uri.Uri.AbsoluteUri;
+        string? remoteUrl;
+        try
+        {
+            using var repo = new LibGit2Sharp.Repository(localPath);
+            remoteUrl = repo.Network.Remotes["origin"]?.Url;
+        }
+        catch
+        {
+            return arguments;
+        }
+
+        if (remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+            return arguments;
+
+        var authenticatedUrl = remoteUrl.Replace("https://github.com/", $"https://oauth2:{token}@github.com/", StringComparison.OrdinalIgnoreCase);
 
         var parts = arguments.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         return parts.Length == 1
@@ -588,7 +601,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         progress?.Report($"> git {arguments}");
 
-        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.RemoteUrl))
+        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.LocalPath))
         {
             WorkingDirectory = info.LocalPath,
             RedirectStandardOutput = true,
