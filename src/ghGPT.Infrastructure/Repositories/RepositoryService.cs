@@ -572,7 +572,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         if (token is null) return;
 
         psi.ArgumentList.Add("-c");
-        psi.ArgumentList.Add($"http.extraheader=AUTHORIZATION: bearer {token}");
+        psi.ArgumentList.Add($"url.https://oauth2:{token}@github.com/.insteadOf=https://github.com/");
         psi.ArgumentList.Add("-c");
         psi.ArgumentList.Add("credential.helper=");
     }
