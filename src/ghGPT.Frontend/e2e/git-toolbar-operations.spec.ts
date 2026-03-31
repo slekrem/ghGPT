@@ -60,7 +60,7 @@ test.afterEach(async () => {
   scenario = null;
 });
 
-test('fetch updates behind indicator in branch dropdown', async ({ page }) => {
+test('fetch updates behind indicator in branch dropdown and pull button', async ({ page }) => {
   const current = scenario!;
 
   fs.writeFileSync(path.join(current.peerDir, 'README.md'), '# Remote change from peer\n');
@@ -77,6 +77,7 @@ test('fetch updates behind indicator in branch dropdown', async ({ page }) => {
   }).toContain('behind 1');
 
   await expect(page.locator('.git-overlay')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Pull/i })).toContainText('↓1');
   await page.locator('.toolbar-branch').click();
   await expect(page.locator('.branch-dropdown-item.active .branch-dropdown-behind')).toContainText('↓1');
 });
@@ -105,6 +106,7 @@ test('push uploads a local commit to the remote', async ({ page }) => {
   execSync('git commit -m "local push change"', { cwd: current.localDir });
 
   await gotoRepo(page, current);
+  await expect(page.getByRole('button', { name: /Push/i })).toContainText('↑1');
   await page.getByRole('button', { name: /Push/i }).click();
 
   await expect.poll(() => {
