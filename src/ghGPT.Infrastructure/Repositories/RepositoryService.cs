@@ -559,7 +559,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         if (token is null) return null;
         return (_, _, _) => new UsernamePasswordCredentials
         {
-            Username = "x-oauth-basic",
+            Username = "oauth2",
             Password = token
         };
     }
@@ -569,10 +569,12 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var token = tokenStore.Load();
         if (token is null) return;
 
-        var encoded = Convert.ToBase64String(Encoding.ASCII.GetBytes($"x-oauth-basic:{token}"));
-        psi.Environment["GIT_CONFIG_COUNT"] = "1";
+        psi.Environment["GIT_CONFIG_COUNT"] = "2";
         psi.Environment["GIT_CONFIG_KEY_0"] = "http.extraheader";
-        psi.Environment["GIT_CONFIG_VALUE_0"] = $"Authorization: Basic {encoded}";
+        psi.Environment["GIT_CONFIG_VALUE_0"] = $"AUTHORIZATION: bearer {token}";
+        psi.Environment["GIT_CONFIG_KEY_1"] = "credential.helper";
+        psi.Environment["GIT_CONFIG_VALUE_1"] = "";
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
     }
 
     private RepositoryInfo GetRepoById(string id) =>
