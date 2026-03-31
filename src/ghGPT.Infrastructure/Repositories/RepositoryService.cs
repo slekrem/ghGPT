@@ -559,20 +559,37 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         if (token is null) return null;
         return (_, _, _) => new UsernamePasswordCredentials
         {
-            Username = "x-oauth-basic",
+            Username = "oauth2",
             Password = token
         };
     }
 
-    private void InjectGitHubCredentials(ProcessStartInfo psi)
+    private string BuildAuthenticatedArguments(string arguments, string localPath)
     {
         var token = tokenStore.Load();
-        if (token is null) return;
+        if (token is null)
+            return arguments;
 
-        var encoded = Convert.ToBase64String(Encoding.ASCII.GetBytes($"x-oauth-basic:{token}"));
-        psi.Environment["GIT_CONFIG_COUNT"] = "1";
-        psi.Environment["GIT_CONFIG_KEY_0"] = "http.extraheader";
-        psi.Environment["GIT_CONFIG_VALUE_0"] = $"Authorization: Basic {encoded}";
+        string? remoteUrl;
+        try
+        {
+            using var repo = new LibGit2Sharp.Repository(localPath);
+            remoteUrl = repo.Network.Remotes["origin"]?.Url;
+        }
+        catch
+        {
+            return arguments;
+        }
+
+        if (remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+            return arguments;
+
+        var authenticatedUrl = remoteUrl.Replace("https://github.com/", $"https://oauth2:{token}@github.com/", StringComparison.OrdinalIgnoreCase);
+
+        var parts = arguments.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1
+            ? $"{parts[0]} {authenticatedUrl}"
+            : $"{parts[0]} {authenticatedUrl} {parts[1]}";
     }
 
     private RepositoryInfo GetRepoById(string id) =>
@@ -584,7 +601,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         progress?.Report($"> git {arguments}");
 
-        var psi = new ProcessStartInfo("git", arguments)
+        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.LocalPath))
         {
             WorkingDirectory = info.LocalPath,
             RedirectStandardOutput = true,
@@ -592,7 +609,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        InjectGitHubCredentials(psi);
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var outputLines = new List<string>();
@@ -660,6 +677,12 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             line.Contains("Automatic merge failed", StringComparison.OrdinalIgnoreCase));
         if (mergeConflict is not null)
             return $"Merge-Konflikt beim Aktualisieren des Branches. {mergeConflict}";
+
+        var lines = outputLines.ToList();
+        var has403 = lines.Any(line => line.Contains("error: 403", StringComparison.OrdinalIgnoreCase) || line.Contains("returned error: 403", StringComparison.OrdinalIgnoreCase));
+        var hasPermissionDenied = lines.Any(line => line.Contains("Permission to", StringComparison.OrdinalIgnoreCase) && line.Contains("denied", StringComparison.OrdinalIgnoreCase));
+        if (has403 || hasPermissionDenied)
+            return "Push fehlgeschlagen (403): Der hinterlegte GitHub-Token hat keine Schreibberechtigung. Bitte stelle sicher, dass der PAT die Berechtigung 'Contents: Write' (Fine-grained) bzw. den Scope 'repo' (Classic) besitzt.";
 
         var authError = relevantLines.FirstOrDefault(line =>
             line.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase) ||
