@@ -564,17 +564,19 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         };
     }
 
-    private void InjectGitHubCredentials(ProcessStartInfo psi)
+    private string BuildAuthenticatedArguments(string arguments, string? remoteUrl)
     {
-        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
-
         var token = tokenStore.Load();
-        if (token is null) return;
+        if (token is null || remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+            return arguments;
 
-        psi.ArgumentList.Add("-c");
-        psi.ArgumentList.Add($"url.https://oauth2:{token}@github.com/.insteadOf=https://github.com/");
-        psi.ArgumentList.Add("-c");
-        psi.ArgumentList.Add("credential.helper=");
+        var uri = new UriBuilder(remoteUrl) { UserName = "oauth2", Password = token };
+        var authenticatedUrl = uri.Uri.AbsoluteUri;
+
+        var parts = arguments.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 1
+            ? $"{parts[0]} {authenticatedUrl}"
+            : $"{parts[0]} {authenticatedUrl} {parts[1]}";
     }
 
     private RepositoryInfo GetRepoById(string id) =>
@@ -586,7 +588,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         progress?.Report($"> git {arguments}");
 
-        var psi = new ProcessStartInfo("git")
+        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.RemoteUrl))
         {
             WorkingDirectory = info.LocalPath,
             RedirectStandardOutput = true,
@@ -594,9 +596,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        InjectGitHubCredentials(psi);
-        foreach (var arg in arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            psi.ArgumentList.Add(arg);
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
         using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
         var outputLines = new List<string>();
