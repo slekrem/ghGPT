@@ -19,7 +19,7 @@ public static class DependencyInjection
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             services.AddSingleton<ITokenStore, MacOsTokenStore>();
         else
-            throw new PlatformNotSupportedException("Token-Speicherung wird auf dieser Plattform nicht unterstützt.");
+            services.AddSingleton<ITokenStore, LinuxTokenStore>();
 
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
         services.AddSingleton<IRepositoryService, RepositoryService>();
