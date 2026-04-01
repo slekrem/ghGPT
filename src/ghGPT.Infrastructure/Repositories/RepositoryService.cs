@@ -409,7 +409,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
     }
 
     public Task FetchAsync(string id, IProgress<string>? progress = null) =>
-        RunGitOperationAsync(id, "fetch --all --progress", progress);
+        RunGitOperationAsync(id, "fetch --all --prune --progress", progress);
 
     public Task PullAsync(string id, IProgress<string>? progress = null) =>
         RunGitOperationAsync(id, "pull --progress", progress);
