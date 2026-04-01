@@ -159,6 +159,17 @@ public class BranchesControllerTests
     }
 
     [Fact]
+    public async Task DeleteBranch_DecodesUrlEncodedBranchName()
+    {
+        _service.DeleteBranch("id-1", "origin/feature/old").Returns(Task.CompletedTask);
+
+        var result = await _controller.DeleteBranch("id-1", "origin%2Ffeature%2Fold");
+
+        Assert.IsType<NoContentResult>(result);
+        await _service.Received(1).DeleteBranch("id-1", "origin/feature/old");
+    }
+
+    [Fact]
     public async Task DeleteBranch_ReturnsBadRequestWhenDeletingActiveBranch()
     {
         _service.DeleteBranch("id-1", "main")

@@ -60,7 +60,7 @@ public class BranchesController(IRepositoryService service) : ControllerBase
     {
         try
         {
-            await service.DeleteBranch(id, name);
+            await service.DeleteBranch(id, Uri.UnescapeDataString(name));
             return NoContent();
         }
         catch (InvalidOperationException ex)
