@@ -119,12 +119,13 @@ public class RepositoryWatcherService(
         {
             try
             {
-                await Task.Delay(300, token);
+                await Task.Delay(300);
+                if (token.IsCancellationRequested)
+                {
+                    logger.LogDebug("Debounce für {RepoId} durch neues Event abgelöst", repoId);
+                    return;
+                }
                 await action();
-            }
-            catch (OperationCanceledException)
-            {
-                logger.LogDebug("Debounce für {RepoId} durch neues Event abgelöst", repoId);
             }
             catch (Exception ex)
             {
