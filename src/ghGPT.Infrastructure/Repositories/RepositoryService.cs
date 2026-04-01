@@ -414,8 +414,20 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
     public Task PullAsync(string id, IProgress<string>? progress = null) =>
         RunGitOperationAsync(id, "pull --progress", progress);
 
-    public Task PushAsync(string id, IProgress<string>? progress = null) =>
-        RunGitOperationAsync(id, "push --progress", progress);
+    public async Task PushAsync(string id, IProgress<string>? progress = null)
+    {
+        await RunGitOperationAsync(id, "push --progress", progress);
+        UpdateRemoteTrackingRef(id);
+    }
+
+    private void UpdateRemoteTrackingRef(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        var head = repo.Head;
+        if (head.TrackedBranch is null || head.Tip is null) return;
+        repo.Refs.UpdateTarget(head.TrackedBranch.CanonicalName, head.Tip.Sha);
+    }
 
     public void Remove(string id)
     {

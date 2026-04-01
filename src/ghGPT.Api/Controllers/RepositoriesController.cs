@@ -8,7 +8,7 @@ namespace ghGPT.Api.Controllers;
 
 [ApiController]
 [Route("api/repos")]
-public class RepositoriesController(IRepositoryService service, IHubContext<RepositoryHub> hub) : ControllerBase
+public class RepositoriesController(IRepositoryService service, IRepositoryWatcherService watcher, IHubContext<RepositoryHub> hub) : ControllerBase
 {
     [HttpGet]
     public ActionResult<IReadOnlyList<RepositoryInfo>> GetAll() => Ok(service.GetAll());
@@ -40,6 +40,7 @@ public class RepositoriesController(IRepositoryService service, IHubContext<Repo
         try
         {
             var repo = await service.CreateAsync(request.LocalPath, request.Name);
+            watcher.StartWatcher(repo);
             return CreatedAtAction(nameof(GetAll), new { id = repo.Id }, repo);
         }
         catch (InvalidOperationException ex)
@@ -54,6 +55,7 @@ public class RepositoriesController(IRepositoryService service, IHubContext<Repo
         try
         {
             var repo = await service.ImportAsync(request.LocalPath);
+            watcher.StartWatcher(repo);
             return CreatedAtAction(nameof(GetAll), new { id = repo.Id }, repo);
         }
         catch (InvalidOperationException ex)
@@ -67,6 +69,7 @@ public class RepositoriesController(IRepositoryService service, IHubContext<Repo
     {
         try
         {
+            watcher.StopWatcher(id);
             service.Remove(id);
             return NoContent();
         }
@@ -85,6 +88,7 @@ public class RepositoriesController(IRepositoryService service, IHubContext<Repo
                 await hub.Clients.All.SendAsync("clone-progress", message));
 
             var repo = await Task.Run(() => service.CloneAsync(request.RemoteUrl, request.LocalPath, progress));
+            watcher.StartWatcher(repo);
             await hub.Clients.All.SendAsync("clone-progress", "✓ Abgeschlossen");
             return CreatedAtAction(nameof(GetAll), new { id = repo.Id }, repo);
         }

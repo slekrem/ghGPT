@@ -105,6 +105,28 @@ public class RepositoryWatcherServiceTests : IDisposable
         sut.Dispose();
     }
 
+    [Fact]
+    public void ScheduleDebounced_ConcurrentCalls_DoesNotThrow()
+    {
+        var store = Substitute.For<IRepositoryStore>();
+        store.Load().Returns([]);
+
+        var sut = new RepositoryWatcherService(
+            store,
+            Substitute.For<IRepositoryService>(),
+            Substitute.For<IRepositoryEventNotifier>(),
+            NullLogger<RepositoryWatcherService>.Instance);
+
+        const string repoId = "race-test-repo";
+
+        var exception = Record.Exception(() =>
+            Parallel.For(0, 20, _ =>
+                sut.ScheduleDebounced(repoId, () => Task.CompletedTask)));
+
+        Assert.Null(exception);
+        sut.Dispose();
+    }
+
     public void Dispose()
     {
         if (!Directory.Exists(_tempPath)) return;

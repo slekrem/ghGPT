@@ -12,6 +12,7 @@ namespace ghGPT.Api.Tests;
 public class RepositoriesControllerTests
 {
     private readonly IRepositoryService _service = Substitute.For<IRepositoryService>();
+    private readonly IRepositoryWatcherService _watcher = Substitute.For<IRepositoryWatcherService>();
     private readonly IHubContext<RepositoryHub> _hub = Substitute.For<IHubContext<RepositoryHub>>();
     private readonly RepositoriesController _controller;
 
@@ -21,7 +22,7 @@ public class RepositoriesControllerTests
         var clientProxy = Substitute.For<IClientProxy>();
         _hub.Clients.Returns(clients);
         clients.All.Returns(clientProxy);
-        _controller = new RepositoriesController(_service, _hub);
+        _controller = new RepositoriesController(_service, _watcher, _hub);
     }
 
     private static RepositoryInfo MakeRepo(string id = "id-1") =>
