@@ -121,7 +121,7 @@ public class RepositoryWatcherService(
 
     internal void ScheduleDebounced(string repoId, Func<Task> action)
     {
-        CancellationTokenSource cts;
+        CancellationToken token;
         lock (_debounceLock)
         {
             if (_debounce.TryGetValue(repoId, out var existing))
@@ -130,11 +130,10 @@ public class RepositoryWatcherService(
                 existing.Dispose();
             }
 
-            cts = new CancellationTokenSource();
+            var cts = new CancellationTokenSource();
             _debounce[repoId] = cts;
+            token = cts.Token;
         }
-
-        var token = cts.Token;
 
         _ = Task.Run(async () =>
         {

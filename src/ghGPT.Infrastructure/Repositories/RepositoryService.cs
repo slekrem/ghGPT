@@ -425,10 +425,16 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
         var head = repo.Head;
-        if (head.TrackedBranch is null || head.Tip is null) return;
-        var trackingRef = repo.Refs[head.TrackedBranch.CanonicalName];
-        if (trackingRef is null) return;
-        repo.Refs.UpdateTarget(trackingRef, head.Tip.Id);
+        if (head.Tip is null || repo.Network.Remotes["origin"] is null) return;
+
+        var trackingRefName = head.TrackedBranch?.CanonicalName
+            ?? $"refs/remotes/origin/{head.FriendlyName}";
+
+        var trackingRef = repo.Refs[trackingRefName];
+        if (trackingRef is null)
+            repo.Refs.Add(trackingRefName, head.Tip.Id);
+        else
+            repo.Refs.UpdateTarget(trackingRef, head.Tip.Id);
     }
 
     public void Remove(string id)
