@@ -9,9 +9,9 @@ public class RepositoryWatcherService(
     IRepositoryStore store,
     IRepositoryService repositoryService,
     IRepositoryEventNotifier notifier,
-    ILogger<RepositoryWatcherService> logger) : BackgroundService
+    ILogger<RepositoryWatcherService> logger) : BackgroundService, IRepositoryWatcherService
 {
-    private readonly List<FileSystemWatcher> _watchers = [];
+    private readonly Dictionary<string, List<FileSystemWatcher>> _watchers = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _debounce = new();
     private readonly object _debounceLock = new();
 
@@ -24,7 +24,7 @@ public class RepositoryWatcherService(
             StartWatcher(repo);
         }
 
-        stoppingToken.Register(StopWatchers);
+        stoppingToken.Register(StopAllWatchers);
         return Task.CompletedTask;
     }
 
@@ -50,8 +50,6 @@ public class RepositoryWatcherService(
         gitWatcher.Deleted += (_, e) => ScheduleNotification(repo.Id, e.FullPath);
         gitWatcher.Renamed += (_, e) => ScheduleNotification(repo.Id, e.FullPath);
 
-        _watchers.Add(gitWatcher);
-
         // Watcher 2: Repo-Root – erkennt Änderungen im Working Tree (ungestagete Dateien)
         var workingTreeWatcher = new FileSystemWatcher(repo.LocalPath)
         {
@@ -65,8 +63,31 @@ public class RepositoryWatcherService(
         workingTreeWatcher.Deleted += (_, e) => OnWorkingTreeChanged(repo.Id, e.FullPath, gitPath);
         workingTreeWatcher.Renamed += (_, e) => OnWorkingTreeChanged(repo.Id, e.FullPath, gitPath);
 
-        _watchers.Add(workingTreeWatcher);
+        _watchers[repo.Id] = [gitWatcher, workingTreeWatcher];
         logger.LogInformation("FileSystemWatcher gestartet für Repo {RepoId}", repo.Id);
+    }
+
+    public void StopWatcher(string id)
+    {
+        if (!_watchers.Remove(id, out var watchers))
+            return;
+
+        foreach (var watcher in watchers)
+        {
+            watcher.EnableRaisingEvents = false;
+            watcher.Dispose();
+        }
+
+        lock (_debounceLock)
+        {
+            if (_debounce.TryRemove(id, out var cts))
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+        }
+
+        logger.LogInformation("FileSystemWatcher gestoppt für Repo {RepoId}", id);
     }
 
     private void OnWorkingTreeChanged(string repoId, string changedPath, string gitPath)
@@ -134,12 +155,15 @@ public class RepositoryWatcherService(
         }, CancellationToken.None);
     }
 
-    private void StopWatchers()
+    private void StopAllWatchers()
     {
-        foreach (var watcher in _watchers)
+        foreach (var watchers in _watchers.Values)
         {
-            watcher.EnableRaisingEvents = false;
-            watcher.Dispose();
+            foreach (var watcher in watchers)
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
+            }
         }
         _watchers.Clear();
 
@@ -156,7 +180,7 @@ public class RepositoryWatcherService(
 
     public override void Dispose()
     {
-        StopWatchers();
+        StopAllWatchers();
         base.Dispose();
     }
 }

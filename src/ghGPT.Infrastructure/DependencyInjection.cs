@@ -25,7 +25,9 @@ public static class DependencyInjection
         services.AddSingleton<IRepositoryService, RepositoryService>();
         services.AddSingleton<IAccountService, AccountService>();
         services.AddSingleton<IPullRequestService, PullRequestService>();
-        services.AddHostedService<RepositoryWatcherService>();
+        services.AddSingleton<RepositoryWatcherService>();
+        services.AddSingleton<IRepositoryWatcherService>(sp => sp.GetRequiredService<RepositoryWatcherService>());
+        services.AddHostedService(sp => sp.GetRequiredService<RepositoryWatcherService>());
         return services;
     }
 }
