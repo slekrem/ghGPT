@@ -153,6 +153,7 @@ export const repositoryService = {
     api.post<RepositoryInfo>('/repos/import', { localPath }),
   clone: (remoteUrl: string, localPath: string) =>
     api.post<RepositoryInfo>('/repos/clone', { remoteUrl, localPath }),
+  remove: (id: string) => api.delete<void>(`/repos/${id}`),
 
   getStatus: (id: string) =>
     api.get<RepositoryStatusResult>(`/repos/${id}/status`),
