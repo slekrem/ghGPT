@@ -426,7 +426,9 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
         var head = repo.Head;
         if (head.TrackedBranch is null || head.Tip is null) return;
-        repo.Refs.UpdateTarget(head.TrackedBranch.CanonicalName, head.Tip.Sha);
+        var trackingRef = repo.Refs[head.TrackedBranch.CanonicalName];
+        if (trackingRef is null) return;
+        repo.Refs.UpdateTarget(trackingRef, head.Tip.Id);
     }
 
     public void Remove(string id)
