@@ -1,7 +1,9 @@
 using ghGPT.Core.Account;
+using ghGPT.Core.Ai;
 using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
 using ghGPT.Infrastructure.Account;
+using ghGPT.Infrastructure.Ai;
 using ghGPT.Infrastructure.PullRequests;
 using ghGPT.Infrastructure.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +22,9 @@ public static class DependencyInjection
             services.AddSingleton<ITokenStore, MacOsTokenStore>();
         else
             services.AddSingleton<ITokenStore, LinuxTokenStore>();
+
+        services.AddSingleton<IAiSettingsService, AiSettingsService>();
+        services.AddSingleton<IOllamaClient, OllamaClient>();
 
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
         services.AddSingleton<IRepositoryService, RepositoryService>();

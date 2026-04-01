@@ -8,8 +8,9 @@ import './changes-view';
 import './history-view';
 import './branches-view';
 import './pull-requests-view';
+import './settings-view';
 
-type View = 'changes' | 'history' | 'branches' | 'pull-requests';
+type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'settings';
 
 @customElement('app-shell')
 export class AppShell extends LitElement {
@@ -922,6 +923,12 @@ export class AppShell extends LitElement {
             @click=${() => this.activeView = 'pull-requests'}>
             <span>🔀</span> Pull Requests
           </div>
+
+          <div class="sidebar-section-title" style="margin-top:0.5rem">App</div>
+          <div class="nav-item ${this.activeView === 'settings' ? 'active' : ''}"
+            @click=${() => this.activeView = 'settings'}>
+            <span>⚙</span> Einstellungen
+          </div>
         </div>
 
         <div class="sidebar-footer" @click=${() => { this.showAccountDialog = true; this.accountError = ''; }}>
@@ -982,8 +989,9 @@ export class AppShell extends LitElement {
           <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('push')}>${this.renderPushButtonLabel()}</button>
         </div>
 
-        <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' ? 'padded' : ''}">
-          ${this.activeRepo ? this.renderView() : html`
+        <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' ? 'padded' : ''}"
+          style="${this.activeView === 'settings' ? 'overflow:auto' : ''}">
+          ${this.activeRepo || this.activeView === 'settings' ? this.renderView() : html`
             <div class="placeholder">
               <span class="placeholder-icon">📂</span>
               <span>Kein Repository geöffnet</span>
@@ -1087,6 +1095,8 @@ export class AppShell extends LitElement {
         return html`<branches-view .repoId=${this.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this.onBranchChanged}></branches-view>`;
       case 'pull-requests':
         return html`<pull-requests-view .repoId=${this.activeRepoId ?? ''}></pull-requests-view>`;
+      case 'settings':
+        return html`<settings-view></settings-view>`;
     }
   }
 }
