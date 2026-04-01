@@ -56,11 +56,11 @@ public class BranchesController(IRepositoryService service) : ControllerBase
     }
 
     [HttpDelete("{name}")]
-    public ActionResult DeleteBranch(string id, string name)
+    public async Task<ActionResult> DeleteBranch(string id, string name)
     {
         try
         {
-            service.DeleteBranch(id, name);
+            await service.DeleteBranch(id, Uri.UnescapeDataString(name));
             return NoContent();
         }
         catch (InvalidOperationException ex)

@@ -148,32 +148,45 @@ public class BranchesControllerTests
     // --- DeleteBranch ---
 
     [Fact]
-    public void DeleteBranch_ReturnsNoContentOnSuccess()
+    public async Task DeleteBranch_ReturnsNoContentOnSuccess()
     {
-        var result = _controller.DeleteBranch("id-1", "feature/old");
+        _service.DeleteBranch("id-1", "feature/old").Returns(Task.CompletedTask);
+
+        var result = await _controller.DeleteBranch("id-1", "feature/old");
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).DeleteBranch("id-1", "feature/old");
+        await _service.Received(1).DeleteBranch("id-1", "feature/old");
     }
 
     [Fact]
-    public void DeleteBranch_ReturnsBadRequestWhenDeletingActiveBranch()
+    public async Task DeleteBranch_DecodesUrlEncodedBranchName()
     {
-        _service.When(s => s.DeleteBranch("id-1", "main"))
-            .Throw(new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden."));
+        _service.DeleteBranch("id-1", "origin/feature/old").Returns(Task.CompletedTask);
 
-        var result = _controller.DeleteBranch("id-1", "main");
+        var result = await _controller.DeleteBranch("id-1", "origin%2Ffeature%2Fold");
+
+        Assert.IsType<NoContentResult>(result);
+        await _service.Received(1).DeleteBranch("id-1", "origin/feature/old");
+    }
+
+    [Fact]
+    public async Task DeleteBranch_ReturnsBadRequestWhenDeletingActiveBranch()
+    {
+        _service.DeleteBranch("id-1", "main")
+            .Throws(new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden."));
+
+        var result = await _controller.DeleteBranch("id-1", "main");
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public void DeleteBranch_ReturnsBadRequestForUnknownBranch()
+    public async Task DeleteBranch_ReturnsBadRequestForUnknownBranch()
     {
-        _service.When(s => s.DeleteBranch("id-1", "ghost"))
-            .Throw(new InvalidOperationException("Branch 'ghost' nicht gefunden."));
+        _service.DeleteBranch("id-1", "ghost")
+            .Throws(new InvalidOperationException("Branch 'ghost' nicht gefunden."));
 
-        var result = _controller.DeleteBranch("id-1", "ghost");
+        var result = await _controller.DeleteBranch("id-1", "ghost");
 
         Assert.IsType<BadRequestObjectResult>(result);
     }

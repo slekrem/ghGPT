@@ -25,7 +25,7 @@ public interface IRepositoryService
     IReadOnlyList<BranchInfo> GetBranches(string id);
     void CheckoutBranch(string id, string branchName);
     BranchInfo CreateBranch(string id, string name, string? startPoint = null);
-    void DeleteBranch(string id, string branchName);
+    Task DeleteBranch(string id, string branchName);
     void RefreshCurrentBranch(string id);
     Task<RepositoryInfo> CreateAsync(string localPath, string name);
     Task<RepositoryInfo> ImportAsync(string localPath);
