@@ -9,6 +9,7 @@ import './history-view';
 import './branches-view';
 import './pull-requests-view';
 import './settings-view';
+import './chat-panel';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'settings';
 
@@ -327,6 +328,12 @@ export class AppShell extends LitElement {
       cursor: not-allowed;
     }
 
+    .toolbar-btn.active {
+      background: #89b4fa22;
+      border-color: #89b4fa;
+      color: #89b4fa;
+    }
+
     .git-overlay {
       position: fixed;
       inset: 0;
@@ -470,6 +477,7 @@ export class AppShell extends LitElement {
   @state() private gitOperationStatus = '';
   @state() private account: AccountInfo | null = null;
   @state() private hubState: HubConnectionStatus = 'disconnected';
+  @state() private showChat = false;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -805,6 +813,7 @@ export class AppShell extends LitElement {
           <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('fetch')}>↓ Fetch</button>
           <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('pull')}>${this.renderPullButtonLabel()}</button>
           <button class="toolbar-btn" ?disabled=${!this.activeRepo || !!this.gitOperation} @click=${() => this.runGitOperation('push')}>${this.renderPushButtonLabel()}</button>
+          <button class="toolbar-btn ${this.showChat ? 'active' : ''}" @click=${() => this.showChat = !this.showChat} title="KI-Assistent">✦</button>
         </div>
 
         <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' ? 'padded' : ''}"
@@ -854,6 +863,14 @@ export class AppShell extends LitElement {
             </div>
           </div>
         </div>
+      ` : ''}
+
+      ${this.showChat ? html`
+        <chat-panel
+          .repoId=${this.activeRepoId ?? ''}
+          .branch=${this.activeRepo?.currentBranch ?? ''}
+          @close=${() => this.showChat = false}>
+        </chat-panel>
       ` : ''}
     `;
   }
