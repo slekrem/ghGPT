@@ -13,6 +13,7 @@ public class RepositoryWatcherService(
 {
     private readonly List<FileSystemWatcher> _watchers = [];
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _debounce = new();
+    private readonly object _debounceLock = new();
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -97,16 +98,21 @@ public class RepositoryWatcherService(
         ScheduleDebounced(repoId, () => notifier.NotifyStatusChangedAsync(repoId));
     }
 
-    private void ScheduleDebounced(string repoId, Func<Task> action)
+    internal void ScheduleDebounced(string repoId, Func<Task> action)
     {
-        if (_debounce.TryGetValue(repoId, out var existing))
+        CancellationTokenSource cts;
+        lock (_debounceLock)
         {
-            existing.Cancel();
-            existing.Dispose();
+            if (_debounce.TryGetValue(repoId, out var existing))
+            {
+                existing.Cancel();
+                existing.Dispose();
+            }
+
+            cts = new CancellationTokenSource();
+            _debounce[repoId] = cts;
         }
 
-        var cts = new CancellationTokenSource();
-        _debounce[repoId] = cts;
         var token = cts.Token;
 
         _ = Task.Run(async () =>
@@ -118,7 +124,7 @@ public class RepositoryWatcherService(
             }
             catch (OperationCanceledException)
             {
-                // Durch neues Event abgelöst, ignorieren
+                logger.LogDebug("Debounce für {RepoId} durch neues Event abgelöst", repoId);
             }
             catch (Exception ex)
             {
@@ -136,12 +142,15 @@ public class RepositoryWatcherService(
         }
         _watchers.Clear();
 
-        foreach (var cts in _debounce.Values)
+        lock (_debounceLock)
         {
-            cts.Cancel();
-            cts.Dispose();
+            foreach (var cts in _debounce.Values)
+            {
+                cts.Cancel();
+                cts.Dispose();
+            }
+            _debounce.Clear();
         }
-        _debounce.Clear();
     }
 
     public override void Dispose()
