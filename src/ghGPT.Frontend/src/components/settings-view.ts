@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { aiService, type OllamaStatus, type OllamaModelInfo } from '../services/ai-service';
+import { repositoryService, type AccountInfo } from '../services/repository-service';
 
 @customElement('settings-view')
 export class SettingsView extends LitElement {
@@ -93,6 +94,34 @@ export class SettingsView extends LitElement {
       color: #a6adc8;
     }
 
+    .account-connected {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 6px;
+      background: #181825;
+      border: 1px solid #313244;
+    }
+
+    .account-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .account-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #cdd6f4;
+    }
+
+    .account-login {
+      font-size: 0.78rem;
+      color: #6c7086;
+    }
+
     .actions {
       display: flex;
       justify-content: flex-end;
@@ -120,6 +149,14 @@ export class SettingsView extends LitElement {
 
     button.primary:hover { background: #89b4fa44; }
 
+    button.danger {
+      background: #f38ba811;
+      border-color: #f38ba8;
+      color: #f38ba8;
+    }
+
+    button.danger:hover { background: #f38ba833; }
+
     button:disabled {
       opacity: 0.45;
       cursor: not-allowed;
@@ -128,61 +165,122 @@ export class SettingsView extends LitElement {
     .success-msg {
       font-size: 0.8rem;
       color: #a6e3a1;
+      align-self: center;
     }
 
     .error-msg {
       font-size: 0.8rem;
       color: #f38ba8;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      background: #f38ba811;
+      border: 1px solid #f38ba844;
     }
   `;
 
-  @state() private status: OllamaStatus | null = null;
-  @state() private statusLoading = true;
+  // Ollama state
+  @state() private ollamaStatus: OllamaStatus | null = null;
+  @state() private ollamaLoading = true;
   @state() private models: OllamaModelInfo[] = [];
   @state() private baseUrl = 'http://localhost:11434';
   @state() private model = 'llama3.2';
-  @state() private saving = false;
-  @state() private saveResult: 'success' | 'error' | null = null;
+  @state() private ollamaSaving = false;
+  @state() private ollamaSaveResult: 'success' | 'error' | null = null;
+
+  // Account state
+  @state() private account: AccountInfo | null = null;
+  @state() private accountLoading = true;
+  @state() private patInput = '';
+  @state() private accountError = '';
+  @state() private accountSaving = false;
 
   async connectedCallback() {
     super.connectedCallback();
-    await this.loadStatus();
+    await Promise.all([this.initOllamaSettings(), this.loadAccount()]);
   }
 
-  private async loadStatus() {
-    this.statusLoading = true;
+  private async initOllamaSettings() {
+    this.ollamaLoading = true;
     try {
-      this.status = await aiService.getStatus();
-      this.baseUrl = this.status.baseUrl;
-      this.model = this.status.model;
-
-      if (this.status.online) {
+      this.ollamaStatus = await aiService.getStatus();
+      this.baseUrl = this.ollamaStatus.baseUrl;
+      this.model = this.ollamaStatus.model;
+      if (this.ollamaStatus.online) {
         this.models = await aiService.getModels().catch(() => []);
       }
     } catch {
-      this.status = null;
+      this.ollamaStatus = null;
     } finally {
-      this.statusLoading = false;
+      this.ollamaLoading = false;
     }
   }
 
-  private async saveSettings() {
-    this.saving = true;
-    this.saveResult = null;
+  private async checkOnlineStatus() {
+    this.ollamaLoading = true;
+    try {
+      const status = await aiService.getStatus();
+      this.ollamaStatus = { ...status, baseUrl: this.baseUrl, model: this.model };
+      if (status.online) {
+        this.models = await aiService.getModels().catch(() => []);
+      }
+    } catch {
+      this.ollamaStatus = null;
+    } finally {
+      this.ollamaLoading = false;
+    }
+  }
+
+  private async saveOllamaSettings() {
+    this.ollamaSaving = true;
+    this.ollamaSaveResult = null;
     try {
       await aiService.saveSettings({ baseUrl: this.baseUrl, model: this.model });
-      this.saveResult = 'success';
-      await this.loadStatus();
+      this.ollamaSaveResult = 'success';
+      await this.checkOnlineStatus();
     } catch {
-      this.saveResult = 'error';
+      this.ollamaSaveResult = 'error';
     } finally {
-      this.saving = false;
+      this.ollamaSaving = false;
     }
   }
 
-  private renderStatusDot() {
-    if (this.statusLoading) return html`<span class="status-dot loading"></span>`;
-    return html`<span class="status-dot ${this.status?.online ? 'online' : 'offline'}"></span>`;
+  private async loadAccount() {
+    this.accountLoading = true;
+    try {
+      this.account = await repositoryService.getAccount();
+    } catch {
+      this.account = null;
+    } finally {
+      this.accountLoading = false;
+    }
+  }
+
+  private async saveToken() {
+    if (!this.patInput.trim()) return;
+    this.accountSaving = true;
+    this.accountError = '';
+    try {
+      this.account = await repositoryService.saveToken(this.patInput.trim());
+      this.patInput = '';
+      this.dispatchEvent(new CustomEvent('account-changed', { bubbles: true, composed: true, detail: this.account }));
+    } catch (err) {
+      this.accountError = (err as Error).message;
+    } finally {
+      this.accountSaving = false;
+    }
+  }
+
+  private async removeAccount() {
+    this.accountSaving = true;
+    try {
+      await repositoryService.removeAccount();
+      this.account = null;
+      this.patInput = '';
+      this.accountError = '';
+      this.dispatchEvent(new CustomEvent('account-changed', { bubbles: true, composed: true, detail: null }));
+    } finally {
+      this.accountSaving = false;
+    }
   }
 
   render() {
@@ -190,19 +288,62 @@ export class SettingsView extends LitElement {
       <h2>Einstellungen</h2>
 
       <div class="section">
+        <div class="section-title">GitHub Account</div>
+        <div class="card">
+          ${this.accountLoading
+            ? html`<span class="status-text">Lade…</span>`
+            : this.account
+              ? html`
+                <div class="account-connected">
+                  <img class="account-avatar" src="${this.account.avatarUrl}" alt="${this.account.login}" />
+                  <div>
+                    <div class="account-name">${this.account.name}</div>
+                    <div class="account-login">@${this.account.login}</div>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="danger" ?disabled=${this.accountSaving} @click=${() => this.removeAccount()}>
+                    Account trennen
+                  </button>
+                </div>
+              `
+              : html`
+                <div class="field">
+                  <label>Personal Access Token (PAT)</label>
+                  <input
+                    type="password"
+                    placeholder="ghp_…"
+                    .value=${this.patInput}
+                    @input=${(e: Event) => { this.patInput = (e.target as HTMLInputElement).value; this.accountError = ''; }}
+                    @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.saveToken()}
+                  />
+                </div>
+                ${this.accountError ? html`<div class="error-msg">${this.accountError}</div>` : ''}
+                <div class="actions">
+                  <button class="primary" ?disabled=${this.accountSaving || !this.patInput.trim()} @click=${() => this.saveToken()}>
+                    ${this.accountSaving ? 'Verbinde…' : 'Verbinden'}
+                  </button>
+                </div>
+              `}
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title">Ollama</div>
         <div class="card">
           <div class="row">
-            ${this.renderStatusDot()}
+            ${this.ollamaLoading
+              ? html`<span class="status-dot loading"></span>`
+              : html`<span class="status-dot ${this.ollamaStatus?.online ? 'online' : 'offline'}"></span>`}
             <span class="status-text">
-              ${this.statusLoading
+              ${this.ollamaLoading
                 ? 'Verbindung wird geprüft…'
-                : this.status?.online
-                  ? `Verbunden · Modell: ${this.status.model}`
+                : this.ollamaStatus?.online
+                  ? `Verbunden · Modell: ${this.ollamaStatus.model}`
                   : 'Nicht erreichbar'}
             </span>
             <button style="margin-left:auto;padding:0.25rem 0.6rem;font-size:0.78rem"
-              @click=${() => this.loadStatus()} ?disabled=${this.statusLoading}>
+              @click=${() => this.checkOnlineStatus()} ?disabled=${this.ollamaLoading}>
               ↻
             </button>
           </div>
@@ -212,7 +353,7 @@ export class SettingsView extends LitElement {
             <input
               type="text"
               .value=${this.baseUrl}
-              @input=${(e: Event) => { this.baseUrl = (e.target as HTMLInputElement).value; this.saveResult = null; }}
+              @input=${(e: Event) => { this.baseUrl = (e.target as HTMLInputElement).value; this.ollamaSaveResult = null; }}
             />
           </div>
 
@@ -221,7 +362,7 @@ export class SettingsView extends LitElement {
             ${this.models.length > 0
               ? html`
                 <select .value=${this.model}
-                  @change=${(e: Event) => { this.model = (e.target as HTMLSelectElement).value; this.saveResult = null; }}>
+                  @change=${(e: Event) => { this.model = (e.target as HTMLSelectElement).value; this.ollamaSaveResult = null; }}>
                   ${this.models.map(m => html`
                     <option value=${m.name} ?selected=${m.name === this.model}>${m.name}</option>
                   `)}
@@ -232,19 +373,19 @@ export class SettingsView extends LitElement {
                   type="text"
                   .value=${this.model}
                   placeholder="z.B. llama3.2"
-                  @input=${(e: Event) => { this.model = (e.target as HTMLInputElement).value; this.saveResult = null; }}
+                  @input=${(e: Event) => { this.model = (e.target as HTMLInputElement).value; this.ollamaSaveResult = null; }}
                 />
               `}
           </div>
 
           <div class="actions">
-            ${this.saveResult === 'success'
+            ${this.ollamaSaveResult === 'success'
               ? html`<span class="success-msg">Gespeichert ✓</span>`
-              : this.saveResult === 'error'
+              : this.ollamaSaveResult === 'error'
                 ? html`<span class="error-msg">Fehler beim Speichern</span>`
                 : ''}
-            <button class="primary" ?disabled=${this.saving} @click=${() => this.saveSettings()}>
-              ${this.saving ? 'Speichert…' : 'Speichern'}
+            <button class="primary" ?disabled=${this.ollamaSaving} @click=${() => this.saveOllamaSettings()}>
+              ${this.ollamaSaving ? 'Speichert…' : 'Speichern'}
             </button>
           </div>
         </div>
