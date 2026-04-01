@@ -57,6 +57,10 @@ public class PullRequestService(ITokenStore tokenStore) : IPullRequestService
         {
             throw new InvalidOperationException("GitHub API Rate Limit erreicht. Bitte später erneut versuchen.");
         }
+        catch (ApiException ex)
+        {
+            throw new InvalidOperationException($"GitHub API Fehler: {ex.Message}");
+        }
     }
 
     public async Task<PullRequestDetail> GetPullRequestDetailAsync(string owner, string repo, int number)
@@ -129,6 +133,10 @@ public class PullRequestService(ITokenStore tokenStore) : IPullRequestService
         catch (RateLimitExceededException)
         {
             throw new InvalidOperationException("GitHub API Rate Limit erreicht. Bitte später erneut versuchen.");
+        }
+        catch (ApiException ex)
+        {
+            throw new InvalidOperationException($"GitHub API Fehler: {ex.Message}");
         }
     }
 
