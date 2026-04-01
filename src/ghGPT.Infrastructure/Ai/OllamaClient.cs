@@ -15,7 +15,7 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
         var settings = settingsService.Load();
         try
         {
-            var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/api/tags");
+            var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models");
             return response.IsSuccessStatusCode;
         }
         catch
@@ -27,27 +27,34 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
     public async Task<IReadOnlyList<OllamaModelInfo>> GetModelsAsync()
     {
         var settings = settingsService.Load();
-        var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/api/tags");
+        var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models");
         response.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadFromJsonAsync<OllamaTagsResponse>();
-        return result?.Models?.Select(m => new OllamaModelInfo
+        var result = await response.Content.ReadFromJsonAsync<OpenAiModelsResponse>();
+        return result?.Data?.Select(m => new OllamaModelInfo
         {
-            Name = m.Name,
-            Size = m.Size,
-            ModifiedAt = m.ModifiedAt
+            Name = m.Id,
+            Size = 0,
+            ModifiedAt = DateTimeOffset.FromUnixTimeSeconds(m.Created).UtcDateTime
         }).ToList() ?? [];
     }
 
     public async IAsyncEnumerable<string> GenerateAsync(
-        string prompt,
+        IEnumerable<ChatMessage> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var settings = settingsService.Load();
-        var requestBody = new { model = settings.Model, prompt, stream = true };
+
+        var requestBody = new
+        {
+            model = settings.Model,
+            messages = messages.Select(m => new { role = m.Role, content = m.Content }),
+            stream = true
+        };
+
         var content = JsonContent.Create(requestBody);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl.TrimEnd('/')}/api/generate")
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl.TrimEnd('/')}/v1/chat/completions")
         {
             Content = content
         };
@@ -64,41 +71,48 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
         {
             var line = await reader.ReadLineAsync(cancellationToken);
             if (string.IsNullOrEmpty(line)) continue;
+            if (!line.StartsWith("data: ")) continue;
 
-            var chunk = JsonSerializer.Deserialize<OllamaGenerateChunk>(line);
-            if (chunk is null) continue;
+            var data = line["data: ".Length..];
+            if (data == "[DONE]") break;
 
-            if (!string.IsNullOrEmpty(chunk.Response))
-                yield return chunk.Response;
-
-            if (chunk.Done) break;
+            var chunk = JsonSerializer.Deserialize<OpenAiChunk>(data);
+            var token = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
+            if (!string.IsNullOrEmpty(token))
+                yield return token;
         }
     }
 
-    private sealed class OllamaTagsResponse
+    private sealed class OpenAiModelsResponse
     {
-        [JsonPropertyName("models")]
-        public List<OllamaModelEntry>? Models { get; set; }
+        [JsonPropertyName("data")]
+        public List<OpenAiModel>? Data { get; set; }
     }
 
-    private sealed class OllamaModelEntry
+    private sealed class OpenAiModel
     {
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
 
-        [JsonPropertyName("size")]
-        public long Size { get; set; }
-
-        [JsonPropertyName("modified_at")]
-        public DateTime ModifiedAt { get; set; }
+        [JsonPropertyName("created")]
+        public long Created { get; set; }
     }
 
-    private sealed class OllamaGenerateChunk
+    private sealed class OpenAiChunk
     {
-        [JsonPropertyName("response")]
-        public string Response { get; set; } = string.Empty;
+        [JsonPropertyName("choices")]
+        public List<OpenAiChoice>? Choices { get; set; }
+    }
 
-        [JsonPropertyName("done")]
-        public bool Done { get; set; }
+    private sealed class OpenAiChoice
+    {
+        [JsonPropertyName("delta")]
+        public OpenAiDelta? Delta { get; set; }
+    }
+
+    private sealed class OpenAiDelta
+    {
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
     }
 }

@@ -9,36 +9,26 @@ internal sealed class ChatService(IOllamaClient ollamaClient) : IChatService
         ChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var prompt = BuildPrompt(request);
+        var messages = BuildMessages(request);
 
-        await foreach (var token in ollamaClient.GenerateAsync(prompt, cancellationToken))
+        await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
         {
             yield return token;
         }
     }
 
-    private static string BuildPrompt(ChatRequest request)
+    private static IEnumerable<ChatMessage> BuildMessages(ChatRequest request)
     {
-        var context = new System.Text.StringBuilder();
-
-        context.AppendLine("Du bist ein hilfreicher Git-Assistent in der App ghGPT.");
+        var systemContent = new System.Text.StringBuilder();
+        systemContent.AppendLine("Du bist ein hilfreicher Git-Assistent in der App ghGPT.");
 
         if (!string.IsNullOrEmpty(request.RepoId))
-        {
-            context.Append("Aktives Repository: ");
-            context.AppendLine(request.RepoId);
-        }
+            systemContent.AppendLine($"Aktives Repository: {request.RepoId}");
 
         if (!string.IsNullOrEmpty(request.Branch))
-        {
-            context.Append("Aktiver Branch: ");
-            context.AppendLine(request.Branch);
-        }
+            systemContent.AppendLine($"Aktiver Branch: {request.Branch}");
 
-        context.AppendLine();
-        context.AppendLine("Benutzer:");
-        context.Append(request.Message);
-
-        return context.ToString();
+        yield return new ChatMessage { Role = "system", Content = systemContent.ToString().TrimEnd() };
+        yield return new ChatMessage { Role = "user", Content = request.Message };
     }
 }
