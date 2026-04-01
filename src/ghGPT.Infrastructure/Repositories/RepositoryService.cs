@@ -538,18 +538,39 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         info.CurrentBranch = repo.Head.FriendlyName;
     }
 
-    public void DeleteBranch(string id, string branchName)
+    public async Task DeleteBranch(string id, string branchName)
     {
         var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
-        var branch = repo.Branches[branchName]
-            ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
+        bool isRemote;
+        string remoteName;
+        string branchOnRemote;
 
-        if (branch.IsCurrentRepositoryHead)
-            throw new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden.");
+        using (var repo = new LibGit2Sharp.Repository(info.LocalPath))
+        {
+            var branch = repo.Branches[branchName]
+                ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
 
-        repo.Branches.Remove(branch);
+            if (branch.IsCurrentRepositoryHead)
+                throw new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden.");
+
+            isRemote = branch.IsRemote;
+            if (!isRemote)
+            {
+                repo.Branches.Remove(branch);
+                return;
+            }
+
+            remoteName = branch.RemoteName;
+            branchOnRemote = branch.FriendlyName[(remoteName.Length + 1)..];
+        }
+
+        await RunGitOperationAsync(id, $"push --delete {branchOnRemote}", null);
+
+        using var repoAfter = new LibGit2Sharp.Repository(info.LocalPath);
+        var trackingBranch = repoAfter.Branches[branchName];
+        if (trackingBranch is not null)
+            repoAfter.Branches.Remove(trackingBranch);
     }
 
     private static void ValidatePatch(string patch)
