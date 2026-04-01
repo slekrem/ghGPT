@@ -196,10 +196,10 @@ export class SettingsView extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    await Promise.all([this.loadOllamaStatus(), this.loadAccount()]);
+    await Promise.all([this.initOllamaSettings(), this.loadAccount()]);
   }
 
-  private async loadOllamaStatus() {
+  private async initOllamaSettings() {
     this.ollamaLoading = true;
     try {
       this.ollamaStatus = await aiService.getStatus();
@@ -215,13 +215,28 @@ export class SettingsView extends LitElement {
     }
   }
 
+  private async checkOnlineStatus() {
+    this.ollamaLoading = true;
+    try {
+      const status = await aiService.getStatus();
+      this.ollamaStatus = { ...status, baseUrl: this.baseUrl, model: this.model };
+      if (status.online) {
+        this.models = await aiService.getModels().catch(() => []);
+      }
+    } catch {
+      this.ollamaStatus = null;
+    } finally {
+      this.ollamaLoading = false;
+    }
+  }
+
   private async saveOllamaSettings() {
     this.ollamaSaving = true;
     this.ollamaSaveResult = null;
     try {
       await aiService.saveSettings({ baseUrl: this.baseUrl, model: this.model });
       this.ollamaSaveResult = 'success';
-      await this.loadOllamaStatus();
+      await this.checkOnlineStatus();
     } catch {
       this.ollamaSaveResult = 'error';
     } finally {
@@ -328,7 +343,7 @@ export class SettingsView extends LitElement {
                   : 'Nicht erreichbar'}
             </span>
             <button style="margin-left:auto;padding:0.25rem 0.6rem;font-size:0.78rem"
-              @click=${() => this.loadOllamaStatus()} ?disabled=${this.ollamaLoading}>
+              @click=${() => this.checkOnlineStatus()} ?disabled=${this.ollamaLoading}>
               ↻
             </button>
           </div>

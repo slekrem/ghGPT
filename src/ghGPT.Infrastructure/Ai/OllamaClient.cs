@@ -8,7 +8,7 @@ namespace ghGPT.Infrastructure.Ai;
 
 internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllamaClient
 {
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(3) };
 
     public async Task<bool> IsAvailableAsync()
     {
