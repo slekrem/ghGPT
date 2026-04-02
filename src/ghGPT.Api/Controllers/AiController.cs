@@ -5,7 +5,7 @@ namespace ghGPT.Api.Controllers;
 
 [ApiController]
 [Route("api/ai")]
-public class AiController(IOllamaClient ollamaClient, IAiSettingsService settingsService) : ControllerBase
+public class AiController(IOllamaClient ollamaClient, IAiSettingsService settingsService, IChatHistoryService historyService) : ControllerBase
 {
     [HttpGet("status")]
     public async Task<ActionResult<OllamaStatus>> GetStatus()
@@ -42,6 +42,20 @@ public class AiController(IOllamaClient ollamaClient, IAiSettingsService setting
             return BadRequest("BaseUrl und Model dürfen nicht leer sein.");
 
         settingsService.Save(settings);
+        return NoContent();
+    }
+
+    [HttpGet("history/{repoId}")]
+    public ActionResult<IReadOnlyList<ChatHistoryEntry>> GetHistory(string repoId)
+    {
+        var history = historyService.Load(repoId);
+        return Ok(history);
+    }
+
+    [HttpDelete("history/{repoId}")]
+    public IActionResult ClearHistory(string repoId)
+    {
+        historyService.Clear(repoId);
         return NoContent();
     }
 }

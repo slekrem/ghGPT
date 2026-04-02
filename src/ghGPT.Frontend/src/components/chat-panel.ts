@@ -43,7 +43,13 @@ export class ChatPanel extends LitElement {
       gap: 0.4rem;
     }
 
-    .close-btn {
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .close-btn, .clear-btn {
       background: none;
       border: none;
       color: #6c7086;
@@ -54,7 +60,8 @@ export class ChatPanel extends LitElement {
       line-height: 1;
     }
 
-    .close-btn:hover { color: #cdd6f4; background: #313244; }
+    .close-btn:hover, .clear-btn:hover { color: #cdd6f4; background: #313244; }
+    .clear-btn { font-size: 0.75rem; }
 
     .messages {
       flex: 1;
@@ -246,9 +253,44 @@ export class ChatPanel extends LitElement {
 
   private _abortController: AbortController | null = null;
 
+  connectedCallback() {
+    super.connectedCallback();
+    if (this.repoId) this.loadHistory();
+  }
+
+  updated(changed: Map<string, unknown>) {
+    if (changed.has('repoId') && changed.get('repoId') !== this.repoId) {
+      this.messages = [];
+      if (this.repoId) this.loadHistory();
+    }
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     this._abortController?.abort();
+  }
+
+  private async loadHistory() {
+    try {
+      const res = await fetch(`/api/ai/history/${encodeURIComponent(this.repoId)}`);
+      if (!res.ok) return;
+      const entries: Array<{ role: string; content: string }> = await res.json();
+      this.messages = entries
+        .filter(e => e.role === 'user' || e.role === 'assistant')
+        .map(e => ({ role: e.role as 'user' | 'assistant', content: e.content }));
+      this.scrollToBottom();
+    } catch {
+      // Verlauf nicht verfügbar — kein Problem
+    }
+  }
+
+  private async clearHistory() {
+    try {
+      await fetch(`/api/ai/history/${encodeURIComponent(this.repoId)}`, { method: 'DELETE' });
+    } catch {
+      // ignorieren
+    }
+    this.messages = [];
   }
 
   private async send() {
@@ -367,7 +409,12 @@ export class ChatPanel extends LitElement {
     return html`
       <div class="panel-header">
         <span class="panel-title">✦ KI-Assistent</span>
-        <button class="close-btn" @click=${() => this.dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }))}>✕</button>
+        <div class="header-actions">
+          ${this.messages.length > 0 && this.repoId ? html`
+            <button class="clear-btn" title="Verlauf löschen" @click=${() => this.clearHistory()}>🗑</button>
+          ` : nothing}
+          <button class="close-btn" @click=${() => this.dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }))}>✕</button>
+        </div>
       </div>
 
       <div class="messages">
