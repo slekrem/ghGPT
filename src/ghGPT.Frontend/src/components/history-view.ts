@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import {
   repositoryService,
@@ -261,6 +261,92 @@ export class HistoryView extends LitElement {
       color: #8f96b3;
       flex-shrink: 0;
     }
+
+    .summarize-btn {
+      background: transparent;
+      border: 1px solid #45475a;
+      border-radius: 4px;
+      color: #a6adc8;
+      cursor: pointer;
+      font-size: 0.72rem;
+      padding: 0.2rem 0.6rem;
+      white-space: nowrap;
+      align-self: flex-start;
+    }
+
+    .summarize-btn:hover:not(:disabled) { background: #313244; color: #cdd6f4; }
+    .summarize-btn:disabled { opacity: 0.45; cursor: default; }
+
+    .summary-overlay {
+      position: absolute;
+      inset: 0;
+      background: #1e1e2e;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #313244;
+    }
+
+    .summary-overlay-header {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid #313244;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .summary-overlay-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #cdd6f4;
+    }
+
+    .summary-overlay-actions {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+
+    .summary-copy-btn {
+      background: transparent;
+      border: 1px solid #45475a;
+      border-radius: 4px;
+      color: #a6adc8;
+      cursor: pointer;
+      font-size: 0.72rem;
+      padding: 0.15rem 0.5rem;
+    }
+
+    .summary-copy-btn:hover { background: #313244; color: #cdd6f4; }
+
+    .summary-close-btn {
+      background: none;
+      border: none;
+      color: #6c7086;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      line-height: 1;
+    }
+
+    .summary-close-btn:hover { color: #cdd6f4; background: #313244; }
+
+    .summary-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: #cdd6f4;
+      white-space: pre-wrap;
+    }
+
+    .summary-streaming {
+      color: #6c7086;
+      font-style: italic;
+    }
   `;
 
   private static readonly PAGE_SIZE = 100;
@@ -284,6 +370,10 @@ export class HistoryView extends LitElement {
   @state() private selectedFileIndex = 0;
   @state() private listScrollTop = 0;
   @state() private viewportHeight = 0;
+  @state() private summaryContent = '';
+  @state() private summaryStreaming = false;
+  @state() private showSummary = false;
+  @state() private copied = false;
 
   updated(changed: Map<string, unknown>) {
     if ((changed.has('repoId') || changed.has('branch') || changed.has('refreshKey')) && this.repoId) {
@@ -304,6 +394,8 @@ export class HistoryView extends LitElement {
     this.selectedCommit = null;
     this.selectedCommitSha = '';
     this.selectedFileIndex = 0;
+    this.summaryContent = '';
+    this.showSummary = false;
     await this.loadMoreCommits(true);
     await this.updateComplete;
     if (this.listScroll) {
@@ -311,6 +403,53 @@ export class HistoryView extends LitElement {
       this.viewportHeight = this.listScroll.clientHeight;
       this.listScrollTop = 0;
     }
+  }
+
+  private async startSummary() {
+    if (this.summaryStreaming || this.entries.length === 0) return;
+    this.summaryContent = '';
+    this.summaryStreaming = true;
+    this.showSummary = true;
+    this.copied = false;
+
+    try {
+      const count = Math.min(this.entries.length, 20);
+      const response = await fetch(
+        `/api/repos/${encodeURIComponent(this.repoId)}/ai/summarize-history?count=${count}`,
+        { method: 'POST' }
+      );
+      if (!response.ok || !response.body) throw new Error('Anfrage fehlgeschlagen');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.startsWith('event: done')) return;
+          if (line.startsWith('data: ')) {
+            this.summaryContent += JSON.parse(line.slice(6)) as string;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[CommitSummary] Stream-Fehler:', err);
+      this.summaryContent += '\n\nFehler beim Laden der Zusammenfassung.';
+    } finally {
+      this.summaryStreaming = false;
+    }
+  }
+
+  private async copySummary() {
+    if (!this.summaryContent) return;
+    await navigator.clipboard.writeText(this.summaryContent);
+    this.copied = true;
+    setTimeout(() => { this.copied = false; }, 2000);
   }
 
   private async loadMoreCommits(reset = false) {
@@ -460,11 +599,38 @@ export class HistoryView extends LitElement {
     const totalHeight = this.entries.length * HistoryView.ROW_HEIGHT;
 
     return html`
-      <section class="list-panel">
+      <section class="list-panel" style="position:relative">
         <div class="panel-header">
           <div class="panel-subtitle">History</div>
           <div class="panel-title">${this.branchName || this.branch || 'Aktueller Branch'}</div>
+          <button class="summarize-btn"
+            ?disabled=${this.entries.length === 0 || this.summaryStreaming}
+            @click=${() => this.startSummary()}>
+            ✦ ${this.summaryStreaming ? 'Zusammenfasse…' : 'Zusammenfassen'}
+          </button>
         </div>
+
+        ${this.showSummary ? html`
+          <div class="summary-overlay">
+            <div class="summary-overlay-header">
+              <span class="summary-overlay-title">✦ Zusammenfassung</span>
+              <div class="summary-overlay-actions">
+                ${this.summaryContent ? html`
+                  <button class="summary-copy-btn" @click=${() => this.copySummary()}>
+                    ${this.copied ? '✓ Kopiert' : 'Kopieren'}
+                  </button>
+                ` : nothing}
+                <button class="summary-close-btn" @click=${() => { this.showSummary = false; }}>✕</button>
+              </div>
+            </div>
+            <div class="summary-content">
+              ${this.summaryStreaming && !this.summaryContent
+                ? html`<span class="summary-streaming">Analysiere Commits…</span>`
+                : this.summaryContent}
+              ${this.summaryStreaming ? html`<span class="summary-streaming"> ▌</span>` : nothing}
+            </div>
+          </div>
+        ` : nothing}
 
         ${this.listError
           ? html`<div class="error">${this.listError}</div>`
