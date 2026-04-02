@@ -3,6 +3,14 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+
+// Erlaubte Tags und Attribute für das Markdown-Review-Rendering
+const REVIEW_PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['h1', 'h2', 'h3', 'p', 'br', 'hr', 'strong', 'em', 'a', 'code', 'pre',
+                 'ul', 'ol', 'li', 'blockquote'],
+  ALLOWED_ATTR: ['href', 'title', 'rel'],
+};
 import { repositoryService, type FileStatusEntry, type RepositoryStatusResult } from '../services/repository-service';
 
 interface ParsedHunk {
@@ -415,8 +423,10 @@ export class ChangesView extends LitElement {
       this.stagedLineKeyValues = [];
       this.diffError = '';
       this._orderedPaths = [];
+      this.resetReviewState();
       this.loadStatus();
     } else if (changed.has('refreshKey') && this.repoId) {
+      this.resetReviewState();
       const prevPath = this.selectedPath;
       this.loadStatus().then(async () => {
         if (!prevPath) return;
@@ -509,6 +519,28 @@ export class ChangesView extends LitElement {
     return result;
   }
 
+  private resetReviewState() {
+    this.reviewContent = '';
+    this.showReview = false;
+    this.reviewStreaming = false;
+  }
+
+  private handleReviewClick = () => {
+    if (this.showReview) {
+      this.showReview = false;
+    } else if (!this.reviewContent) {
+      this.startReview();
+    } else {
+      this.showReview = true;
+    }
+  };
+
+  private get reviewBtnText(): string {
+    if (this.reviewStreaming) return 'Analysiere…';
+    if (this.showReview) return 'Review ausblenden';
+    return this.reviewContent ? 'Review anzeigen' : 'Code-Review';
+  }
+
   private async startReview() {
     const totalCount = this.status.staged.length + this.status.unstaged.length;
     if (totalCount === 0 || this.reviewStreaming) return;
@@ -541,7 +573,8 @@ export class ChangesView extends LitElement {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('[CodeReview] Stream-Fehler:', err);
       this.reviewContent += '\n\n*Fehler beim Laden des Reviews.*';
     } finally {
       this.reviewStreaming = false;
@@ -1007,8 +1040,8 @@ export class ChangesView extends LitElement {
           <span class="diff-header-path">${this.selectedPath || 'Kein Diff'}</span>
           <button class="review-btn"
             ?disabled=${(this.status.staged.length + this.status.unstaged.length) === 0 || this.reviewStreaming}
-            @click=${this.startReview}>
-            ✦ ${this.reviewStreaming ? 'Analysiere…' : 'Code-Review'}
+            @click=${this.handleReviewClick}>
+            ✦ ${this.reviewBtnText}
           </button>
         </div>
         ${this.renderDiff()}
@@ -1021,7 +1054,7 @@ export class ChangesView extends LitElement {
             <div class="review-content">
               ${this.reviewStreaming && !this.reviewContent
                 ? html`<div class="review-streaming">Analysiere Änderungen…</div>`
-                : unsafeHTML(marked.parse(this.reviewContent || '') as string)}
+                : unsafeHTML(DOMPurify.sanitize(marked.parse(this.reviewContent || '') as string, REVIEW_PURIFY_CONFIG) as string)}
               ${this.reviewStreaming ? html`<div class="review-streaming" style="margin-top:0.5rem">▌</div>` : nothing}
             </div>
           </div>
