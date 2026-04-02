@@ -869,6 +869,7 @@ export class AppShell extends LitElement {
         <chat-panel
           .repoId=${this.activeRepoId ?? ''}
           .branch=${this.activeRepo?.currentBranch ?? ''}
+          .activeView=${this.activeView}
           @close=${() => this.showChat = false}>
         </chat-panel>
       ` : ''}
