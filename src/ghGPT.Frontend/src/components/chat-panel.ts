@@ -238,6 +238,7 @@ export class ChatPanel extends LitElement {
 
   @property() repoId = '';
   @property() branch = '';
+  @property() activeView = '';
 
   @state() private messages: Message[] = [];
   @state() private input = '';
@@ -268,7 +269,7 @@ export class ChatPanel extends LitElement {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, repoId: this.repoId || null, branch: this.branch || null }),
+        body: JSON.stringify({ message: text, repoId: this.repoId || null, branch: this.branch || null, activeView: this.activeView || null }),
         signal: this._abortController.signal,
       });
 
