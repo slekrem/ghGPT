@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddSingleton<IOllamaClient, OllamaClient>();
         services.AddSingleton<IChatHistoryService, ChatHistoryService>();
         services.AddSingleton<IChatService, ChatService>();
+        services.AddSingleton<ICommitMessageService, CommitMessageService>();
 
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
         services.AddSingleton<IRepositoryService, RepositoryService>();

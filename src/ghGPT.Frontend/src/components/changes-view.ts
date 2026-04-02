@@ -243,6 +243,30 @@ export class ChangesView extends LitElement {
     .commit-btn:disabled { background: #313244; color: #45475a; cursor: default; }
     .commit-btn:not(:disabled):hover { background: #b4d0ff; }
 
+    .ai-btn {
+      background: transparent;
+      border: 1px solid #45475a;
+      border-radius: 4px;
+      color: #a6adc8;
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      align-self: flex-start;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .ai-btn:hover:not(:disabled) { background: #313244; color: #cdd6f4; }
+    .ai-btn:disabled { opacity: 0.45; cursor: default; }
+
+    .ai-streaming {
+      font-size: 0.72rem;
+      color: #89b4fa;
+      font-style: italic;
+      min-height: 1em;
+    }
+
     .commit-error {
       font-size: 0.72rem;
       color: #f38ba8;
@@ -262,6 +286,8 @@ export class ChangesView extends LitElement {
   @state() private diffError = '';
   @state() private commitMessage = '';
   @state() private commitDescription = '';
+  @state() private generatingMessage = false;
+  @state() private aiStreamPreview = '';
   @state() private commitError = '';
   @state() private committing = false;
   @state() private lineActionInProgress = false;
@@ -367,6 +393,52 @@ export class ChangesView extends LitElement {
       this.fileEntries.scrollTop = scrollTop;
     }
     return result;
+  }
+
+  private async generateCommitMessage() {
+    if (this.generatingMessage || this.status.staged.length === 0) return;
+    this.generatingMessage = true;
+    this.aiStreamPreview = '';
+    this.commitMessage = '';
+
+    try {
+      const response = await fetch(`/api/repos/${encodeURIComponent(this.repoId)}/ai/commit-message`, {
+        method: 'POST',
+      });
+      if (!response.ok || !response.body) throw new Error('Anfrage fehlgeschlagen');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulated = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.startsWith('event: done')) {
+            this.commitMessage = accumulated.trim();
+            this.aiStreamPreview = '';
+            return;
+          }
+          if (line.startsWith('data: ')) {
+            const token: string = JSON.parse(line.slice(6));
+            accumulated += token;
+            this.aiStreamPreview = accumulated;
+          }
+        }
+      }
+      this.commitMessage = accumulated.trim();
+      this.aiStreamPreview = '';
+    } catch {
+      // Fehler still ignorieren
+    } finally {
+      this.generatingMessage = false;
+      this.aiStreamPreview = '';
+    }
   }
 
   private async doCommit() {
@@ -756,6 +828,12 @@ export class ChangesView extends LitElement {
         </div>
 
         <div class="commit-form">
+          <button class="ai-btn"
+            ?disabled=${stagedCount === 0 || this.generatingMessage || this.committing}
+            @click=${this.generateCommitMessage}>
+            ✦ ${this.generatingMessage ? 'Generiere…' : 'KI-Vorschlag'}
+          </button>
+          ${this.aiStreamPreview ? html`<div class="ai-streaming">${this.aiStreamPreview}</div>` : ''}
           <input class="commit-input" type="text" placeholder="Commit-Titel (Pflichtfeld)"
             .value=${this.commitMessage}
             @input=${(e: Event) => { this.commitMessage = (e.target as HTMLInputElement).value; }} />
