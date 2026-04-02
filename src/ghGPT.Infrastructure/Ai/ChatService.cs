@@ -12,8 +12,6 @@ internal sealed class ChatService(
     IRepositoryService repositoryService,
     IPullRequestService pullRequestService) : IChatService
 {
-    private const int MaxDiffChars = 3000;
-
     public async IAsyncEnumerable<string> StreamAsync(
         ChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -136,24 +134,17 @@ internal sealed class ChatService(
         sb.AppendLine($"Geänderte Dateien: {allFiles.Count}");
         sb.AppendLine();
 
-        var totalChars = 0;
         foreach (var file in allFiles)
         {
-            if (totalChars >= MaxDiffChars) break;
             try
             {
                 var diff = repositoryService.GetCombinedDiff(repoId, file);
                 if (string.IsNullOrEmpty(diff)) continue;
 
-                var excerpt = diff.Length + totalChars > MaxDiffChars
-                    ? diff[..(MaxDiffChars - totalChars)] + "\n... (gekürzt)"
-                    : diff;
-
                 sb.AppendLine($"### {file}");
                 sb.AppendLine("```diff");
-                sb.AppendLine(excerpt);
+                sb.AppendLine(diff);
                 sb.AppendLine("```");
-                totalChars += excerpt.Length;
             }
             catch { /* Datei überspringen */ }
         }
