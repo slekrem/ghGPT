@@ -258,6 +258,13 @@ export class ChatPanel extends LitElement {
     if (this.repoId) this.loadHistory();
   }
 
+  updated(changed: Map<string, unknown>) {
+    if (changed.has('repoId') && changed.get('repoId') !== this.repoId) {
+      this.messages = [];
+      if (this.repoId) this.loadHistory();
+    }
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     this._abortController?.abort();
