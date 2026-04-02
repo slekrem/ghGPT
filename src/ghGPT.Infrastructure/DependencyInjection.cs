@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddSingleton<IChatHistoryService, ChatHistoryService>();
         services.AddSingleton<IChatService, ChatService>();
         services.AddSingleton<ICommitMessageService, CommitMessageService>();
+        services.AddSingleton<ICodeReviewService, CodeReviewService>();
 
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
         services.AddSingleton<IRepositoryService, RepositoryService>();

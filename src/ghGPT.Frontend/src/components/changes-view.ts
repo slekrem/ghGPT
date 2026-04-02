@@ -1,6 +1,16 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+
+// Erlaubte Tags und Attribute für das Markdown-Review-Rendering
+const REVIEW_PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['h1', 'h2', 'h3', 'p', 'br', 'hr', 'strong', 'em', 'a', 'code', 'pre',
+                 'ul', 'ol', 'li', 'blockquote'],
+  ALLOWED_ATTR: ['href', 'title', 'rel'],
+};
 import { repositoryService, type FileStatusEntry, type RepositoryStatusResult } from '../services/repository-service';
 
 interface ParsedHunk {
@@ -125,7 +135,116 @@ export class ChangesView extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
+
+    .diff-header-path {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .review-btn {
+      background: transparent;
+      border: 1px solid #45475a;
+      border-radius: 4px;
+      color: #a6adc8;
+      cursor: pointer;
+      font-size: 0.72rem;
+      padding: 0.15rem 0.55rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .review-btn:hover:not(:disabled) { background: #313244; color: #cdd6f4; }
+    .review-btn:disabled { opacity: 0.45; cursor: default; }
+
+    .review-overlay {
+      position: absolute;
+      inset: 0;
+      background: #181825;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .review-overlay-header {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid #313244;
+      background: #1e1e2e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .review-overlay-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #cdd6f4;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .review-close-btn {
+      background: none;
+      border: none;
+      color: #6c7086;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      line-height: 1;
+    }
+
+    .review-close-btn:hover { color: #cdd6f4; background: #313244; }
+
+    .review-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.25rem;
+      font-size: 0.83rem;
+      line-height: 1.6;
+      color: #cdd6f4;
+    }
+
+    .review-streaming {
+      font-style: italic;
+      color: #6c7086;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .review-content h2 { font-size: 0.9rem; color: #cdd6f4; margin: 0.75em 0 0.35em; }
+    .review-content h3 { font-size: 0.84rem; color: #a6adc8; margin: 0.6em 0 0.25em; }
+    .review-content p { margin: 0 0 0.5em; }
+    .review-content p:last-child { margin-bottom: 0; }
+    .review-content ul, .review-content ol { margin: 0.25em 0; padding-left: 1.4em; }
+    .review-content li { margin: 0.15em 0; }
+    .review-content strong { color: #cba6f7; }
+    .review-content code {
+      background: #313244;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+      font-family: 'Cascadia Code', monospace;
+      font-size: 0.77rem;
+      color: #89b4fa;
+    }
+    .review-content pre {
+      background: #11111b;
+      border: 1px solid #313244;
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      overflow-x: auto;
+      margin: 0.4em 0;
+    }
+    .review-content pre code { background: none; padding: 0; color: #cdd6f4; }
 
     .diff-content {
       flex: 1;
@@ -288,6 +407,9 @@ export class ChangesView extends LitElement {
   @state() private commitDescription = '';
   @state() private generatingMessage = false;
   @state() private aiStreamPreview = '';
+  @state() private reviewContent = '';
+  @state() private reviewStreaming = false;
+  @state() private showReview = false;
   @state() private commitError = '';
   @state() private committing = false;
   @state() private lineActionInProgress = false;
@@ -301,8 +423,10 @@ export class ChangesView extends LitElement {
       this.stagedLineKeyValues = [];
       this.diffError = '';
       this._orderedPaths = [];
+      this.resetReviewState();
       this.loadStatus();
     } else if (changed.has('refreshKey') && this.repoId) {
+      this.resetReviewState();
       const prevPath = this.selectedPath;
       this.loadStatus().then(async () => {
         if (!prevPath) return;
@@ -393,6 +517,68 @@ export class ChangesView extends LitElement {
       this.fileEntries.scrollTop = scrollTop;
     }
     return result;
+  }
+
+  private resetReviewState() {
+    this.reviewContent = '';
+    this.showReview = false;
+    this.reviewStreaming = false;
+  }
+
+  private handleReviewClick = () => {
+    if (this.showReview) {
+      this.showReview = false;
+    } else if (!this.reviewContent) {
+      this.startReview();
+    } else {
+      this.showReview = true;
+    }
+  };
+
+  private get reviewBtnText(): string {
+    if (this.reviewStreaming) return 'Analysiere…';
+    if (this.showReview) return 'Review ausblenden';
+    return this.reviewContent ? 'Review anzeigen' : 'Code-Review';
+  }
+
+  private async startReview() {
+    const totalCount = this.status.staged.length + this.status.unstaged.length;
+    if (totalCount === 0 || this.reviewStreaming) return;
+
+    this.showReview = true;
+    this.reviewStreaming = true;
+    this.reviewContent = '';
+
+    try {
+      const response = await fetch(`/api/repos/${encodeURIComponent(this.repoId)}/ai/review`, {
+        method: 'POST',
+      });
+      if (!response.ok || !response.body) throw new Error('Anfrage fehlgeschlagen');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.startsWith('event: done')) { return; }
+          if (line.startsWith('data: ')) {
+            const token: string = JSON.parse(line.slice(6));
+            this.reviewContent += token;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[CodeReview] Stream-Fehler:', err);
+      this.reviewContent += '\n\n*Fehler beim Laden des Reviews.*';
+    } finally {
+      this.reviewStreaming = false;
+    }
   }
 
   private async generateCommitMessage() {
@@ -849,9 +1035,30 @@ export class ChangesView extends LitElement {
         </div>
       </div>
 
-      <div class="diff-panel">
-        <div class="diff-header">${this.selectedPath || 'Kein Diff'}</div>
+      <div class="diff-panel" style="position:relative">
+        <div class="diff-header">
+          <span class="diff-header-path">${this.selectedPath || 'Kein Diff'}</span>
+          <button class="review-btn"
+            ?disabled=${(this.status.staged.length + this.status.unstaged.length) === 0 || this.reviewStreaming}
+            @click=${this.handleReviewClick}>
+            ✦ ${this.reviewBtnText}
+          </button>
+        </div>
         ${this.renderDiff()}
+        ${this.showReview ? html`
+          <div class="review-overlay">
+            <div class="review-overlay-header">
+              <span class="review-overlay-title">✦ Code-Review</span>
+              <button class="review-close-btn" @click=${() => { this.showReview = false; }}>✕</button>
+            </div>
+            <div class="review-content">
+              ${this.reviewStreaming && !this.reviewContent
+                ? html`<div class="review-streaming">Analysiere Änderungen…</div>`
+                : unsafeHTML(DOMPurify.sanitize(marked.parse(this.reviewContent || '') as string, REVIEW_PURIFY_CONFIG) as string)}
+              ${this.reviewStreaming ? html`<div class="review-streaming" style="margin-top:0.5rem">▌</div>` : nothing}
+            </div>
+          </div>
+        ` : nothing}
       </div>
     `;
   }
