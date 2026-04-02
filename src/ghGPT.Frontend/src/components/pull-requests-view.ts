@@ -475,28 +475,36 @@ export class PullRequestsView extends LitElement {
   }
 
   private async loadPrs() {
+    const requestedRepoId = this.repoId;
     this.loading = true;
     this.error = null;
     try {
-      this.prs = await repositoryService.getPullRequests(this.repoId, this.stateFilter);
+      const result = await repositoryService.getPullRequests(requestedRepoId, this.stateFilter);
+      if (this.repoId !== requestedRepoId) return;
+      this.prs = result;
     } catch (e: unknown) {
+      if (this.repoId !== requestedRepoId) return;
       this.error = e instanceof Error ? e.message : 'Fehler beim Laden der Pull Requests.';
     } finally {
-      this.loading = false;
+      if (this.repoId === requestedRepoId) this.loading = false;
     }
   }
 
   private async selectPr(number: number) {
+    const requestedRepoId = this.repoId;
     this.selectedNumber = number;
     this.selectedPr = null;
     this.detailError = null;
     this.loadingDetail = true;
     try {
-      this.selectedPr = await repositoryService.getPullRequestDetail(this.repoId, number);
+      const result = await repositoryService.getPullRequestDetail(requestedRepoId, number);
+      if (this.repoId !== requestedRepoId || this.selectedNumber !== number) return;
+      this.selectedPr = result;
     } catch (e: unknown) {
+      if (this.repoId !== requestedRepoId || this.selectedNumber !== number) return;
       this.detailError = e instanceof Error ? e.message : 'Fehler beim Laden des PR-Details.';
     } finally {
-      this.loadingDetail = false;
+      if (this.repoId === requestedRepoId && this.selectedNumber === number) this.loadingDetail = false;
     }
   }
 
