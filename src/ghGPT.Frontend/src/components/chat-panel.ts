@@ -1,5 +1,9 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import { marked } from 'marked';
+
+marked.setOptions({ breaks: true });
 
 interface Message {
   role: 'user' | 'assistant';
@@ -89,12 +93,13 @@ export class ChatPanel extends LitElement {
       color: #6c7086;
     }
 
+    .message.user .message-label { text-align: right; }
+
     .message-bubble {
       padding: 0.5rem 0.75rem;
       border-radius: 8px;
       font-size: 0.82rem;
       line-height: 1.5;
-      white-space: pre-wrap;
       word-break: break-word;
     }
 
@@ -102,16 +107,71 @@ export class ChatPanel extends LitElement {
       background: #313244;
       color: #cdd6f4;
       align-self: flex-end;
-    }
-
-    .message.user .message-label {
-      text-align: right;
+      white-space: pre-wrap;
     }
 
     .message.assistant .message-bubble {
       background: #181825;
       border: 1px solid #313244;
       color: #cdd6f4;
+    }
+
+    /* Markdown styles inside assistant bubble */
+    .message.assistant .message-bubble p {
+      margin: 0 0 0.5em;
+    }
+    .message.assistant .message-bubble p:last-child { margin-bottom: 0; }
+
+    .message.assistant .message-bubble pre {
+      background: #11111b;
+      border: 1px solid #313244;
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem;
+      overflow-x: auto;
+      margin: 0.4em 0;
+    }
+
+    .message.assistant .message-bubble code {
+      font-family: 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.78rem;
+    }
+
+    .message.assistant .message-bubble pre code {
+      background: none;
+      padding: 0;
+      color: #cdd6f4;
+    }
+
+    .message.assistant .message-bubble :not(pre) > code {
+      background: #313244;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+      color: #89b4fa;
+    }
+
+    .message.assistant .message-bubble ul,
+    .message.assistant .message-bubble ol {
+      margin: 0.3em 0;
+      padding-left: 1.25em;
+    }
+
+    .message.assistant .message-bubble li { margin: 0.1em 0; }
+
+    .message.assistant .message-bubble strong { color: #cba6f7; }
+
+    .message.assistant .message-bubble blockquote {
+      border-left: 3px solid #45475a;
+      margin: 0.4em 0;
+      padding-left: 0.75em;
+      color: #a6adc8;
+    }
+
+    .message.assistant .message-bubble h1,
+    .message.assistant .message-bubble h2,
+    .message.assistant .message-bubble h3 {
+      margin: 0.5em 0 0.25em;
+      color: #cdd6f4;
+      font-size: 0.9rem;
     }
 
     .cursor {
@@ -134,6 +194,7 @@ export class ChatPanel extends LitElement {
       display: flex;
       gap: 0.5rem;
       flex-shrink: 0;
+      align-items: flex-end;
     }
 
     textarea {
@@ -149,6 +210,7 @@ export class ChatPanel extends LitElement {
       line-height: 1.4;
       min-height: 36px;
       max-height: 120px;
+      overflow-y: auto;
     }
 
     textarea:focus {
@@ -166,8 +228,8 @@ export class ChatPanel extends LitElement {
       color: #89b4fa;
       cursor: pointer;
       font-size: 0.9rem;
-      align-self: flex-end;
       flex-shrink: 0;
+      height: 36px;
     }
 
     .send-btn:hover { background: #313244; }
@@ -193,6 +255,7 @@ export class ChatPanel extends LitElement {
     if (!text || this.streaming) return;
 
     this.input = '';
+    this.resetTextareaHeight();
     this.messages = [...this.messages, { role: 'user', content: text }];
     this.streaming = true;
 
@@ -265,11 +328,21 @@ export class ChatPanel extends LitElement {
     }
     this.streaming = false;
     this._abortController = null;
+    this.scrollToBottom();
   }
 
   private scrollToBottom() {
-    const el = this.shadowRoot?.querySelector('.messages');
-    if (el) el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      const el = this.shadowRoot?.querySelector('.messages');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  private onInput(e: Event) {
+    const ta = e.target as HTMLTextAreaElement;
+    this.input = ta.value;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
   }
 
   private onKeydown(e: KeyboardEvent) {
@@ -277,6 +350,16 @@ export class ChatPanel extends LitElement {
       e.preventDefault();
       this.send();
     }
+  }
+
+  private resetTextareaHeight() {
+    const ta = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (ta) ta.style.height = 'auto';
+  }
+
+  private renderMarkdown(content: string) {
+    const html = marked.parse(content) as string;
+    return unsafeHTML(html);
   }
 
   render() {
@@ -296,7 +379,9 @@ export class ChatPanel extends LitElement {
           <div class="message ${m.role}">
             <span class="message-label">${m.role === 'user' ? 'Du' : 'Assistent'}</span>
             <div class="message-bubble">
-              ${m.content}${m.streaming ? html`<span class="cursor"></span>` : ''}
+              ${m.role === 'assistant'
+                ? html`${this.renderMarkdown(m.content)}${m.streaming ? html`<span class="cursor"></span>` : nothing}`
+                : html`${m.content}`}
             </div>
           </div>
         `)}
@@ -306,7 +391,7 @@ export class ChatPanel extends LitElement {
         <textarea
           placeholder="Nachricht eingeben… (Enter zum Senden)"
           .value=${this.input}
-          @input=${(e: Event) => { this.input = (e.target as HTMLTextAreaElement).value; }}
+          @input=${this.onInput}
           @keydown=${this.onKeydown}
           ?disabled=${this.streaming}
           rows="1"
