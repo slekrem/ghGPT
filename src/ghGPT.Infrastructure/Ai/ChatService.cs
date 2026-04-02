@@ -10,18 +10,27 @@ namespace ghGPT.Infrastructure.Ai;
 internal sealed class ChatService(
     IOllamaClient ollamaClient,
     IRepositoryService repositoryService,
-    IPullRequestService pullRequestService) : IChatService
+    IPullRequestService pullRequestService,
+    IChatHistoryService historyService) : IChatService
 {
     public async IAsyncEnumerable<string> StreamAsync(
         ChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var messages = await BuildMessagesAsync(request);
+        var assistantResponse = new StringBuilder();
+
+        if (!string.IsNullOrEmpty(request.RepoId))
+            historyService.Append(request.RepoId, "user", request.Message);
 
         await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
         {
+            assistantResponse.Append(token);
             yield return token;
         }
+
+        if (!string.IsNullOrEmpty(request.RepoId) && assistantResponse.Length > 0)
+            historyService.Append(request.RepoId, "assistant", assistantResponse.ToString());
     }
 
     private async Task<IEnumerable<ChatMessage>> BuildMessagesAsync(ChatRequest request)
@@ -38,6 +47,14 @@ internal sealed class ChatService(
         var viewContext = await BuildViewContextAsync(request);
         if (viewContext is not null)
             result.Add(new ChatMessage { Role = "system", Content = viewContext });
+
+        // Gesprächshistorie nach den System-Messages einfügen
+        if (!string.IsNullOrEmpty(request.RepoId))
+        {
+            var history = historyService.Load(request.RepoId);
+            foreach (var entry in history)
+                result.Add(new ChatMessage { Role = entry.Role, Content = entry.Content });
+        }
 
         result.Add(new ChatMessage { Role = "user", Content = request.Message });
         return result;
