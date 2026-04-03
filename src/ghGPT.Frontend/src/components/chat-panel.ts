@@ -6,9 +6,12 @@ import { marked } from 'marked';
 marked.setOptions({ breaks: true });
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool';
   content: string;
   streaming?: boolean;
+  toolName?: string;
+  toolDisplayArgs?: string;
+  toolSuccess?: boolean;
 }
 
 @customElement('chat-panel')
@@ -181,6 +184,24 @@ export class ChatPanel extends LitElement {
       font-size: 0.9rem;
     }
 
+    .tool-card {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      border: 1px solid #313244;
+      background: #181825;
+      color: #a6adc8;
+    }
+
+    .tool-card.success { border-color: #a6e3a1; color: #a6e3a1; }
+    .tool-card.error { border-color: #f38ba8; color: #f38ba8; }
+
+    .tool-icon { font-size: 0.9rem; flex-shrink: 0; }
+    .tool-label { flex: 1; font-family: 'Cascadia Code', 'Consolas', monospace; }
+
     .cursor {
       display: inline-block;
       width: 2px;
@@ -252,6 +273,7 @@ export class ChatPanel extends LitElement {
   @state() private streaming = false;
 
   private _abortController: AbortController | null = null;
+  private _pendingToolEvent = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -335,9 +357,19 @@ export class ChatPanel extends LitElement {
             return;
           }
           if (line.startsWith('event: error')) continue;
+          if (line.startsWith('event: tool')) {
+            this._pendingToolEvent = true;
+            continue;
+          }
           if (line.startsWith('data: ')) {
-            const token = JSON.parse(line.slice(6));
-            this.appendToken(token);
+            if (this._pendingToolEvent) {
+              this._pendingToolEvent = false;
+              const toolEvent = JSON.parse(line.slice(6));
+              this.addToolCard(toolEvent);
+            } else {
+              const token = JSON.parse(line.slice(6));
+              this.appendToken(token);
+            }
           }
         }
       }
@@ -348,6 +380,30 @@ export class ChatPanel extends LitElement {
     } finally {
       this.finalizeLastMessage();
     }
+  }
+
+  private addToolCard(toolEvent: { toolName: string; displayArgs: string; success: boolean; message: string }) {
+    // Streaming-Message temporär finalisieren damit die Tool-Karte davor eingefügt wird
+    const last = this.messages[this.messages.length - 1];
+    const hasStreamingAssistant = last?.role === 'assistant' && last.streaming;
+    if (hasStreamingAssistant) {
+      this.messages = [...this.messages.slice(0, -1)];
+    }
+
+    this.messages = [...this.messages, {
+      role: 'tool',
+      content: toolEvent.message,
+      toolName: toolEvent.toolName,
+      toolDisplayArgs: toolEvent.displayArgs,
+      toolSuccess: toolEvent.success,
+    }];
+
+    // Streaming-Message wieder anhängen
+    if (hasStreamingAssistant) {
+      this.messages = [...this.messages, last];
+    }
+
+    this.scrollToBottom();
   }
 
   private appendToken(token: string) {
@@ -423,16 +479,28 @@ export class ChatPanel extends LitElement {
             <span class="empty-icon">✦</span>
             <span>Stelle eine Frage oder beschreibe eine Aufgabe</span>
           </div>
-        ` : this.messages.map(m => html`
-          <div class="message ${m.role}">
-            <span class="message-label">${m.role === 'user' ? 'Du' : 'Assistent'}</span>
-            <div class="message-bubble">
-              ${m.role === 'assistant'
-                ? html`${this.renderMarkdown(m.content)}${m.streaming ? html`<span class="cursor"></span>` : nothing}`
-                : html`${m.content}`}
+        ` : this.messages.map(m => {
+          if (m.role === 'tool') {
+            const icon = m.toolSuccess ? '✓' : '✗';
+            const cls = m.toolSuccess ? 'success' : 'error';
+            return html`
+              <div class="tool-card ${cls}">
+                <span class="tool-icon">${icon}</span>
+                <span class="tool-label">${m.content}</span>
+              </div>
+            `;
+          }
+          return html`
+            <div class="message ${m.role}">
+              <span class="message-label">${m.role === 'user' ? 'Du' : 'Assistent'}</span>
+              <div class="message-bubble">
+                ${m.role === 'assistant'
+                  ? html`${this.renderMarkdown(m.content)}${m.streaming ? html`<span class="cursor"></span>` : nothing}`
+                  : html`${m.content}`}
+              </div>
             </div>
-          </div>
-        `)}
+          `;
+        })}
       </div>
 
       <div class="input-area">
