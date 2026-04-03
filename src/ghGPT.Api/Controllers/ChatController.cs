@@ -20,13 +20,27 @@ public class ChatController(IChatService chatService) : ControllerBase
 
         try
         {
-            await foreach (var token in chatService.StreamAsync(request, cancellationToken))
+            await foreach (var chatEvent in chatService.StreamAsync(request, cancellationToken))
             {
-                var data = JsonSerializer.Serialize(token);
-                var line = $"data: {data}\n\n";
-                var bytes = Encoding.UTF8.GetBytes(line);
-                await Response.Body.WriteAsync(bytes, cancellationToken);
-                await Response.Body.FlushAsync(cancellationToken);
+                switch (chatEvent)
+                {
+                    case TokenEvent tokenEvent:
+                        var data = JsonSerializer.Serialize(tokenEvent.Token);
+                        var line = $"data: {data}\n\n";
+                        await WriteRaw(line, cancellationToken);
+                        break;
+
+                    case ToolExecutedEvent toolEvent:
+                        var toolData = JsonSerializer.Serialize(new
+                        {
+                            toolName = toolEvent.ToolName,
+                            displayArgs = toolEvent.DisplayArgs,
+                            success = toolEvent.Success,
+                            message = toolEvent.Message
+                        });
+                        await WriteRaw($"event: tool\ndata: {toolData}\n\n", cancellationToken);
+                        break;
+                }
             }
 
             await WriteEvent("done", "", cancellationToken);
@@ -41,11 +55,16 @@ public class ChatController(IChatService chatService) : ControllerBase
         }
     }
 
+    private async Task WriteRaw(string text, CancellationToken cancellationToken)
+    {
+        var bytes = Encoding.UTF8.GetBytes(text);
+        await Response.Body.WriteAsync(bytes, cancellationToken);
+        await Response.Body.FlushAsync(cancellationToken);
+    }
+
     private async Task WriteEvent(string eventType, string data, CancellationToken cancellationToken)
     {
         var line = $"event: {eventType}\ndata: {JsonSerializer.Serialize(data)}\n\n";
-        var bytes = Encoding.UTF8.GetBytes(line);
-        await Response.Body.WriteAsync(bytes, cancellationToken);
-        await Response.Body.FlushAsync(cancellationToken);
+        await WriteRaw(line, cancellationToken);
     }
 }
