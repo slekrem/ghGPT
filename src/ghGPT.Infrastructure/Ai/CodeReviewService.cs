@@ -1,5 +1,6 @@
 using ghGPT.Core.Ai;
 using ghGPT.Core.Repositories;
+using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -7,18 +8,20 @@ namespace ghGPT.Infrastructure.Ai;
 
 internal sealed class CodeReviewService(
     IOllamaClient ollamaClient,
-    IRepositoryService repositoryService) : ICodeReviewService
+    IRepositoryService repositoryService,
+    ILogger<CodeReviewService> logger) : ICodeReviewService
 {
     public async IAsyncEnumerable<string> StreamReviewAsync(
         string repoId,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var diff = BuildCombinedDiff(repoId);
+        var reviewContext = LoadReviewContext(repoId);
 
         var messages = new[]
         {
             new ChatMessage { Role = "system", Content = SystemPrompt },
-            new ChatMessage { Role = "user", Content = BuildUserPrompt(diff) }
+            new ChatMessage { Role = "user", Content = BuildUserPrompt(diff, reviewContext) }
         };
 
         await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
@@ -48,16 +51,44 @@ internal sealed class CodeReviewService(
         - Antworte auf Deutsch
         """;
 
-    private static string BuildUserPrompt(string diff)
+    private static string BuildUserPrompt(string diff, string? reviewContext)
     {
         if (string.IsNullOrWhiteSpace(diff))
             return "Es gibt keine Änderungen zum Reviewen.";
 
+        if (string.IsNullOrWhiteSpace(reviewContext))
+            return $"""
+                Reviewe den folgenden Git-Diff:
+
+                {diff}
+                """;
+
         return $"""
+            Berücksichtige folgenden Projekt-Kontext beim Review:
+
+            {reviewContext}
+
             Reviewe den folgenden Git-Diff:
 
             {diff}
             """;
+    }
+
+    private string? LoadReviewContext(string repoId)
+    {
+        try
+        {
+            var repo = repositoryService.GetAll().FirstOrDefault(r => r.Id == repoId);
+            if (repo is null) return null;
+
+            var reviewFile = Path.Combine(repo.LocalPath, "REVIEW.md");
+            return File.Exists(reviewFile) ? File.ReadAllText(reviewFile) : null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "REVIEW.md konnte nicht geladen werden für Repo {RepoId}.", repoId);
+            return null;
+        }
     }
 
     private string BuildCombinedDiff(string repoId)
