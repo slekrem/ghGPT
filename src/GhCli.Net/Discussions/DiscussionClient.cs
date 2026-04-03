@@ -8,7 +8,7 @@ namespace GhCli.Net.Discussions;
 
 internal class DiscussionClient(IGhCliRunner runner) : IDiscussionClient
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = new();
 
     private const string ListQuery = """
         query($owner: String!, $repo: String!, $limit: Int!) {

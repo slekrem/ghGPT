@@ -1,0 +1,45 @@
+using GhCli.Net.Abstractions;
+using GhCli.Net.PullRequests.Models;
+using System.Text.Json;
+
+namespace GhCli.Net.PullRequests;
+
+internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
+{
+    private static readonly JsonSerializerOptions JsonOptions = new();
+
+    private const string ListFields = "number,title,state,author,headRefName,baseRefName,isDraft,mergeable,labels,createdAt,updatedAt,url";
+    private const string DetailFields = "number,title,state,author,headRefName,baseRefName,isDraft,body,labels,reviews,files,statusCheckRollup,url,createdAt,updatedAt";
+
+    public async Task<IReadOnlyList<PullRequest>> ListAsync(string owner, string repo, string state = "open", int limit = 100)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentException.ThrowIfNullOrWhiteSpace(state);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+
+        var json = await runner.RunAsync(
+            "pr", "list",
+            "--repo", $"{owner}/{repo}",
+            "--state", state,
+            "--limit", limit.ToString(),
+            "--json", ListFields);
+
+        return JsonSerializer.Deserialize<List<PullRequest>>(json, JsonOptions) ?? [];
+    }
+
+    public async Task<PullRequestDetail> GetDetailAsync(string owner, string repo, int number)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        var json = await runner.RunAsync(
+            "pr", "view", number.ToString(),
+            "--repo", $"{owner}/{repo}",
+            "--json", DetailFields);
+
+        return JsonSerializer.Deserialize<PullRequestDetail>(json, JsonOptions)
+            ?? throw new InvalidOperationException($"Pull Request #{number} konnte nicht abgerufen werden.");
+    }
+}
