@@ -54,6 +54,10 @@ internal class DiscussionClient(IGhCliRunner runner) : IDiscussionClient
 
     public async Task<IReadOnlyList<Discussion>> ListAsync(string owner, string repo, int limit = 30)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+
         var json = await runner.RunAsync(
             "api", "graphql",
             "-f", $"query={ListQuery}",
@@ -61,25 +65,40 @@ internal class DiscussionClient(IGhCliRunner runner) : IDiscussionClient
             "-f", $"repo={repo}",
             "-F", $"limit={limit}");
 
-        var response = JsonSerializer.Deserialize<GraphQlResponse<RepositoryData>>(json, JsonOptions);
-        return response?.Data?.Repository?.Discussions?.Nodes ?? [];
+        var response = JsonSerializer.Deserialize<GraphQlResponse<RepositoryData>>(json, JsonOptions)
+            ?? throw new InvalidOperationException("Ungültige Antwort von der GraphQL-API.");
+
+        if (response.HasErrors)
+            throw new InvalidOperationException($"GraphQL-Fehler: {string.Join(", ", response.Errors!.Select(e => e.Message))}");
+
+        return response.Data?.Repository?.Discussions?.Nodes ?? [];
     }
 
     public async Task<Discussion> CreateAsync(string owner, string repo, string title, string body, string category = "General")
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(body);
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+
         var repoJson = await runner.RunAsync(
             "api", "graphql",
             "-f", $"query={RepoMetaQuery}",
             "-f", $"owner={owner}",
             "-f", $"repo={repo}");
 
-        var repoResponse = JsonSerializer.Deserialize<GraphQlResponse<RepositoryData>>(repoJson, JsonOptions);
+        var repoResponse = JsonSerializer.Deserialize<GraphQlResponse<RepositoryData>>(repoJson, JsonOptions)
+            ?? throw new InvalidOperationException("Ungültige Antwort von der GraphQL-API.");
 
-        var repoId = repoResponse?.Data?.Repository?.Id
+        if (repoResponse.HasErrors)
+            throw new InvalidOperationException($"GraphQL-Fehler: {string.Join(", ", repoResponse.Errors!.Select(e => e.Message))}");
+
+        var repoId = repoResponse.Data?.Repository?.Id
             ?? throw new InvalidOperationException("Repository nicht gefunden.");
 
-        var categoryId = repoResponse?.Data?.Repository?.DiscussionCategories?.Nodes
-            .FirstOrDefault(c => c.Name.Equals(category, StringComparison.OrdinalIgnoreCase))?.Id
+        var categoryId = repoResponse.Data?.Repository?.DiscussionCategories?.Nodes
+            ?.FirstOrDefault(c => c.Name.Equals(category, StringComparison.OrdinalIgnoreCase))?.Id
             ?? throw new InvalidOperationException($"Kategorie '{category}' nicht gefunden.");
 
         var resultJson = await runner.RunAsync(
@@ -90,8 +109,13 @@ internal class DiscussionClient(IGhCliRunner runner) : IDiscussionClient
             "-f", $"title={title}",
             "-f", $"body={body}");
 
-        var result = JsonSerializer.Deserialize<GraphQlResponse<CreateDiscussionData>>(resultJson, JsonOptions);
-        return result?.Data?.CreateDiscussion?.Discussion
+        var result = JsonSerializer.Deserialize<GraphQlResponse<CreateDiscussionData>>(resultJson, JsonOptions)
+            ?? throw new InvalidOperationException("Ungültige Antwort von der GraphQL-API.");
+
+        if (result.HasErrors)
+            throw new InvalidOperationException($"GraphQL-Fehler: {string.Join(", ", result.Errors!.Select(e => e.Message))}");
+
+        return result.Data?.CreateDiscussion?.Discussion
             ?? throw new InvalidOperationException("Discussion konnte nicht erstellt werden.");
     }
 }
