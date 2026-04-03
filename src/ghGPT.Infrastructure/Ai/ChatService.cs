@@ -13,25 +13,84 @@ internal sealed class ChatService(
     IPullRequestService pullRequestService,
     IChatHistoryService historyService) : IChatService
 {
-    public async IAsyncEnumerable<string> StreamAsync(
+    private const int MaxToolRounds = 5;
+
+    public async IAsyncEnumerable<ChatEvent> StreamAsync(
         ChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var messages = await BuildMessagesAsync(request);
-        var assistantResponse = new StringBuilder();
 
         if (!string.IsNullOrEmpty(request.RepoId))
             historyService.Append(request.RepoId, "user", request.Message);
 
+        // Tool-Loop: nur wenn ein Repo aktiv ist
+        if (!string.IsNullOrEmpty(request.RepoId))
+        {
+            var dispatcher = new ToolDispatcher(repositoryService);
+            var messageList = messages.ToList();
+            var tools = ToolDefinitions.All;
+
+            for (var round = 0; round < MaxToolRounds; round++)
+            {
+                var toolResponse = await ollamaClient.CompleteWithToolsAsync(messageList, tools, cancellationToken);
+
+                if (!toolResponse.HasToolCalls)
+                    break;
+
+                // Assistent-Message mit tool_calls hinzufügen
+                messageList.Add(new ChatMessage
+                {
+                    Role = "assistant",
+                    ToolCalls = toolResponse.ToolCalls.ToList()
+                });
+
+                // Jedes Tool ausführen und Ergebnis als Event liefern
+                foreach (var toolCall in toolResponse.ToolCalls)
+                {
+                    var (result, displayArgs, success) = await dispatcher.DispatchAsync(toolCall, request.RepoId, cancellationToken);
+
+                    yield return new ToolExecutedEvent(
+                        ToolName: toolCall.Name,
+                        DisplayArgs: displayArgs,
+                        Success: success,
+                        Message: success ? GetSuccessMessage(toolCall.Name, displayArgs) : result);
+
+                    // Tool-Ergebnis-Message hinzufügen
+                    messageList.Add(new ChatMessage
+                    {
+                        Role = "tool",
+                        ToolCallId = toolCall.Id,
+                        Content = result
+                    });
+                }
+            }
+
+            messages = messageList;
+        }
+
+        // Finale Antwort streamen
+        var assistantResponse = new StringBuilder();
         await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
         {
             assistantResponse.Append(token);
-            yield return token;
+            yield return new TokenEvent(token);
         }
 
         if (!string.IsNullOrEmpty(request.RepoId) && assistantResponse.Length > 0)
             historyService.Append(request.RepoId, "assistant", assistantResponse.ToString());
     }
+
+    private static string GetSuccessMessage(string toolName, string displayArgs) => toolName switch
+    {
+        "get_status" => "Repository-Status abgerufen",
+        "get_branches" => "Branches abgerufen",
+        "checkout_branch" => $"Branch gewechselt: {displayArgs.Replace("checkout_branch(", "").TrimEnd(')')}",
+        "create_branch" => $"Branch erstellt: {displayArgs.Replace("create_branch(", "").TrimEnd(')')}",
+        "get_history" => "Commit-History abgerufen",
+        "fetch" => "Remote-Stand aktualisiert (fetch)",
+        _ => displayArgs
+    };
 
     private async Task<IEnumerable<ChatMessage>> BuildMessagesAsync(ChatRequest request)
     {
