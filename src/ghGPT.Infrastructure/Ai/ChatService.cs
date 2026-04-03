@@ -30,13 +30,18 @@ internal sealed class ChatService(
             var dispatcher = new ToolDispatcher(repositoryService);
             var messageList = messages.ToList();
             var tools = ToolDefinitions.All;
+            string? toolLoopAnswer = null;
 
             for (var round = 0; round < MaxToolRounds; round++)
             {
                 var toolResponse = await ollamaClient.CompleteWithToolsAsync(messageList, tools, cancellationToken);
 
                 if (!toolResponse.HasToolCalls)
+                {
+                    // LLM hat direkt geantwortet, kein weiterer Request nötig
+                    toolLoopAnswer = toolResponse.Content ?? string.Empty;
                     break;
+                }
 
                 // Assistent-Message mit tool_calls hinzufügen
                 messageList.Add(new ChatMessage
@@ -66,10 +71,22 @@ internal sealed class ChatService(
                 }
             }
 
+            if (toolLoopAnswer is not null)
+            {
+                // Antwort direkt aus Tool-Loop verwenden — kein zweiter Request
+                if (toolLoopAnswer.Length > 0)
+                {
+                    yield return new TokenEvent(toolLoopAnswer);
+                    historyService.Append(request.RepoId, "assistant", toolLoopAnswer);
+                }
+                yield break;
+            }
+
+            // Nach Tool-Ausführungen: finale Antwort mit erweitertem Kontext streamen
             messages = messageList;
         }
 
-        // Finale Antwort streamen
+        // Finale Antwort streamen (kein Repo aktiv, oder nach Tool-Runden ohne direkte Antwort)
         var assistantResponse = new StringBuilder();
         await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
         {
