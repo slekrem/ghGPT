@@ -1,4 +1,4 @@
-namespace GhCli.Net.Models.Discussions;
+namespace GhCli.Net.Discussions.Models;
 
 public class DiscussionCategory
 {

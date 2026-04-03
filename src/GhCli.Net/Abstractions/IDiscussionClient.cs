@@ -1,4 +1,4 @@
-using GhCli.Net.Models.Discussions;
+using GhCli.Net.Discussions.Models;
 
 namespace GhCli.Net.Abstractions;
 
