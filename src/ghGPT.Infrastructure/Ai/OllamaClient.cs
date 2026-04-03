@@ -6,16 +6,23 @@ using System.Text.Json.Serialization;
 
 namespace ghGPT.Infrastructure.Ai;
 
-internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllamaClient
+internal sealed class OllamaClient(IAiSettingsService settingsService, HttpClient? httpClient = null) : IOllamaClient
 {
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(3) };
+    private readonly HttpClient _http = httpClient ?? new() { Timeout = TimeSpan.FromMinutes(10) };
+
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     public async Task<bool> IsAvailableAsync()
     {
         var settings = settingsService.Load();
         try
         {
-            var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models");
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models", cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -27,7 +34,8 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
     public async Task<IReadOnlyList<OllamaModelInfo>> GetModelsAsync()
     {
         var settings = settingsService.Load();
-        var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models", cts.Token);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<OpenAiModelsResponse>();
@@ -48,7 +56,7 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
         var requestBody = new
         {
             model = settings.Model,
-            messages = messages.Select(m => new { role = m.Role, content = m.Content }),
+            messages = SerializeMessages(messages),
             stream = true
         };
 
@@ -59,10 +67,7 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
             Content = content
         };
 
-        using var response = await new HttpClient { Timeout = TimeSpan.FromMinutes(5) }
-            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-
-        response.EnsureSuccessStatusCode();
+        using var response = await SendStreamingAsync(request, cancellationToken);
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var reader = new System.IO.StreamReader(stream);
@@ -81,6 +86,100 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
             if (!string.IsNullOrEmpty(token))
                 yield return token;
         }
+    }
+
+    public async Task<ToolCallResponse> CompleteWithToolsAsync(
+        IEnumerable<ChatMessage> messages,
+        IEnumerable<ToolDefinition> tools,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = settingsService.Load();
+
+        var requestBody = new
+        {
+            model = settings.Model,
+            messages = SerializeMessages(messages),
+            tools = tools.Select(t => new
+            {
+                type = t.Type,
+                function = new
+                {
+                    name = t.Function.Name,
+                    description = t.Function.Description,
+                    parameters = t.Function.Parameters
+                }
+            }),
+            stream = false
+        };
+
+        var content = JsonContent.Create(requestBody);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl.TrimEnd('/')}/v1/chat/completions")
+        {
+            Content = content
+        };
+
+        using var response = await SendStreamingAsync(request, cancellationToken);
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var completion = JsonSerializer.Deserialize<OpenAiCompletion>(json);
+
+        var choice = completion?.Choices?.FirstOrDefault();
+        if (choice is null)
+            return new ToolCallResponse { Content = string.Empty };
+
+        if (choice.FinishReason == "tool_calls" && choice.Message?.ToolCalls?.Count > 0)
+        {
+            var toolCalls = choice.Message.ToolCalls.Select(tc => new ToolCall
+            {
+                Id = tc.Id ?? string.Empty,
+                Name = tc.Function?.Name ?? string.Empty,
+                ArgumentsJson = tc.Function?.Arguments ?? "{}"
+            }).ToList();
+
+            return new ToolCallResponse { HasToolCalls = true, ToolCalls = toolCalls };
+        }
+
+        return new ToolCallResponse { Content = choice.Message?.Content ?? string.Empty };
+    }
+
+    private async Task<HttpResponseMessage> SendStreamingAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return response;
+    }
+
+    private static IEnumerable<object> SerializeMessages(IEnumerable<ChatMessage> messages)
+    {
+        return messages.Select<ChatMessage, object>(m =>
+        {
+            if (m.ToolCalls is { Count: > 0 })
+            {
+                return new
+                {
+                    role = m.Role,
+                    tool_calls = m.ToolCalls.Select(tc => new
+                    {
+                        id = tc.Id,
+                        type = "function",
+                        function = new { name = tc.Name, arguments = tc.ArgumentsJson }
+                    })
+                };
+            }
+
+            if (m.Role == "tool")
+            {
+                return new
+                {
+                    role = m.Role,
+                    tool_call_id = m.ToolCallId,
+                    content = m.Content ?? string.Empty
+                };
+            }
+
+            return new { role = m.Role, content = m.Content ?? string.Empty };
+        });
     }
 
     private sealed class OpenAiModelsResponse
@@ -108,11 +207,62 @@ internal sealed class OllamaClient(IAiSettingsService settingsService) : IOllama
     {
         [JsonPropertyName("delta")]
         public OpenAiDelta? Delta { get; set; }
+
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
+
+        [JsonPropertyName("message")]
+        public OpenAiMessage? Message { get; set; }
     }
 
     private sealed class OpenAiDelta
     {
         [JsonPropertyName("content")]
         public string? Content { get; set; }
+    }
+
+    private sealed class OpenAiCompletion
+    {
+        [JsonPropertyName("choices")]
+        public List<OpenAiCompletionChoice>? Choices { get; set; }
+    }
+
+    private sealed class OpenAiCompletionChoice
+    {
+        [JsonPropertyName("finish_reason")]
+        public string? FinishReason { get; set; }
+
+        [JsonPropertyName("message")]
+        public OpenAiMessage? Message { get; set; }
+    }
+
+    private sealed class OpenAiMessage
+    {
+        [JsonPropertyName("role")]
+        public string? Role { get; set; }
+
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
+
+        [JsonPropertyName("tool_calls")]
+        public List<OpenAiToolCall>? ToolCalls { get; set; }
+    }
+
+    private sealed class OpenAiToolCall
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("function")]
+        public OpenAiToolCallFunction? Function { get; set; }
+    }
+
+    private sealed class OpenAiToolCallFunction
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("arguments")]
+        public string? Arguments { get; set; }
     }
 }

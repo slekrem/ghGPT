@@ -2,5 +2,5 @@ namespace ghGPT.Core.Ai;
 
 public interface IChatService
 {
-    IAsyncEnumerable<string> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<ChatEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken = default);
 }
