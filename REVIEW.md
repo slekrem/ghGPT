@@ -19,6 +19,33 @@ Diese Datei wird automatisch vom Code-Review geladen und gibt dem Reviewer zusä
 - Eingabevalidierung erfolgt am Methodenanfang mit `ArgumentException.ThrowIfNullOrWhiteSpace`
 - JSON-Mapping immer mit expliziten `[JsonPropertyName]`-Attributen – `PropertyNameCaseInsensitive = true` wird nicht verwendet, da es Namenskollisionen maskieren kann
 
+## Test-Konventionen
+
+- Jede neue `public`-Methode braucht mindestens einen Unit-Test
+- `private`- und `internal`-Methoden werden **nicht** direkt getestet – sie werden indirekt über öffentliche Methoden abgedeckt
+- Testprojekte liegen unter `tests/`, Namensschema: `{Projektname}.Tests`
+- Framework: xUnit + NSubstitute für Mocks
+- Integrationstests die `gh` CLI aufrufen sind bewusst nicht Teil der Unit-Tests
+- Testklassen spiegeln die zu testende Klasse wider: `DiscussionClient` → `DiscussionClientTests`
+- Tests folgen der **Arrange-Act-Assert**-Struktur:
+
+```csharp
+[Fact]
+public async Task ListAsync_ReturnsPullRequests()
+{
+    // Arrange
+    var json = JsonSerializer.Serialize(new[] { ... });
+    _runner.RunAsync(Arg.Any<string[]>()).Returns(json);
+
+    // Act
+    var result = await _sut.ListAsync("owner", "repo");
+
+    // Assert
+    Assert.Single(result);
+    Assert.Equal("Fix bug", result[0].Title);
+}
+```
+
 ## Bekannte Architektur-Entscheidungen
 
 - `GhCli.Net` nutzt die `gh` CLI als Proxy zu GitHub – kein direkter API-Token nötig

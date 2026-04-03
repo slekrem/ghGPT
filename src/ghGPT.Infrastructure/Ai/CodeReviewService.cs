@@ -49,6 +49,11 @@ internal sealed class CodeReviewService(
         - Keine allgemeinen Platitüden ("guter Code", "sieht gut aus")
         - Kein Kommentar zu Dingen die nicht im Diff sind
         - Antworte auf Deutsch
+
+        TESTS:
+        - Prüfe ob neue public-Methoden oder Klassen im Diff zugehörige Tests haben
+        - Falls im Diff neue Logik hinzugefügt wurde aber keine Test-Dateien geändert wurden: als 🟡 mittel melden
+        - Falls bestehende Tests durch die Änderung ungültig werden könnten: als 🔴 kritisch melden
         """;
 
     private static string BuildUserPrompt(string diff, string? reviewContext)
