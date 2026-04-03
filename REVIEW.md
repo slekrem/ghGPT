@@ -11,6 +11,12 @@ Diese Datei wird automatisch vom Code-Review geladen und gibt dem Reviewer zusä
 - `gh api graphql -F key=value` übergibt typisierte GraphQL-Variablen (Integer, Boolean) – das ist korrekte Syntax, kein Bug
 - `record`-Typen mit `init`-Properties sind immutable by design
 - `internal`-Klassen benötigen keine öffentliche Dokumentation
+- `switch` in C# hat kein Fall-through – ein `case` fällt nicht automatisch in den nächsten
+- `StringBuilder` implementiert `IDisposable` nicht – kein `using`-Statement nötig oder möglich
+- `int.TryParse()` wirft keine Exception – gibt `false` zurück bei ungültiger Eingabe
+- `Console.WriteLine()` fügt standardmäßig einen Zeilenumbruch ein
+- `IAsyncEnumerable` mit `yield return` streamt sofort – ein parallel akkumulierender `StringBuilder` der erst am Ende mit `.ToString()` ausgewertet wird ist korrekt, kein Bug
+- `catch (Exception)` für optionale Best-Effort-Operationen (z. B. Hilfsdatei speichern) ist bewusst weit gefasst – kein Redesign nötig
 
 ## Projekt-Konventionen
 

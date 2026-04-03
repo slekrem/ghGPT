@@ -419,3 +419,7 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Review Session
+.review-session.md
+.review-last.md
