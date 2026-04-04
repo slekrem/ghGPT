@@ -19,6 +19,18 @@ try
         case "user":
             await ShowCurrentUserAsync();
             break;
+        case "issues":
+            var issueState = args.ElementAtOrDefault(3) ?? "open";
+            await ShowIssuesAsync(issueState);
+            break;
+        case "issue" when args.ElementAtOrDefault(3) is { } issueArg && int.TryParse(issueArg, out var issueNumber):
+            await ShowIssueDetailAsync(issueNumber);
+            break;
+        case "issue":
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Verwendung: <owner> <repo> issue <nummer>  (z.B. issue 42)");
+            Console.ResetColor();
+            break;
         case "discussions":
             await ShowDiscussionsAsync();
             break;
@@ -46,6 +58,54 @@ catch (InvalidOperationException ex)
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine($"Fehler: {ex.Message}");
     Console.ResetColor();
+}
+
+async Task ShowIssuesAsync(string state = "open")
+{
+    Console.WriteLine($"── Issues ({state}) ──────────────────────────");
+    var issues = await client.Issue.ListAsync(owner, repo, state);
+
+    if (issues.Count == 0)
+    {
+        Console.WriteLine("  Keine Issues gefunden.");
+        return;
+    }
+
+    foreach (var i in issues)
+    {
+        var labels = i.Labels.Count > 0 ? $" [{string.Join(", ", i.Labels.Select(l => l.Name))}]" : string.Empty;
+        Console.WriteLine($"  #{i.Number}{labels} {i.Title}");
+        Console.WriteLine($"           Autor: {i.Author.Login} | {i.CreatedAt:dd.MM.yyyy} | {i.State}");
+        Console.WriteLine($"           {i.Url}");
+        Console.WriteLine();
+    }
+}
+
+async Task ShowIssueDetailAsync(int number)
+{
+    Console.WriteLine($"── Issue #{number} ──────────────────────────");
+    var issue = await client.Issue.GetDetailAsync(owner, repo, number);
+
+    Console.WriteLine($"  {issue.Title}");
+    Console.WriteLine($"  Status: {issue.State}");
+    Console.WriteLine($"  Autor:  {issue.Author.Login} | {issue.CreatedAt:dd.MM.yyyy}");
+
+    if (issue.Labels.Count > 0)
+        Console.WriteLine($"  Labels: {string.Join(", ", issue.Labels.Select(l => l.Name))}");
+
+    if (issue.Assignees.Count > 0)
+        Console.WriteLine($"  Zugewiesen: {string.Join(", ", issue.Assignees.Select(a => a.Login))}");
+
+    Console.WriteLine();
+
+    if (!string.IsNullOrWhiteSpace(issue.Body))
+    {
+        Console.WriteLine("  Beschreibung:");
+        Console.WriteLine($"  {issue.Body.Replace("\n", "\n  ")}");
+        Console.WriteLine();
+    }
+
+    Console.WriteLine($"  {issue.Url}");
 }
 
 async Task ShowCurrentUserAsync()
