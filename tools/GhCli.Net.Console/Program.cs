@@ -16,6 +16,9 @@ try
 {
     switch (command)
     {
+        case "user":
+            await ShowCurrentUserAsync();
+            break;
         case "discussions":
             await ShowDiscussionsAsync();
             break;
@@ -43,6 +46,20 @@ catch (InvalidOperationException ex)
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine($"Fehler: {ex.Message}");
     Console.ResetColor();
+}
+
+async Task ShowCurrentUserAsync()
+{
+    Console.WriteLine("── Aktueller Benutzer ───────────────────");
+    var user = await client.User.GetCurrentAsync();
+
+    Console.WriteLine($"  Login:    {user.Login}");
+    Console.WriteLine($"  Name:     {user.Name ?? "–"}");
+    Console.WriteLine($"  E-Mail:   {user.Email ?? "–"}");
+    Console.WriteLine($"  Repos:    {user.PublicRepos} öffentlich");
+    Console.WriteLine($"  Followers:{user.Followers}  Following: {user.Following}");
+    Console.WriteLine($"  Dabei seit: {user.CreatedAt:dd.MM.yyyy}");
+    Console.WriteLine($"  {user.Url}");
 }
 
 async Task ShowDiscussionsAsync()
