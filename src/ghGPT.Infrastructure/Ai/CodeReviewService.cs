@@ -59,6 +59,8 @@ internal sealed class CodeReviewService(
         - Keine allgemeinen Platitüden ("guter Code", "sieht gut aus")
         - Kein Kommentar zu Dingen die nicht im Diff sind
         - Antworte auf Deutsch
+        - Ein Review ohne Findings ist ein gutes Review — es ist ausdrücklich korrekt, nichts zu melden
+        - Ein falsches Finding ist schlimmer als kein Finding
         - Prüfe die Sichtbarkeit (private/internal/public) BEVOR fehlende Tests gemeldet werden
         - Schlage keine Abstraktionen oder Hilfsfunktionen vor, die nur einmal verwendet werden
         - Melde keine hypothetischen Performance-Probleme ohne konkreten, messbaren Anhalt
