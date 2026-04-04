@@ -11,21 +11,31 @@ internal sealed class CodeReviewService(
     IRepositoryService repositoryService,
     ILogger<CodeReviewService> logger) : ICodeReviewService
 {
+    private const string SessionFileName = ".review-session.md";
+    private const string LastReviewFileName = ".review-last.md";
+
     public async IAsyncEnumerable<string> StreamReviewAsync(
         string repoId,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var diff = BuildCombinedDiff(repoId);
-        var reviewContext = LoadReviewContext(repoId);
+        var reviewContext = LoadFileContext(repoId, "REVIEW.md");
+        var sessionContext = LoadFileContext(repoId, SessionFileName);
 
         var messages = new[]
         {
             new ChatMessage { Role = "system", Content = SystemPrompt },
-            new ChatMessage { Role = "user", Content = BuildUserPrompt(diff, reviewContext) }
+            new ChatMessage { Role = "user", Content = BuildUserPrompt(diff, reviewContext, sessionContext) }
         };
 
+        var fullReview = new StringBuilder();
         await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
+        {
+            fullReview.Append(token);
             yield return token;
+        }
+
+        SaveLastReview(repoId, fullReview.ToString());
     }
 
     private const string SystemPrompt =
@@ -49,49 +59,74 @@ internal sealed class CodeReviewService(
         - Keine allgemeinen Platitüden ("guter Code", "sieht gut aus")
         - Kein Kommentar zu Dingen die nicht im Diff sind
         - Antworte auf Deutsch
+        - Prüfe die Sichtbarkeit (private/internal/public) BEVOR fehlende Tests gemeldet werden
+        - Schlage keine Abstraktionen oder Hilfsfunktionen vor, die nur einmal verwendet werden
+        - Melde keine hypothetischen Performance-Probleme ohne konkreten, messbaren Anhalt
+        - Validierungen die das Framework, die Runtime oder ein externes Tool selbst übernimmt, nicht doppelt fordern
+        - Fehlerbehandlung die bewusst weit gefasst ist (z. B. catch-all für optionale Operationen), nicht als Bug werten
 
         TESTS:
-        - Prüfe ob neue public-Methoden oder Klassen im Diff zugehörige Tests haben
-        - Falls im Diff neue Logik hinzugefügt wurde aber keine Test-Dateien geändert wurden: als 🟡 mittel melden
+        - Nur öffentliche Methoden/Klassen benötigen direkte Tests — nicht-öffentliche werden indirekt abgedeckt
+        - Falls neue öffentliche Logik ohne Test-Dateiänderung hinzugefügt wurde: als 🔵 hinweis melden
         - Falls bestehende Tests durch die Änderung ungültig werden könnten: als 🔴 kritisch melden
         """;
 
-    private static string BuildUserPrompt(string diff, string? reviewContext)
+    private static string BuildUserPrompt(string diff, string? reviewContext, string? sessionContext)
     {
         if (string.IsNullOrWhiteSpace(diff))
             return "Es gibt keine Änderungen zum Reviewen.";
 
-        if (string.IsNullOrWhiteSpace(reviewContext))
-            return $"""
-                Reviewe den folgenden Git-Diff:
+        var sb = new StringBuilder();
 
-                {diff}
-                """;
+        if (!string.IsNullOrWhiteSpace(reviewContext))
+        {
+            sb.AppendLine("## Projekt-Kontext (REVIEW.md)");
+            sb.AppendLine(reviewContext);
+            sb.AppendLine();
+        }
 
-        return $"""
-            Berücksichtige folgenden Projekt-Kontext beim Review:
+        if (!string.IsNullOrWhiteSpace(sessionContext))
+        {
+            sb.AppendLine("## Review-Session-Feedback (.review-session.md)");
+            sb.AppendLine(sessionContext);
+            sb.AppendLine();
+        }
 
-            {reviewContext}
+        sb.AppendLine("## Git-Diff");
+        sb.AppendLine(diff);
 
-            Reviewe den folgenden Git-Diff:
-
-            {diff}
-            """;
+        return sb.ToString();
     }
 
-    private string? LoadReviewContext(string repoId)
+    private void SaveLastReview(string repoId, string content)
+    {
+        try
+        {
+            var repo = repositoryService.GetAll().FirstOrDefault(r => r.Id == repoId);
+            if (repo is null) return;
+
+            var filePath = Path.Combine(repo.LocalPath, LastReviewFileName);
+            File.WriteAllText(filePath, content);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "{FileName} konnte nicht gespeichert werden für Repo {RepoId}.", LastReviewFileName, repoId);
+        }
+    }
+
+    private string? LoadFileContext(string repoId, string fileName)
     {
         try
         {
             var repo = repositoryService.GetAll().FirstOrDefault(r => r.Id == repoId);
             if (repo is null) return null;
 
-            var reviewFile = Path.Combine(repo.LocalPath, "REVIEW.md");
-            return File.Exists(reviewFile) ? File.ReadAllText(reviewFile) : null;
+            var filePath = Path.Combine(repo.LocalPath, fileName);
+            return File.Exists(filePath) ? File.ReadAllText(filePath) : null;
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "REVIEW.md konnte nicht geladen werden für Repo {RepoId}.", repoId);
+            logger.LogWarning(ex, "{FileName} konnte nicht geladen werden für Repo {RepoId}.", fileName, repoId);
             return null;
         }
     }
