@@ -54,6 +54,11 @@ internal sealed class CodeReviewService(
         Konkrete Vorschläge zur Code-Qualität, Lesbarkeit oder Performance.
         Falls keine Verbesserungen nötig: "Keine weiteren Verbesserungen."
 
+        ## Ohne Befunde
+        Dateien aus dem Diff, für die keine Probleme oder Verbesserungen gefunden wurden.
+        Diese können unabhängig committet werden.
+        Falls alle Dateien Befunde haben: weglassen.
+
         REGELN:
         - Beziehe dich immer auf konkrete Zeilen oder Dateinamen aus dem Diff
         - Keine allgemeinen Platitüden ("guter Code", "sieht gut aus")
