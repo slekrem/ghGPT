@@ -7,6 +7,7 @@ namespace GhCli.Net.PullRequests;
 internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new();
+    private static readonly System.Text.RegularExpressions.Regex PrNumberRegex = new(@"/pull/(\d+)");
 
     private const string ListFields = "number,title,state,author,headRefName,baseRefName,isDraft,mergeable,labels,createdAt,updatedAt,url";
     private const string DetailFields = "number,title,state,author,headRefName,baseRefName,isDraft,body,labels,reviews,files,statusCheckRollup,url,createdAt,updatedAt";
@@ -173,11 +174,13 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
         var output = await runner.RunAsync([.. args]);
 
         // gh pr create returns the PR URL, e.g. https://github.com/owner/repo/pull/42
-        var match = System.Text.RegularExpressions.Regex.Match(output.Trim(), @"/pull/(\d+)");
+        var match = PrNumberRegex.Match(output.Trim());
         if (!match.Success)
             throw new InvalidOperationException("Pull Request wurde erstellt, aber die PR-Nummer konnte nicht ermittelt werden.");
 
-        var number = int.Parse(match.Groups[1].Value);
+        if (!int.TryParse(match.Groups[1].Value, out var number))
+            throw new InvalidOperationException("Pull Request wurde erstellt, aber die PR-Nummer konnte nicht als Zahl interpretiert werden.");
+
         return await GetDetailAsync(owner, repo, number);
     }
 
