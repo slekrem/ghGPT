@@ -9,6 +9,7 @@ internal static class AiServiceExtensions
     internal static IServiceCollection AddAiServices(this IServiceCollection services)
     {
         services.AddSingleton<IToolDispatcher, ToolDispatcher>();
+        services.AddSingleton<IChatContextBuilder, ChatContextBuilder>();
         services.AddSingleton<IAiSettingsService, AiSettingsService>();
         services.AddSingleton<IOllamaClient, OllamaClient>();
         services.AddSingleton<IChatHistoryService, ChatHistoryService>();
