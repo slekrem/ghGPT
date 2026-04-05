@@ -9,4 +9,6 @@ public interface IPullRequestClient
     Task AddCommentAsync(string owner, string repo, int number, string body);
     Task CreateReviewAsync(string owner, string repo, int number, PullRequestReviewEvent reviewEvent, string? body = null);
     Task<IReadOnlyList<PullRequestStatusCheck>> GetChecksAsync(string owner, string repo, int number);
+    Task CloseAsync(string owner, string repo, int number);
+    Task ReopenAsync(string owner, string repo, int number);
 }

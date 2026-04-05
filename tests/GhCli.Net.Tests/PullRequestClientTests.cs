@@ -270,4 +270,46 @@ public class PullRequestClientTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             _sut.GetChecksAsync("slekrem", "ghGPT", 0));
     }
+
+    [Fact]
+    public async Task CloseAsync_CallsCorrectCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "close", "42", "--repo", "slekrem/ghGPT")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.CloseAsync("slekrem", "ghGPT", 42);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "close", "42", "--repo", "slekrem/ghGPT");
+    }
+
+    [Fact]
+    public async Task CloseAsync_ThrowsWhenNumberIsZero()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            _sut.CloseAsync("slekrem", "ghGPT", 0));
+    }
+
+    [Fact]
+    public async Task ReopenAsync_CallsCorrectCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "reopen", "42", "--repo", "slekrem/ghGPT")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.ReopenAsync("slekrem", "ghGPT", 42);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "reopen", "42", "--repo", "slekrem/ghGPT");
+    }
+
+    [Fact]
+    public async Task ReopenAsync_ThrowsWhenNumberIsZero()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            _sut.ReopenAsync("slekrem", "ghGPT", 0));
+    }
 }
