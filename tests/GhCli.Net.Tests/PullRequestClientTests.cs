@@ -153,4 +153,59 @@ public class PullRequestClientTests
     {
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => _sut.GetDetailAsync("owner", "repo", 0));
     }
+
+    [Fact]
+    public async Task AddCommentAsync_CallsRunner()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "comment", "42", "--repo", "slekrem/ghGPT", "--body", "Sieht gut aus!")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.AddCommentAsync("slekrem", "ghGPT", 42, "Sieht gut aus!");
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "comment", "42", "--repo", "slekrem/ghGPT", "--body", "Sieht gut aus!");
+    }
+
+    [Fact]
+    public async Task AddCommentAsync_ThrowsWhenBodyIsEmpty()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.AddCommentAsync("slekrem", "ghGPT", 42, ""));
+    }
+
+    [Fact]
+    public async Task CreateReviewAsync_Approve_CallsRunnerWithApproveFlag()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "review", "42", "--repo", "slekrem/ghGPT", "--approve")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.CreateReviewAsync("slekrem", "ghGPT", 42, PullRequests.Models.PullRequestReviewEvent.Approve);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "review", "42", "--repo", "slekrem/ghGPT", "--approve");
+    }
+
+    [Fact]
+    public async Task CreateReviewAsync_RequestChanges_WithBody_IncludesBodyFlag()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "review", "42", "--repo", "slekrem/ghGPT", "--request-changes", "--body", "Bitte überarbeiten.")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.CreateReviewAsync("slekrem", "ghGPT", 42, PullRequests.Models.PullRequestReviewEvent.RequestChanges, "Bitte überarbeiten.");
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "review", "42", "--repo", "slekrem/ghGPT", "--request-changes", "--body", "Bitte überarbeiten.");
+    }
+
+    [Fact]
+    public async Task CreateReviewAsync_ThrowsWhenNumberIsZero()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            _sut.CreateReviewAsync("slekrem", "ghGPT", 0, PullRequests.Models.PullRequestReviewEvent.Comment));
+    }
 }

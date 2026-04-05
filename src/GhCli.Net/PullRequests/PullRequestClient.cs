@@ -42,4 +42,44 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
         return JsonSerializer.Deserialize<PullRequestDetail>(json, JsonOptions)
             ?? throw new InvalidOperationException($"Pull Request #{number} konnte nicht abgerufen werden.");
     }
+
+    public async Task AddCommentAsync(string owner, string repo, int number, string body)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+        ArgumentException.ThrowIfNullOrWhiteSpace(body);
+
+        await runner.RunAsync(
+            "pr", "comment", number.ToString(),
+            "--repo", $"{owner}/{repo}",
+            "--body", body);
+    }
+
+    public async Task CreateReviewAsync(string owner, string repo, int number, PullRequestReviewEvent reviewEvent, string? body = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        var eventFlag = reviewEvent switch
+        {
+            PullRequestReviewEvent.Approve => "--approve",
+            PullRequestReviewEvent.RequestChanges => "--request-changes",
+            PullRequestReviewEvent.Comment => "--comment",
+            _ => throw new ArgumentOutOfRangeException(nameof(reviewEvent))
+        };
+
+        var args = new List<string>
+        {
+            "pr", "review", number.ToString(),
+            "--repo", $"{owner}/{repo}",
+            eventFlag
+        };
+
+        if (!string.IsNullOrWhiteSpace(body))
+            args.AddRange(["--body", body]);
+
+        await runner.RunAsync([.. args]);
+    }
 }
