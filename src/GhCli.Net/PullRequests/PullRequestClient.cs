@@ -119,4 +119,29 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
             "pr", "reopen", number.ToString(),
             "--repo", $"{owner}/{repo}");
     }
+
+    public async Task EditAsync(string owner, string repo, int number, string? title = null, string? body = null, IEnumerable<string>? addLabels = null, IEnumerable<string>? removeLabels = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        var args = new List<string> { "pr", "edit", number.ToString(), "--repo", $"{owner}/{repo}" };
+
+        if (!string.IsNullOrWhiteSpace(title))
+            args.AddRange(["--title", title]);
+
+        if (!string.IsNullOrWhiteSpace(body))
+            args.AddRange(["--body", body]);
+
+        var addList = addLabels?.ToList();
+        if (addList is { Count: > 0 })
+            args.AddRange(["--add-label", string.Join(",", addList)]);
+
+        var removeList = removeLabels?.ToList();
+        if (removeList is { Count: > 0 })
+            args.AddRange(["--remove-label", string.Join(",", removeList)]);
+
+        await runner.RunAsync([.. args]);
+    }
 }

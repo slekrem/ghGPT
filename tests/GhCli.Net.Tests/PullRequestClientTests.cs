@@ -312,4 +312,53 @@ public class PullRequestClientTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             _sut.ReopenAsync("slekrem", "ghGPT", 0));
     }
+
+    [Fact]
+    public async Task EditAsync_WithTitleAndBody_CallsCorrectCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "edit", "42", "--repo", "slekrem/ghGPT", "--title", "Neuer Titel", "--body", "Neuer Body")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.EditAsync("slekrem", "ghGPT", 42, title: "Neuer Titel", body: "Neuer Body");
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "edit", "42", "--repo", "slekrem/ghGPT", "--title", "Neuer Titel", "--body", "Neuer Body");
+    }
+
+    [Fact]
+    public async Task EditAsync_WithLabels_CallsCorrectCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "edit", "42", "--repo", "slekrem/ghGPT", "--add-label", "bug,enhancement", "--remove-label", "wip")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.EditAsync("slekrem", "ghGPT", 42, addLabels: ["bug", "enhancement"], removeLabels: ["wip"]);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "edit", "42", "--repo", "slekrem/ghGPT", "--add-label", "bug,enhancement", "--remove-label", "wip");
+    }
+
+    [Fact]
+    public async Task EditAsync_WithNoChanges_CallsBaseCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "edit", "42", "--repo", "slekrem/ghGPT")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.EditAsync("slekrem", "ghGPT", 42);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "edit", "42", "--repo", "slekrem/ghGPT");
+    }
+
+    [Fact]
+    public async Task EditAsync_ThrowsWhenNumberIsZero()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            _sut.EditAsync("slekrem", "ghGPT", 0));
+    }
 }
