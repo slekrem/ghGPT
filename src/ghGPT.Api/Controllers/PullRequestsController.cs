@@ -1,6 +1,5 @@
 using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
-using ghGPT.Infrastructure.PullRequests;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ghGPT.Api.Controllers;
@@ -26,7 +25,7 @@ public class PullRequestsController(
         (string owner, string repoName) ownerRepo;
         try
         {
-            ownerRepo = PullRequestService.ParseRemoteUrl(repo.RemoteUrl);
+            ownerRepo = RemoteUrlParser.Parse(repo.RemoteUrl);
         }
         catch (InvalidOperationException ex)
         {
@@ -57,7 +56,7 @@ public class PullRequestsController(
         (string owner, string repoName) ownerRepo;
         try
         {
-            ownerRepo = PullRequestService.ParseRemoteUrl(repo.RemoteUrl);
+            ownerRepo = RemoteUrlParser.Parse(repo.RemoteUrl);
         }
         catch (InvalidOperationException ex)
         {
