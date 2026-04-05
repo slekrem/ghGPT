@@ -96,6 +96,12 @@ public class RepositoryWatcherService(
         if (changedPath.StartsWith(gitPath, StringComparison.OrdinalIgnoreCase))
             return;
 
+        // Interne Review-Hilfsdateien ignorieren – sie werden von ghGPT selbst geschrieben
+        // und sollen keinen Status-Reset im UI auslösen
+        var fileName = Path.GetFileName(changedPath);
+        if (fileName.StartsWith(".review-", StringComparison.OrdinalIgnoreCase))
+            return;
+
         ScheduleStatusNotification(repoId);
     }
 
