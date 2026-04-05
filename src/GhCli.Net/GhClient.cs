@@ -1,5 +1,6 @@
 using GhCli.Net.Abstractions;
 using GhCli.Net.Discussions;
+using GhCli.Net.Issues;
 using GhCli.Net.PullRequests;
 using GhCli.Net.User;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +10,7 @@ namespace GhCli.Net;
 public class GhClient
 {
     public IDiscussionClient Discussion { get; }
+    public IIssueClient Issue { get; }
     public IPullRequestClient PullRequest { get; }
     public IUserClient User { get; }
 
@@ -17,6 +19,7 @@ public class GhClient
     internal GhClient(IGhCliRunner runner)
     {
         Discussion = new DiscussionClient(runner);
+        Issue = new IssueClient(runner);
         PullRequest = new PullRequestClient(runner);
         User = new UserClient(runner);
     }
@@ -28,6 +31,7 @@ public static class GhClientServiceCollectionExtensions
     {
         services.AddSingleton<IGhCliRunner, GhCliRunner>();
         services.AddSingleton<IDiscussionClient, DiscussionClient>();
+        services.AddSingleton<IIssueClient, IssueClient>();
         services.AddSingleton<IPullRequestClient, PullRequestClient>();
         services.AddSingleton<IUserClient, UserClient>();
         services.AddSingleton<GhClient>();
