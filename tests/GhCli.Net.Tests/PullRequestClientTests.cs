@@ -208,4 +208,66 @@ public class PullRequestClientTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             _sut.CreateReviewAsync("slekrem", "ghGPT", 0, PullRequests.Models.PullRequestReviewEvent.Comment));
     }
+
+    [Fact]
+    public async Task GetChecksAsync_ReturnsChecks()
+    {
+        // Arrange
+        var json = JsonSerializer.Serialize(new[]
+        {
+            new
+            {
+                name = "build",
+                state = "SUCCESS",
+                conclusion = "SUCCESS",
+                startedAt = "2026-04-05T10:00:00Z",
+                completedAt = "2026-04-05T10:05:00Z",
+                link = "https://github.com/slekrem/ghGPT/actions/runs/1"
+            },
+            new
+            {
+                name = "test",
+                state = "FAILURE",
+                conclusion = "FAILURE",
+                startedAt = "2026-04-05T10:00:00Z",
+                completedAt = "2026-04-05T10:03:00Z",
+                link = "https://github.com/slekrem/ghGPT/actions/runs/2"
+            }
+        });
+        _runner.RunAsync("pr", "checks", "42", "--repo", "slekrem/ghGPT", "--json", Arg.Any<string>())
+            .Returns(json);
+
+        // Act
+        var result = await _sut.GetChecksAsync("slekrem", "ghGPT", 42);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Equal("build", result[0].Name);
+        Assert.Equal("SUCCESS", result[0].State);
+        Assert.Equal("SUCCESS", result[0].Conclusion);
+        Assert.NotNull(result[0].Link);
+        Assert.Equal("test", result[1].Name);
+        Assert.Equal("FAILURE", result[1].State);
+    }
+
+    [Fact]
+    public async Task GetChecksAsync_ReturnsEmpty_WhenNoChecks()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "checks", "42", "--repo", "slekrem/ghGPT", "--json", Arg.Any<string>())
+            .Returns("[]");
+
+        // Act
+        var result = await _sut.GetChecksAsync("slekrem", "ghGPT", 42);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetChecksAsync_ThrowsWhenNumberIsZero()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            _sut.GetChecksAsync("slekrem", "ghGPT", 0));
+    }
 }
