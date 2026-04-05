@@ -202,6 +202,16 @@ export const repositoryService = {
     api.get<PullRequestListItem[]>(`/repos/${id}/pull-requests?state=${state}`),
   getPullRequestDetail: (id: string, number: number) =>
     api.get<PullRequestDetail>(`/repos/${id}/pull-requests/${number}`),
+  createPullRequest: (id: string, title: string, body: string, headBranch: string, baseBranch: string, draft = false) =>
+    api.post<PullRequestDetail>(`/repos/${id}/pull-requests`, { title, body, headBranch, baseBranch, draft }),
+  editPullRequest: (id: string, number: number, title?: string, body?: string) =>
+    api.patch<void>(`/repos/${id}/pull-requests/${number}`, { title, body }),
+  closePullRequest: (id: string, number: number) =>
+    api.patch<void>(`/repos/${id}/pull-requests/${number}/close`, {}),
+  reopenPullRequest: (id: string, number: number) =>
+    api.patch<void>(`/repos/${id}/pull-requests/${number}/reopen`, {}),
+  mergePullRequest: (id: string, number: number, method: 'merge' | 'squash' | 'rebase' = 'merge', commitTitle?: string, commitBody?: string) =>
+    api.post<void>(`/repos/${id}/pull-requests/${number}/merge`, { method, commitTitle, commitBody }),
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),

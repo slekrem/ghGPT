@@ -7,6 +7,7 @@ namespace GhCli.Net.PullRequests;
 internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new();
+    private static readonly System.Text.RegularExpressions.Regex PrNumberRegex = new(@"/pull/(\d+)");
 
     private const string ListFields = "number,title,state,author,headRefName,baseRefName,isDraft,mergeable,labels,createdAt,updatedAt,url";
     private const string DetailFields = "number,title,state,author,headRefName,baseRefName,isDraft,body,labels,reviews,files,statusCheckRollup,url,createdAt,updatedAt";
@@ -161,7 +162,6 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
             "--body", body,
             "--head", headBranch,
             "--base", baseBranch,
-            "--json", DetailFields
         };
 
         if (draft)
@@ -171,10 +171,17 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
         if (labelList is { Count: > 0 })
             args.AddRange(["--label", string.Join(",", labelList)]);
 
-        var json = await runner.RunAsync([.. args]);
+        var output = await runner.RunAsync([.. args]);
 
-        return JsonSerializer.Deserialize<PullRequestDetail>(json, JsonOptions)
-            ?? throw new InvalidOperationException("Pull Request konnte nicht erstellt werden.");
+        // gh pr create returns the PR URL, e.g. https://github.com/owner/repo/pull/42
+        var match = PrNumberRegex.Match(output.Trim());
+        if (!match.Success)
+            throw new InvalidOperationException("Pull Request wurde erstellt, aber die PR-Nummer konnte nicht ermittelt werden.");
+
+        if (!int.TryParse(match.Groups[1].Value, out var number))
+            throw new InvalidOperationException("Pull Request wurde erstellt, aber die PR-Nummer konnte nicht als Zahl interpretiert werden.");
+
+        return await GetDetailAsync(owner, repo, number);
     }
 
     public async Task MergeAsync(string owner, string repo, int number, PullRequestMergeMethod method = PullRequestMergeMethod.Merge, string? commitTitle = null, string? commitBody = null)

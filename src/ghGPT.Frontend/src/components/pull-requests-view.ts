@@ -39,10 +39,31 @@ export class PullRequestsView extends LitElement {
       background: #1e1e2e;
     }
 
+    .panel-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
     .panel-title {
       font-size: 0.95rem;
       font-weight: 700;
       color: #eef1ff;
+    }
+
+    .create-btn {
+      padding: 0.2rem 0.65rem;
+      font-size: 0.75rem;
+      border: 1px solid #45475a;
+      border-radius: 4px;
+      background: transparent;
+      color: #a6e3a1;
+      border-color: #a6e3a1;
+      cursor: pointer;
+    }
+
+    .create-btn:hover {
+      background: rgba(166, 227, 161, 0.1);
     }
 
     .filter-row {
@@ -104,13 +125,8 @@ export class PullRequestsView extends LitElement {
       gap: 0.35rem;
     }
 
-    .pr-entry:hover {
-      background: #25273a;
-    }
-
-    .pr-entry.selected {
-      background: #313244;
-    }
+    .pr-entry:hover { background: #25273a; }
+    .pr-entry.selected { background: #313244; }
 
     .pr-entry-top {
       display: flex;
@@ -249,6 +265,74 @@ export class PullRequestsView extends LitElement {
       flex: 1;
     }
 
+    .detail-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .action-btn {
+      padding: 0.3rem 0.75rem;
+      font-size: 0.78rem;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      background: transparent;
+      color: #cdd6f4;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .action-btn:hover { background: #313244; }
+    .action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .action-btn.danger {
+      color: #f38ba8;
+      border-color: #f38ba8;
+    }
+
+    .action-btn.danger:hover { background: rgba(243, 139, 168, 0.1); }
+
+    .action-btn.success {
+      color: #a6e3a1;
+      border-color: #a6e3a1;
+    }
+
+    .action-btn.success:hover { background: rgba(166, 227, 161, 0.1); }
+
+    .action-btn.primary {
+      color: #89b4fa;
+      border-color: #89b4fa;
+    }
+
+    .action-btn.primary:hover { background: rgba(137, 180, 250, 0.1); }
+
+    .merge-wrapper { position: relative; }
+
+    .merge-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      background: #1e1e2e;
+      border: 1px solid #45475a;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 200;
+      min-width: 160px;
+      overflow: hidden;
+    }
+
+    .merge-option {
+      padding: 0.5rem 0.85rem;
+      font-size: 0.82rem;
+      color: #cdd6f4;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .merge-option:hover { background: #313244; }
+
     .open-github-btn {
       padding: 0.3rem 0.75rem;
       font-size: 0.78rem;
@@ -328,7 +412,6 @@ export class PullRequestsView extends LitElement {
 
     .ci-dot.passing { background: #a6e3a1; }
     .ci-dot.failing { background: #f38ba8; }
-    .ci-dot.none { background: #6c7086; }
 
     .files-list {
       display: flex;
@@ -369,21 +452,11 @@ export class PullRequestsView extends LitElement {
       font-family: monospace;
     }
 
-    .file-stats {
-      font-size: 0.72rem;
-      color: #8f96b3;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
+    .file-stats { font-size: 0.72rem; color: #8f96b3; white-space: nowrap; flex-shrink: 0; }
     .file-stat-add { color: #a6e3a1; }
     .file-stat-del { color: #f38ba8; }
 
-    .reviews-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
+    .reviews-list { display: flex; flex-direction: column; gap: 0.4rem; }
 
     .review-entry {
       display: flex;
@@ -395,13 +468,7 @@ export class PullRequestsView extends LitElement {
       font-size: 0.8rem;
     }
 
-    .review-avatar {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
+    .review-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 
     .review-avatar-fallback {
       width: 24px;
@@ -418,10 +485,105 @@ export class PullRequestsView extends LitElement {
     }
 
     .review-login { color: #cdd6f4; font-weight: 600; }
-
     .review-state-approved { color: #a6e3a1; }
     .review-state-changes { color: #f38ba8; }
     .review-state-commented { color: #a6adc8; }
+
+    /* Edit form */
+    .edit-form {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      border-bottom: 1px solid #313244;
+      background: #181825;
+    }
+
+    .edit-form input, .edit-form textarea {
+      background: #1e1e2e;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      color: #cdd6f4;
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      font-family: inherit;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .edit-form textarea {
+      min-height: 100px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .edit-form input:focus, .edit-form textarea:focus {
+      outline: none;
+      border-color: #89b4fa;
+    }
+
+    .edit-form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+    /* Create form */
+    .create-form {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .create-form-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #eef1ff;
+      margin-bottom: 0.25rem;
+    }
+
+    .form-label {
+      font-size: 0.78rem;
+      color: #a6adc8;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+
+    .create-form input, .create-form textarea {
+      background: #1e1e2e;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      color: #cdd6f4;
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      font-family: inherit;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .create-form textarea {
+      min-height: 120px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .create-form input:focus, .create-form textarea:focus {
+      outline: none;
+      border-color: #89b4fa;
+    }
+
+    .form-row { display: flex; gap: 0.75rem; }
+    .form-row > div { flex: 1; }
+
+    .form-check {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #a6adc8;
+      cursor: pointer;
+    }
+
+    .create-form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem; }
 
     .placeholder-detail {
       flex: 1;
@@ -434,9 +596,7 @@ export class PullRequestsView extends LitElement {
       font-size: 0.9rem;
     }
 
-    .placeholder-icon {
-      font-size: 2.5rem;
-    }
+    .placeholder-icon { font-size: 2.5rem; }
 
     .loading, .error-msg, .empty-msg {
       padding: 2rem 1rem;
@@ -446,6 +606,7 @@ export class PullRequestsView extends LitElement {
     }
 
     .error-msg { color: #f38ba8; }
+    .action-error { color: #f38ba8; font-size: 0.8rem; padding: 0.5rem 1rem; background: rgba(243,139,168,0.08); border-radius: 4px; }
   `;
 
   @property() repoId = '';
@@ -458,6 +619,18 @@ export class PullRequestsView extends LitElement {
   @state() private loadingDetail = false;
   @state() private error: string | null = null;
   @state() private detailError: string | null = null;
+  @state() private actionBusy = false;
+  @state() private actionError: string | null = null;
+  @state() private showMergeDropdown = false;
+  @state() private showEditForm = false;
+  @state() private showCreateForm = false;
+  @state() private editTitle = '';
+  @state() private editBody = '';
+  @state() private createTitle = '';
+  @state() private createBody = '';
+  @state() private createHead = '';
+  @state() private createBase = '';
+  @state() private createDraft = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -470,6 +643,7 @@ export class PullRequestsView extends LitElement {
       this.selectedPr = null;
       this.selectedNumber = null;
       this.error = null;
+      this.showCreateForm = false;
       this.loadPrs();
     }
   }
@@ -495,6 +669,10 @@ export class PullRequestsView extends LitElement {
     this.selectedNumber = number;
     this.selectedPr = null;
     this.detailError = null;
+    this.actionError = null;
+    this.showEditForm = false;
+    this.showMergeDropdown = false;
+    this.showCreateForm = false;
     this.loadingDetail = true;
     try {
       const result = await repositoryService.getPullRequestDetail(requestedRepoId, number);
@@ -514,6 +692,100 @@ export class PullRequestsView extends LitElement {
     this.selectedPr = null;
     this.selectedNumber = null;
     await this.loadPrs();
+  }
+
+  private async _doClose() {
+    if (!this.selectedNumber) return;
+    this.actionBusy = true;
+    this.actionError = null;
+    try {
+      await repositoryService.closePullRequest(this.repoId, this.selectedNumber);
+      await this.selectPr(this.selectedNumber);
+      await this.loadPrs();
+    } catch (e: unknown) {
+      this.actionError = e instanceof Error ? e.message : 'Fehler beim Schließen.';
+    } finally {
+      this.actionBusy = false;
+    }
+  }
+
+  private async _doReopen() {
+    if (!this.selectedNumber) return;
+    this.actionBusy = true;
+    this.actionError = null;
+    try {
+      await repositoryService.reopenPullRequest(this.repoId, this.selectedNumber);
+      await this.selectPr(this.selectedNumber);
+      await this.loadPrs();
+    } catch (e: unknown) {
+      this.actionError = e instanceof Error ? e.message : 'Fehler beim Wiedereröffnen.';
+    } finally {
+      this.actionBusy = false;
+    }
+  }
+
+  private async _doMerge(method: 'merge' | 'squash' | 'rebase') {
+    if (!this.selectedNumber) return;
+    this.showMergeDropdown = false;
+    this.actionBusy = true;
+    this.actionError = null;
+    try {
+      await repositoryService.mergePullRequest(this.repoId, this.selectedNumber, method);
+      await this.selectPr(this.selectedNumber);
+      await this.loadPrs();
+    } catch (e: unknown) {
+      this.actionError = e instanceof Error ? e.message : 'Fehler beim Mergen.';
+    } finally {
+      this.actionBusy = false;
+    }
+  }
+
+  private _openEditForm() {
+    if (!this.selectedPr) return;
+    this.editTitle = this.selectedPr.title;
+    this.editBody = this.selectedPr.body;
+    this.showEditForm = true;
+  }
+
+  private async _doEdit() {
+    if (!this.selectedNumber) return;
+    this.actionBusy = true;
+    this.actionError = null;
+    try {
+      await repositoryService.editPullRequest(this.repoId, this.selectedNumber, this.editTitle || undefined, this.editBody || undefined);
+      this.showEditForm = false;
+      await this.selectPr(this.selectedNumber);
+    } catch (e: unknown) {
+      this.actionError = e instanceof Error ? e.message : 'Fehler beim Bearbeiten.';
+    } finally {
+      this.actionBusy = false;
+    }
+  }
+
+  private async _doCreate() {
+    if (!this.createTitle || !this.createHead || !this.createBase) {
+      this.actionError = 'Titel, Head-Branch und Base-Branch sind Pflichtfelder.';
+      return;
+    }
+    this.actionBusy = true;
+    this.actionError = null;
+    try {
+      const pr = await repositoryService.createPullRequest(
+        this.repoId, this.createTitle, this.createBody,
+        this.createHead, this.createBase, this.createDraft);
+      this.showCreateForm = false;
+      this.createTitle = '';
+      this.createBody = '';
+      this.createHead = '';
+      this.createBase = '';
+      this.createDraft = false;
+      await this.loadPrs();
+      await this.selectPr(pr.number);
+    } catch (e: unknown) {
+      this.actionError = e instanceof Error ? e.message : 'Fehler beim Erstellen.';
+    } finally {
+      this.actionBusy = false;
+    }
   }
 
   private renderStateBadge(state: string, isDraft: boolean) {
@@ -560,11 +832,53 @@ export class PullRequestsView extends LitElement {
     return 'Commented';
   }
 
+  private _renderDetailActions(pr: PullRequestDetail) {
+    const busy = this.actionBusy;
+    const isOpen = pr.state === 'open';
+    const isClosed = pr.state === 'closed';
+    const isMerged = pr.state === 'merged';
+
+    return html`
+      <div class="detail-actions">
+        ${isOpen ? html`
+          <button class="action-btn" ?disabled=${busy} @click=${this._openEditForm}>Bearbeiten</button>
+          <div class="merge-wrapper">
+            <button class="action-btn success" ?disabled=${busy}
+              @click=${() => this.showMergeDropdown = !this.showMergeDropdown}>
+              ⇝ Mergen ▾
+            </button>
+            ${this.showMergeDropdown ? html`
+              <div class="merge-dropdown">
+                <div class="merge-option" @click=${() => this._doMerge('merge')}>Merge commit</div>
+                <div class="merge-option" @click=${() => this._doMerge('squash')}>Squash and merge</div>
+                <div class="merge-option" @click=${() => this._doMerge('rebase')}>Rebase and merge</div>
+              </div>
+            ` : ''}
+          </div>
+          <button class="action-btn danger" ?disabled=${busy} @click=${this._doClose}>Schließen</button>
+        ` : ''}
+        ${isClosed ? html`
+          <button class="action-btn success" ?disabled=${busy} @click=${this._doReopen}>Wiedereröffnen</button>
+        ` : ''}
+        ${isMerged ? '' : ''}
+        <button class="open-github-btn"
+          @click=${() => window.open(pr.htmlUrl, '_blank')}>
+          Auf GitHub ↗
+        </button>
+      </div>
+    `;
+  }
+
   render() {
     return html`
       <div class="list-panel">
         <div class="panel-header">
-          <span class="panel-title">Pull Requests</span>
+          <div class="panel-title-row">
+            <span class="panel-title">Pull Requests</span>
+            <button class="create-btn" @click=${() => { this.showCreateForm = true; this.selectedNumber = null; this.selectedPr = null; this.actionError = null; }}>
+              + Neu
+            </button>
+          </div>
           <div class="filter-row">
             <button class="filter-btn ${this.stateFilter === 'open' ? 'active' : ''}"
               @click=${() => this.setFilter('open')}>Open</button>
@@ -607,7 +921,57 @@ export class PullRequestsView extends LitElement {
       </div>
 
       <div class="detail-panel">
-        ${this.selectedNumber === null
+        ${this.showCreateForm ? html`
+          <div class="create-form">
+            <div class="create-form-title">Neuer Pull Request</div>
+
+            <div>
+              <label class="form-label">Titel *</label>
+              <input type="text" .value=${this.createTitle}
+                @input=${(e: Event) => this.createTitle = (e.target as HTMLInputElement).value}
+                placeholder="PR-Titel" />
+            </div>
+
+            <div class="form-row">
+              <div>
+                <label class="form-label">Head-Branch *</label>
+                <input type="text" .value=${this.createHead}
+                  @input=${(e: Event) => this.createHead = (e.target as HTMLInputElement).value}
+                  placeholder="feature/mein-feature" />
+              </div>
+              <div>
+                <label class="form-label">Base-Branch *</label>
+                <input type="text" .value=${this.createBase}
+                  @input=${(e: Event) => this.createBase = (e.target as HTMLInputElement).value}
+                  placeholder="main" />
+              </div>
+            </div>
+
+            <div>
+              <label class="form-label">Beschreibung</label>
+              <textarea .value=${this.createBody}
+                @input=${(e: Event) => this.createBody = (e.target as HTMLTextAreaElement).value}
+                placeholder="Beschreibung des Pull Requests..."></textarea>
+            </div>
+
+            <label class="form-check">
+              <input type="checkbox" .checked=${this.createDraft}
+                @change=${(e: Event) => this.createDraft = (e.target as HTMLInputElement).checked} />
+              Als Draft erstellen
+            </label>
+
+            ${this.actionError ? html`<div class="action-error">${this.actionError}</div>` : ''}
+
+            <div class="create-form-actions">
+              <button class="action-btn" @click=${() => { this.showCreateForm = false; this.actionError = null; }}>
+                Abbrechen
+              </button>
+              <button class="action-btn primary" ?disabled=${this.actionBusy} @click=${this._doCreate}>
+                ${this.actionBusy ? 'Erstelle...' : 'Pull Request erstellen'}
+              </button>
+            </div>
+          </div>
+        ` : this.selectedNumber === null
           ? html`
             <div class="placeholder-detail">
               <span class="placeholder-icon">🔀</span>
@@ -623,10 +987,7 @@ export class PullRequestsView extends LitElement {
             <div class="detail-header">
               <div class="detail-header-top">
                 <div class="detail-title">#${this.selectedPr.number} ${this.selectedPr.title}</div>
-                <button class="open-github-btn"
-                  @click=${() => window.open(this.selectedPr!.htmlUrl, '_blank')}>
-                  Auf GitHub öffnen ↗
-                </button>
+                ${this._renderDetailActions(this.selectedPr)}
               </div>
               <div class="detail-meta">
                 ${this.renderStateBadge(this.selectedPr.state, this.selectedPr.isDraft)}
@@ -643,7 +1004,25 @@ export class PullRequestsView extends LitElement {
                   </div>
                 ` : ''}
               </div>
+              ${this.actionError ? html`<div class="action-error" style="margin-top:0.5rem">${this.actionError}</div>` : ''}
             </div>
+
+            ${this.showEditForm ? html`
+              <div class="edit-form">
+                <input type="text" .value=${this.editTitle}
+                  @input=${(e: Event) => this.editTitle = (e.target as HTMLInputElement).value}
+                  placeholder="Titel" />
+                <textarea .value=${this.editBody}
+                  @input=${(e: Event) => this.editBody = (e.target as HTMLTextAreaElement).value}
+                  placeholder="Beschreibung"></textarea>
+                <div class="edit-form-actions">
+                  <button class="action-btn" @click=${() => this.showEditForm = false}>Abbrechen</button>
+                  <button class="action-btn primary" ?disabled=${this.actionBusy} @click=${this._doEdit}>
+                    ${this.actionBusy ? 'Speichere...' : 'Speichern'}
+                  </button>
+                </div>
+              </div>
+            ` : ''}
 
             <div class="detail-scroll">
               ${this.selectedPr.body ? html`
