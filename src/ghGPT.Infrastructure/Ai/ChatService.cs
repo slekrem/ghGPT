@@ -1,7 +1,6 @@
 using ghGPT.Core.Ai;
 using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
-using ghGPT.Infrastructure.PullRequests;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -295,7 +294,7 @@ internal sealed class ChatService(
         var repo = repositoryService.GetAll().FirstOrDefault(r => r.Id == repoId);
         if (repo?.RemoteUrl is null) return null;
 
-        var (owner, repoName) = PullRequestService.ParseRemoteUrl(repo.RemoteUrl);
+        var (owner, repoName) = RemoteUrlParser.Parse(repo.RemoteUrl);
         var prs = await pullRequestService.GetPullRequestsAsync(owner, repoName);
         if (prs.Count == 0) return "## Ansicht: Pull Requests\nKeine offenen Pull Requests.";
 

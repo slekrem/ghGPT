@@ -1,6 +1,5 @@
 using GhCli.Net.Abstractions;
 using ghGPT.Core.PullRequests;
-using System.Text.RegularExpressions;
 
 namespace ghGPT.Infrastructure.PullRequests;
 
@@ -74,14 +73,4 @@ public class PullRequestService(IPullRequestClient pullRequestClient) : IPullReq
         };
     }
 
-    public static (string Owner, string Repo) ParseRemoteUrl(string remoteUrl)
-    {
-        var match = Regex.Match(remoteUrl,
-            @"(?:https://github\.com/|git@github\.com:)([^/]+)/([^/\.]+?)(?:\.git)?$");
-
-        if (!match.Success)
-            throw new InvalidOperationException("Dieses Repository ist kein GitHub-Repository.");
-
-        return (match.Groups[1].Value, match.Groups[2].Value);
-    }
 }
