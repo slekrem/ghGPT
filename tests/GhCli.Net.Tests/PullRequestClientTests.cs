@@ -447,4 +447,67 @@ public class PullRequestClientTests
         await Assert.ThrowsAsync<ArgumentException>(() =>
             _sut.CreateAsync("slekrem", "ghGPT", "title", "body", "", "main"));
     }
+
+    [Fact]
+    public async Task MergeAsync_DefaultMerge_CallsCorrectCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--merge")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.MergeAsync("slekrem", "ghGPT", 42);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--merge");
+    }
+
+    [Fact]
+    public async Task MergeAsync_Squash_CallsCorrectCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--squash")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.MergeAsync("slekrem", "ghGPT", 42, PullRequests.Models.PullRequestMergeMethod.Squash);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--squash");
+    }
+
+    [Fact]
+    public async Task MergeAsync_Rebase_CallsCorrectCommand()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--rebase")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.MergeAsync("slekrem", "ghGPT", 42, PullRequests.Models.PullRequestMergeMethod.Rebase);
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--rebase");
+    }
+
+    [Fact]
+    public async Task MergeAsync_WithCommitTitleAndBody_IncludesFlags()
+    {
+        // Arrange
+        _runner.RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--squash", "--subject", "feat: squash commit", "--body", "Details")
+            .Returns(string.Empty);
+
+        // Act
+        await _sut.MergeAsync("slekrem", "ghGPT", 42, PullRequests.Models.PullRequestMergeMethod.Squash, "feat: squash commit", "Details");
+
+        // Assert
+        await _runner.Received(1).RunAsync("pr", "merge", "42", "--repo", "slekrem/ghGPT", "--squash", "--subject", "feat: squash commit", "--body", "Details");
+    }
+
+    [Fact]
+    public async Task MergeAsync_ThrowsWhenNumberIsZero()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            _sut.MergeAsync("slekrem", "ghGPT", 0));
+    }
 }

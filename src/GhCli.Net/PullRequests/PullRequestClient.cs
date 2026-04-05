@@ -176,4 +176,33 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
         return JsonSerializer.Deserialize<PullRequestDetail>(json, JsonOptions)
             ?? throw new InvalidOperationException("Pull Request konnte nicht erstellt werden.");
     }
+
+    public async Task MergeAsync(string owner, string repo, int number, PullRequestMergeMethod method = PullRequestMergeMethod.Merge, string? commitTitle = null, string? commitBody = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        var methodFlag = method switch
+        {
+            PullRequestMergeMethod.Squash => "--squash",
+            PullRequestMergeMethod.Rebase => "--rebase",
+            _ => "--merge"
+        };
+
+        var args = new List<string>
+        {
+            "pr", "merge", number.ToString(),
+            "--repo", $"{owner}/{repo}",
+            methodFlag
+        };
+
+        if (!string.IsNullOrWhiteSpace(commitTitle))
+            args.AddRange(["--subject", commitTitle]);
+
+        if (!string.IsNullOrWhiteSpace(commitBody))
+            args.AddRange(["--body", commitBody]);
+
+        await runner.RunAsync([.. args]);
+    }
 }
