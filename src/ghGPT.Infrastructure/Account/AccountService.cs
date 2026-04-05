@@ -1,12 +1,10 @@
+using GhCli.Net.Abstractions;
 using ghGPT.Core.Account;
-using Octokit;
 
 namespace ghGPT.Infrastructure.Account;
 
-public class AccountService(ITokenStore tokenStore) : IAccountService
+public class AccountService(ITokenStore tokenStore, IGhCliRunner runner, IUserClient userClient) : IAccountService
 {
-    private const string GitHubProductHeader = "ghGPT";
-
     public async Task<AccountInfo?> GetAccountAsync()
     {
         var token = tokenStore.Load();
@@ -15,7 +13,8 @@ public class AccountService(ITokenStore tokenStore) : IAccountService
 
         try
         {
-            return await FetchAccountInfoAsync(token);
+            var user = await userClient.GetCurrentAsync();
+            return new AccountInfo(user.Login, user.Name ?? user.Login, user.AvatarUrl);
         }
         catch
         {
@@ -25,14 +24,20 @@ public class AccountService(ITokenStore tokenStore) : IAccountService
 
     public async Task<AccountInfo> SaveTokenAsync(string token)
     {
+        try
+        {
+            await runner.RunWithInputAsync(token, "auth", "login", "--with-token");
+        }
+        catch (InvalidOperationException)
+        {
+            throw new InvalidOperationException("Der Token ist ungültig oder abgelaufen.");
+        }
+
         AccountInfo info;
         try
         {
-            info = await FetchAccountInfoAsync(token);
-        }
-        catch (AuthorizationException)
-        {
-            throw new InvalidOperationException("Der Token ist ungültig oder abgelaufen.");
+            var user = await userClient.GetCurrentAsync();
+            info = new AccountInfo(user.Login, user.Name ?? user.Login, user.AvatarUrl);
         }
         catch (Exception ex)
         {
@@ -46,19 +51,5 @@ public class AccountService(ITokenStore tokenStore) : IAccountService
     public void RemoveAccount()
     {
         tokenStore.Delete();
-    }
-
-    private static async Task<AccountInfo> FetchAccountInfoAsync(string token)
-    {
-        var client = new GitHubClient(new ProductHeaderValue(GitHubProductHeader))
-        {
-            Credentials = new Credentials(token)
-        };
-        var user = await client.User.Current();
-        return new AccountInfo(
-            Login: user.Login,
-            Name: user.Name ?? user.Login,
-            AvatarUrl: user.AvatarUrl
-        );
     }
 }
