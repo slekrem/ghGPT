@@ -1,12 +1,11 @@
 using ghGPT.Core.Ai;
-using ghGPT.Infrastructure.Ai;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ghGPT.Infrastructure;
+namespace ghGPT.Ai;
 
-internal static class AiServiceExtensions
+public static class DependencyInjection
 {
-    internal static IServiceCollection AddAiServices(this IServiceCollection services)
+    public static IServiceCollection AddAiServices(this IServiceCollection services)
     {
         services.AddSingleton<IToolDispatcher, ToolDispatcher>();
         services.AddSingleton<IChatContextBuilder, ChatContextBuilder>();

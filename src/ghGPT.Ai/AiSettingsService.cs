@@ -1,7 +1,7 @@
 using ghGPT.Core.Ai;
 using System.Text.Json;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal sealed class AiSettingsService : IAiSettingsService
 {

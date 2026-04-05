@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal sealed class OllamaClient(IAiSettingsService settingsService, HttpClient? httpClient = null) : IOllamaClient
 {

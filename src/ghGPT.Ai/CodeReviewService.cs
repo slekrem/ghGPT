@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal sealed class CodeReviewService(
     IOllamaClient ollamaClient,

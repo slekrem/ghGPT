@@ -1,10 +1,9 @@
 using ghGPT.Core.Ai;
 using ghGPT.Core.Repositories;
-using ghGPT.Infrastructure.Ai;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
-namespace ghGPT.Infrastructure.Tests;
+namespace ghGPT.Ai.Tests;
 
 public class ToolDispatcherTests
 {

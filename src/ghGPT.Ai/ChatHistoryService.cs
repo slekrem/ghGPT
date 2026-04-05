@@ -2,7 +2,7 @@ using ghGPT.Core.Ai;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal sealed class ChatHistoryService : IChatHistoryService
 {

@@ -1,4 +1,4 @@
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 /// <summary>
 /// v1 — Optimierter System-Prompt für ghGPT Chat-Assistent
