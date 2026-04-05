@@ -1,3 +1,4 @@
+using GhCli.Net;
 using ghGPT.Core.Account;
 using ghGPT.Core.Ai;
 using ghGPT.Core.PullRequests;
@@ -22,6 +23,8 @@ public static class DependencyInjection
             services.AddSingleton<ITokenStore, MacOsTokenStore>();
         else
             services.AddSingleton<ITokenStore, LinuxTokenStore>();
+
+        services.AddGhCli();
 
         services.AddSingleton<IAiSettingsService, AiSettingsService>();
         services.AddSingleton<IOllamaClient, OllamaClient>();
