@@ -3,7 +3,7 @@ using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
 using System.Text;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal sealed class ChatContextBuilder(
     IRepositoryService repositoryService,

@@ -1,10 +1,9 @@
 using ghGPT.Core.Ai;
-using ghGPT.Infrastructure.Ai;
 using NSubstitute;
 using System.Net;
 using System.Text;
 
-namespace ghGPT.Infrastructure.Tests.Ai;
+namespace ghGPT.Ai.Tests;
 
 public class OllamaClientTests
 {

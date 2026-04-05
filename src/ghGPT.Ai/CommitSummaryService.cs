@@ -3,7 +3,7 @@ using ghGPT.Core.Repositories;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal sealed class CommitSummaryService(
     IOllamaClient ollamaClient,

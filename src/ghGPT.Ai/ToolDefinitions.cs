@@ -1,6 +1,6 @@
 using ghGPT.Core.Ai;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal static class ToolDefinitions
 {

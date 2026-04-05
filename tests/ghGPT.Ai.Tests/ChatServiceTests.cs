@@ -1,32 +1,29 @@
 using ghGPT.Core.Ai;
-using ghGPT.Core.PullRequests;
-using ghGPT.Core.Repositories;
-using ghGPT.Infrastructure.Ai;
 using NSubstitute;
 
-namespace ghGPT.Infrastructure.Tests.Ai;
+namespace ghGPT.Ai.Tests;
 
 public class ChatServiceTests
 {
     private readonly IOllamaClient _ollamaClient = Substitute.For<IOllamaClient>();
-    private readonly IRepositoryService _repositoryService = Substitute.For<IRepositoryService>();
-    private readonly IPullRequestService _pullRequestService = Substitute.For<IPullRequestService>();
     private readonly IChatHistoryService _historyService = Substitute.For<IChatHistoryService>();
+    private readonly IToolDispatcher _toolDispatcher = Substitute.For<IToolDispatcher>();
+    private readonly IChatContextBuilder _contextBuilder = Substitute.For<IChatContextBuilder>();
     private readonly ChatService _sut;
 
     public ChatServiceTests()
     {
-        _sut = new ChatService(_ollamaClient, _repositoryService, _pullRequestService, _historyService);
+        _sut = new ChatService(_ollamaClient, _historyService, _toolDispatcher, _contextBuilder);
 
-        _repositoryService.GetAll().Returns([
-            new RepositoryInfo { Id = "repo-1", Name = "Test", LocalPath = "/tmp/test" }
+        _contextBuilder.BuildAsync(Arg.Any<ChatRequest>()).Returns(
+        [
+            new ChatMessage { Role = "system", Content = "System-Prompt" },
+            new ChatMessage { Role = "user", Content = "Hallo" }
         ]);
-        _repositoryService.GetBranches("repo-1").Returns([
-            new BranchInfo { Name = "main", IsHead = true, IsRemote = false }
-        ]);
-        _repositoryService.GetHistory("repo-1", limit: 5).Returns([]);
-        _repositoryService.GetStatus("repo-1").Returns(new RepositoryStatusResult { Staged = [], Unstaged = [] });
         _historyService.Load(Arg.Any<string>()).Returns([]);
+
+        _toolDispatcher.DispatchAsync(Arg.Any<ToolCall>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(("Tool-Ergebnis", "get_status", true));
     }
 
     // --- StreamAsync: History ---
@@ -179,20 +176,8 @@ public class ChatServiceTests
     }
 
     [Fact]
-    public async Task StreamAsync_WithoutRepoId_WhenGenerateAsyncStreams_SavesFullResponseToHistory()
+    public async Task StreamAsync_WhenMaxRoundsReachedWithRepoId_SavesAssistantResponseToHistory()
     {
-        _ollamaClient.GenerateAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<CancellationToken>())
-            .Returns(StringEnumerable("Hallo", " Welt"));
-
-        // RepoId nötig damit History gespeichert wird
-        _repositoryService.GetAll().Returns([
-            new RepositoryInfo { Id = "repo-2", Name = "Repo2", LocalPath = "/tmp/repo2" }
-        ]);
-        _repositoryService.GetBranches("repo-2").Returns([]);
-        _repositoryService.GetHistory("repo-2", limit: 5).Returns([]);
-        _repositoryService.GetStatus("repo-2").Returns(new RepositoryStatusResult { Staged = [], Unstaged = [] });
-
-        // Kein Tool-Loop-Ausgang → GenerateAsync-Pfad via MaxRounds überschritten
         var infiniteToolCall = new ToolCallResponse
         {
             HasToolCalls = true,
@@ -204,108 +189,25 @@ public class ChatServiceTests
             Arg.Any<CancellationToken>())
             .Returns(infiniteToolCall);
 
-        await CollectEventsAsync(new ChatRequest { Message = "Status?", RepoId = "repo-2" });
+        _ollamaClient.GenerateAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(StringEnumerable("Hallo", " Welt"));
 
-        _historyService.Received(1).Append("repo-2", "assistant", "Hallo Welt");
+        await CollectEventsAsync(new ChatRequest { Message = "Status?", RepoId = "repo-1" });
+
+        _historyService.Received(1).Append("repo-1", "assistant", "Hallo Welt");
     }
 
-    // --- BuildMessagesAsync ---
+    // --- BuildAsync wird delegiert ---
 
     [Fact]
-    public async Task StreamAsync_AlwaysIncludesSystemPromptMessage()
+    public async Task StreamAsync_CallsContextBuilderBuildAsync()
     {
-        IEnumerable<ChatMessage>? captured = null;
-        _ollamaClient.CompleteWithToolsAsync(
-            Arg.Do<IEnumerable<ChatMessage>>(m => captured = m),
-            Arg.Any<IEnumerable<ToolDefinition>>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new ToolCallResponse { HasToolCalls = false, Content = "ok" });
-
-        await CollectEventsAsync(new ChatRequest { Message = "Test", RepoId = "repo-1" });
-
-        Assert.NotNull(captured);
-        Assert.Contains(captured!, m => m.Role == "system");
-    }
-
-    [Fact]
-    public async Task StreamAsync_UserMessageIsLastInMessageList()
-    {
-        IEnumerable<ChatMessage>? captured = null;
-        _ollamaClient.CompleteWithToolsAsync(
-            Arg.Do<IEnumerable<ChatMessage>>(m => captured = m),
-            Arg.Any<IEnumerable<ToolDefinition>>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new ToolCallResponse { HasToolCalls = false, Content = "ok" });
-
-        await CollectEventsAsync(new ChatRequest { Message = "Meine Frage", RepoId = "repo-1" });
-
-        Assert.NotNull(captured);
-        var last = captured!.Last();
-        Assert.Equal("user", last.Role);
-        Assert.Equal("Meine Frage", last.Content);
-    }
-
-    [Fact]
-    public async Task StreamAsync_IncludesHistoryEntriesInMessages()
-    {
-        _historyService.Load("repo-1").Returns([
-            new ChatHistoryEntry { Role = "user", Content = "Vorherige Frage" },
-            new ChatHistoryEntry { Role = "assistant", Content = "Vorherige Antwort" }
-        ]);
-
-        IEnumerable<ChatMessage>? captured = null;
-        _ollamaClient.CompleteWithToolsAsync(
-            Arg.Do<IEnumerable<ChatMessage>>(m => captured = m),
-            Arg.Any<IEnumerable<ToolDefinition>>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new ToolCallResponse { HasToolCalls = false, Content = "ok" });
-
-        await CollectEventsAsync(new ChatRequest { Message = "Neue Frage", RepoId = "repo-1" });
-
-        Assert.NotNull(captured);
-        Assert.Contains(captured!, m => m.Role == "user" && m.Content == "Vorherige Frage");
-        Assert.Contains(captured!, m => m.Role == "assistant" && m.Content == "Vorherige Antwort");
-    }
-
-    // --- BuildRepositoryContext ---
-
-    [Fact]
-    public async Task StreamAsync_WhenRepoFound_IncludesRepoContextInSystemMessage()
-    {
-        IEnumerable<ChatMessage>? captured = null;
-        _ollamaClient.CompleteWithToolsAsync(
-            Arg.Do<IEnumerable<ChatMessage>>(m => captured = m),
-            Arg.Any<IEnumerable<ToolDefinition>>(),
-            Arg.Any<CancellationToken>())
-            .Returns(new ToolCallResponse { HasToolCalls = false, Content = "ok" });
-
-        await CollectEventsAsync(new ChatRequest { Message = "Test", RepoId = "repo-1" });
-
-        Assert.NotNull(captured);
-        var systemMessages = captured!.Where(m => m.Role == "system").ToList();
-        Assert.Contains(systemMessages, m => m.Content != null && m.Content.Contains("Test"));
-    }
-
-    [Fact]
-    public async Task StreamAsync_WhenRepoNotFound_DoesNotThrow()
-    {
-        _repositoryService.GetAll().Returns([]);
         SetupDirectAnswer("ok");
+        var request = new ChatRequest { Message = "Test", RepoId = "repo-1" };
 
-        var events = await CollectEventsAsync(new ChatRequest { Message = "Test", RepoId = "unknown" });
+        await CollectEventsAsync(request);
 
-        Assert.NotEmpty(events);
-    }
-
-    [Fact]
-    public async Task StreamAsync_WhenBranchServiceThrows_StillCompletes()
-    {
-        _repositoryService.When(s => s.GetBranches("repo-1")).Throw(new Exception("git error"));
-        SetupDirectAnswer("ok");
-
-        var events = await CollectEventsAsync(new ChatRequest { Message = "Test", RepoId = "repo-1" });
-
-        Assert.NotEmpty(events);
+        await _contextBuilder.Received(1).BuildAsync(request);
     }
 
     // --- Helper ---

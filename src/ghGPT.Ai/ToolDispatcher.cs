@@ -3,7 +3,7 @@ using ghGPT.Core.Repositories;
 using System.Text;
 using System.Text.Json;
 
-namespace ghGPT.Infrastructure.Ai;
+namespace ghGPT.Ai;
 
 internal sealed class ToolDispatcher(IRepositoryService repositoryService) : IToolDispatcher
 {
