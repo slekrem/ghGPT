@@ -1,8 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { repositoryService, type RepositoryInfo, type GitOperationProgressEvent, type AccountInfo } from '../services/repository-service';
-import { onHubEvent, offHubEvent, onHubStateChange, offHubStateChange, getHubState, type HubConnectionStatus } from '../services/hub-client';
-import { startHub } from '../services/hub-client';
+import type { RepositoryInfo, AccountInfo } from '../services/repository-service';
+import { AppStateController } from '../services/app-state';
 import './sidebar';
 import './toolbar';
 import './git-operation-overlay';
@@ -72,188 +71,74 @@ export class AppShell extends LitElement {
     .placeholder-btn:hover { background-color: #313244; }
   `;
 
+  private readonly _appState = new AppStateController(this);
+
   @state() private activeView: View = 'changes';
-  @state() private repos: RepositoryInfo[] = [];
-  @state() private activeRepoId: string | null = null;
   @state() private showDialog = false;
   @state() private historyRefreshKey = 0;
   @state() private changesRefreshKey = 0;
   @state() private branchesRefreshKey = 0;
-  @state() private gitOperation: 'fetch' | 'pull' | 'push' | null = null;
-  @state() private gitOperationLines: string[] = [];
-  @state() private gitOperationError = '';
-  @state() private gitOperationStatus = '';
-  @state() private account: AccountInfo | null = null;
-  @state() private hubState: HubConnectionStatus = 'disconnected';
   @state() private showChat = false;
 
-  private _onHubStateChange = (state: HubConnectionStatus) => { this.hubState = state; };
-
-  async connectedCallback() {
-    super.connectedCallback();
-    onHubStateChange(this._onHubStateChange);
-    startHub()
-      .then(() => { this.hubState = getHubState(); })
-      .catch(err => console.warn('SignalR connection failed:', err));
-    onHubEvent<GitOperationProgressEvent>('git-operation-progress', this._onGitOperationProgress);
-    onHubEvent<{ repoId: string }>('status-changed', this._onStatusChanged);
-    onHubEvent<{ repoId: string }>('branch-changed', this._onHubBranchChanged);
-    await this._loadRepos();
-    await this._loadAccount();
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    offHubStateChange(this._onHubStateChange);
-    offHubEvent<GitOperationProgressEvent>('git-operation-progress', this._onGitOperationProgress);
-    offHubEvent('status-changed', this._onStatusChanged);
-    offHubEvent('branch-changed', this._onHubBranchChanged);
-  }
-
-  private async _loadAccount() {
-    try {
-      this.account = await repositoryService.getAccount();
-    } catch {
-      this.account = null;
-    }
-  }
-
-  private async _loadRepos() {
-    this.repos = await repositoryService.getAll();
-    const savedId = repositoryService.loadActiveId();
-    if (savedId && this.repos.some(r => r.id === savedId)) {
-      await this._activateRepo(savedId);
-    } else if (this.repos.length > 0) {
-      await this._activateRepo(this.repos[0].id);
-    }
-  }
-
-  private async _activateRepo(id: string) {
-    this.activeRepoId = id;
-    repositoryService.saveActiveId(id);
-    await repositoryService.setActive(id).catch(() => {});
-    this.branchesRefreshKey++;
-  }
-
-  private async _removeRepo(id: string) {
-    await repositoryService.remove(id);
-    this.repos = this.repos.filter(r => r.id !== id);
-    if (this.activeRepoId === id) {
-      if (this.repos.length > 0) {
-        await this._activateRepo(this.repos[0].id);
-      } else {
-        this.activeRepoId = null;
-        localStorage.removeItem('ghgpt:activeRepoId');
-      }
-    }
-  }
-
-  private get _activeRepo(): RepositoryInfo | undefined {
-    return this.repos.find(r => r.id === this.activeRepoId);
-  }
-
-  private _onStatusChanged = (event: { repoId: string }) => {
-    if (event.repoId !== this.activeRepoId) return;
-    this.changesRefreshKey++;
-  };
-
-  private _onHubBranchChanged = (event: { repoId: string }) => {
-    if (event.repoId !== this.activeRepoId) return;
-    this.branchesRefreshKey++;
-    this.historyRefreshKey++;
-    this.changesRefreshKey++;
-  };
-
-  private _onGitOperationProgress = (event: GitOperationProgressEvent) => {
-    if (!this.activeRepoId || event.repoId !== this.activeRepoId || event.operation !== this.gitOperation) return;
-    this.gitOperationStatus = event.status;
-    if (event.message) {
-      this.gitOperationLines = [...this.gitOperationLines, event.message];
-    }
-    if (event.status === 'error') {
-      this.gitOperationError = event.message;
-    }
-  };
-
-  private _closeGitOverlay() {
-    if (this.gitOperationStatus === 'progress' || this.gitOperationStatus === 'started') return;
-    this.gitOperation = null;
-    this.gitOperationLines = [];
-    this.gitOperationError = '';
-    this.gitOperationStatus = '';
-  }
-
-  private async _runGitOperation(operation: 'fetch' | 'pull' | 'push') {
-    if (!this.activeRepoId || this.gitOperation) return;
-    this.gitOperation = operation;
-    this.gitOperationLines = [];
-    this.gitOperationError = '';
-    this.gitOperationStatus = 'started';
-    try {
-      if (operation === 'fetch') {
-        await repositoryService.fetch(this.activeRepoId);
-      } else if (operation === 'pull') {
-        await repositoryService.pull(this.activeRepoId);
-      } else {
-        await repositoryService.push(this.activeRepoId);
-      }
-      this.repos = await repositoryService.getAll();
+  constructor() {
+    super();
+    this._appState.onStatusChanged = () => { this.changesRefreshKey++; };
+    this._appState.onBranchChanged = () => {
+      this.branchesRefreshKey++;
+      this.historyRefreshKey++;
+      this.changesRefreshKey++;
+    };
+    this._appState.onGitOperationCompleted = (operation) => {
       this.branchesRefreshKey++;
       this.changesRefreshKey++;
       if (operation !== 'fetch') this.historyRefreshKey++;
-      this.gitOperationStatus = 'completed';
-      this._closeGitOverlay();
-    } catch (err) {
-      this.gitOperationError = (err as Error).message;
-      this.gitOperationStatus = 'error';
-      if (!this.gitOperationLines.includes(this.gitOperationError)) {
-        this.gitOperationLines = [...this.gitOperationLines, this.gitOperationError];
-      }
-    }
+    };
   }
 
   // --- Event handlers from child components ---
 
-  private _onActivateRepo = (e: Event) => this._activateRepo((e as CustomEvent<string>).detail);
-  private _onRemoveRepo = (e: Event) => this._removeRepo((e as CustomEvent<string>).detail);
+  private _onActivateRepo = (e: Event) => this._appState.activateRepo((e as CustomEvent<string>).detail);
+  private _onRemoveRepo = (e: Event) => this._appState.removeRepo((e as CustomEvent<string>).detail);
   private _onAddRepo = () => { this.showDialog = true; };
   private _onNavigate = (e: Event) => { this.activeView = (e as CustomEvent<View>).detail; };
 
   private _onRepoAdded = async (e: Event) => {
     const repo = (e as CustomEvent<RepositoryInfo>).detail;
-    this.repos = [...this.repos, repo];
-    await this._activateRepo(repo.id);
+    this._appState.repos = [...this._appState.repos, repo];
+    await this._appState.activateRepo(repo.id);
   };
 
   private _onGitOperation = (e: Event) => {
-    this._runGitOperation((e as CustomEvent<'fetch' | 'pull' | 'push'>).detail);
+    this._appState.runGitOperation((e as CustomEvent<'fetch' | 'pull' | 'push'>).detail);
   };
 
   private _onToggleChat = () => { this.showChat = !this.showChat; };
 
   private _onBranchSwitched = async () => {
-    this.repos = await repositoryService.getAll();
+    await this._appState.refreshRepos();
   };
 
   private _onAccountChanged = (e: Event) => {
-    this.account = (e as CustomEvent<AccountInfo | null>).detail;
+    this._appState.account = (e as CustomEvent<AccountInfo | null>).detail;
+    this.requestUpdate();
   };
 
   private _onCommitCreated = () => { this.historyRefreshKey++; };
 
   private _onBranchChanged = async () => {
-    this.repos = await repositoryService.getAll();
+    await this._appState.refreshRepos();
     this.branchesRefreshKey++;
   };
 
   render() {
+    const s = this._appState;
     return html`
       <app-sidebar
-        .repos=${this.repos}
-        .activeRepoId=${this.activeRepoId}
+        .repos=${s.repos}
+        .activeRepoId=${s.activeRepoId}
         .activeView=${this.activeView}
-        .account=${this.account}
-        .hubState=${this.hubState}
+        .account=${s.account}
+        .hubState=${s.hubState}
         @activate-repo=${this._onActivateRepo}
         @remove-repo=${this._onRemoveRepo}
         @add-repo=${this._onAddRepo}
@@ -262,8 +147,8 @@ export class AppShell extends LitElement {
 
       <main class="main">
         <app-toolbar
-          .activeRepo=${this._activeRepo}
-          .gitOperation=${this.gitOperation}
+          .activeRepo=${s.activeRepo}
+          .gitOperation=${s.gitOperation}
           .showChat=${this.showChat}
           .branchesRefreshKey=${this.branchesRefreshKey}
           @git-operation=${this._onGitOperation}
@@ -274,7 +159,7 @@ export class AppShell extends LitElement {
 
         <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' ? 'padded' : ''}"
           style="${this.activeView === 'settings' ? 'overflow:auto' : ''}">
-          ${this._activeRepo || this.activeView === 'settings' ? this._renderView() : html`
+          ${s.activeRepo || this.activeView === 'settings' ? this._renderView() : html`
             <div class="placeholder">
               <span class="placeholder-icon">📂</span>
               <span>Kein Repository geöffnet</span>
@@ -293,20 +178,20 @@ export class AppShell extends LitElement {
         </repo-dialog>
       ` : ''}
 
-      ${this.gitOperation ? html`
+      ${s.gitOperation ? html`
         <git-operation-overlay
-          .operation=${this.gitOperation}
-          .lines=${this.gitOperationLines}
-          .error=${this.gitOperationError}
-          .status=${this.gitOperationStatus}
-          @close=${this._closeGitOverlay}>
+          .operation=${s.gitOperation}
+          .lines=${s.gitOperationLines}
+          .error=${s.gitOperationError}
+          .status=${s.gitOperationStatus}
+          @close=${() => s.closeGitOverlay()}>
         </git-operation-overlay>
       ` : ''}
 
       ${this.showChat ? html`
         <chat-panel
-          .repoId=${this.activeRepoId ?? ''}
-          .branch=${this._activeRepo?.currentBranch ?? ''}
+          .repoId=${s.activeRepoId ?? ''}
+          .branch=${s.activeRepo?.currentBranch ?? ''}
           .activeView=${this.activeView}
           @close=${() => this.showChat = false}>
         </chat-panel>
@@ -315,15 +200,16 @@ export class AppShell extends LitElement {
   }
 
   private _renderView() {
+    const s = this._appState;
     switch (this.activeView) {
       case 'changes':
-        return html`<changes-view .repoId=${this.activeRepoId ?? ''} .refreshKey=${this.changesRefreshKey} @commit-created=${this._onCommitCreated}></changes-view>`;
+        return html`<changes-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.changesRefreshKey} @commit-created=${this._onCommitCreated}></changes-view>`;
       case 'history':
-        return html`<history-view .repoId=${this.activeRepoId ?? ''} .branch=${this._activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
+        return html`<history-view .repoId=${s.activeRepoId ?? ''} .branch=${s.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
-        return html`<branches-view .repoId=${this.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this._onBranchChanged}></branches-view>`;
+        return html`<branches-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this._onBranchChanged}></branches-view>`;
       case 'pull-requests':
-        return html`<pull-requests-view .repoId=${this.activeRepoId ?? ''}></pull-requests-view>`;
+        return html`<pull-requests-view .repoId=${s.activeRepoId ?? ''}></pull-requests-view>`;
       case 'settings':
         return html`<settings-view @account-changed=${this._onAccountChanged}></settings-view>`;
     }
