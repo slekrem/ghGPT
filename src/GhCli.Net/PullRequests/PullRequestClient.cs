@@ -10,6 +10,7 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
 
     private const string ListFields = "number,title,state,author,headRefName,baseRefName,isDraft,mergeable,labels,createdAt,updatedAt,url";
     private const string DetailFields = "number,title,state,author,headRefName,baseRefName,isDraft,body,labels,reviews,files,statusCheckRollup,url,createdAt,updatedAt";
+    private const string ChecksFields = "name,state,conclusion,startedAt,completedAt,link";
 
     public async Task<IReadOnlyList<PullRequest>> ListAsync(string owner, string repo, string state = "open", int limit = 100)
     {
@@ -81,5 +82,19 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
             args.AddRange(["--body", body]);
 
         await runner.RunAsync([.. args]);
+    }
+
+    public async Task<IReadOnlyList<PullRequestStatusCheck>> GetChecksAsync(string owner, string repo, int number)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        var json = await runner.RunAsync(
+            "pr", "checks", number.ToString(),
+            "--repo", $"{owner}/{repo}",
+            "--json", ChecksFields);
+
+        return JsonSerializer.Deserialize<List<PullRequestStatusCheck>>(json, JsonOptions) ?? [];
     }
 }

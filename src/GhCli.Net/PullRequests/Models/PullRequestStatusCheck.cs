@@ -12,4 +12,13 @@ public class PullRequestStatusCheck
 
     [JsonPropertyName("conclusion")]
     public string? Conclusion { get; init; }
+
+    [JsonPropertyName("startedAt")]
+    public DateTimeOffset? StartedAt { get; init; }
+
+    [JsonPropertyName("completedAt")]
+    public DateTimeOffset? CompletedAt { get; init; }
+
+    [JsonPropertyName("link")]
+    public string? Link { get; init; }
 }
