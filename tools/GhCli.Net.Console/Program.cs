@@ -19,6 +19,12 @@ try
         case "user":
             await ShowCurrentUserAsync();
             break;
+        case "releases":
+            await ShowReleasesAsync();
+            break;
+        case "release" when args.ElementAtOrDefault(3) is { } tag:
+            await ShowReleaseDetailAsync(tag);
+            break;
         case "issues":
             var issueState = args.ElementAtOrDefault(3) ?? "open";
             await ShowIssuesAsync(issueState);
@@ -58,6 +64,51 @@ catch (InvalidOperationException ex)
     Console.ForegroundColor = ConsoleColor.Red;
     Console.WriteLine($"Fehler: {ex.Message}");
     Console.ResetColor();
+}
+
+async Task ShowReleasesAsync()
+{
+    Console.WriteLine("── Releases ─────────────────────────────");
+    var releases = await client.Release.ListAsync(owner, repo);
+
+    if (releases.Count == 0)
+    {
+        Console.WriteLine("  Keine Releases gefunden.");
+        return;
+    }
+
+    foreach (var r in releases)
+    {
+        var flags = new List<string>();
+        if (r.IsLatest) flags.Add("latest");
+        if (r.IsPrerelease) flags.Add("pre-release");
+        if (r.IsDraft) flags.Add("draft");
+        var flagStr = flags.Count > 0 ? $" [{string.Join(", ", flags)}]" : string.Empty;
+
+        Console.WriteLine($"  {r.TagName}{flagStr} – {r.Name}");
+        Console.WriteLine($"           {r.PublishedAt:dd.MM.yyyy}");
+        Console.WriteLine();
+    }
+}
+
+async Task ShowReleaseDetailAsync(string tag)
+{
+    Console.WriteLine($"── Release {tag} ──────────────────────────");
+    var r = await client.Release.GetByTagAsync(owner, repo, tag);
+
+    Console.WriteLine($"  {r.Name}");
+    Console.WriteLine($"  Tag:     {r.TagName}");
+    Console.WriteLine($"  Autor:   {r.Author.Login} | {r.PublishedAt:dd.MM.yyyy}");
+    if (r.IsPrerelease) Console.WriteLine("  Pre-release");
+    if (r.IsDraft) Console.WriteLine("  Draft");
+    Console.WriteLine($"  {r.Url}");
+
+    if (!string.IsNullOrWhiteSpace(r.Body))
+    {
+        Console.WriteLine();
+        Console.WriteLine("  Release Notes:");
+        Console.WriteLine($"  {r.Body.Replace("\n", "\n  ")}");
+    }
 }
 
 async Task ShowIssuesAsync(string state = "open")
