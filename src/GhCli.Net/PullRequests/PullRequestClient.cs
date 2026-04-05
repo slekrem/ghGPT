@@ -97,4 +97,26 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
 
         return JsonSerializer.Deserialize<List<PullRequestStatusCheck>>(json, JsonOptions) ?? [];
     }
+
+    public async Task CloseAsync(string owner, string repo, int number)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        await runner.RunAsync(
+            "pr", "close", number.ToString(),
+            "--repo", $"{owner}/{repo}");
+    }
+
+    public async Task ReopenAsync(string owner, string repo, int number)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+
+        await runner.RunAsync(
+            "pr", "reopen", number.ToString(),
+            "--repo", $"{owner}/{repo}");
+    }
 }
