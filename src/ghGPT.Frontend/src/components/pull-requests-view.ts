@@ -790,8 +790,9 @@ export class PullRequestsView extends LitElement {
 
   private renderStateBadge(state: string, isDraft: boolean) {
     if (isDraft) return html`<span class="badge badge-draft">Draft</span>`;
-    if (state === 'merged') return html`<span class="badge badge-merged">Merged</span>`;
-    if (state === 'closed') return html`<span class="badge badge-closed">Closed</span>`;
+    const s = state.toLowerCase();
+    if (s === 'merged') return html`<span class="badge badge-merged">Merged</span>`;
+    if (s === 'closed') return html`<span class="badge badge-closed">Closed</span>`;
     return html`<span class="badge badge-open">Open</span>`;
   }
 
@@ -834,9 +835,10 @@ export class PullRequestsView extends LitElement {
 
   private _renderDetailActions(pr: PullRequestDetail) {
     const busy = this.actionBusy;
-    const isOpen = pr.state === 'open';
-    const isClosed = pr.state === 'closed';
-    const isMerged = pr.state === 'merged';
+    const state = pr.state.toLowerCase();
+    const isOpen = state === 'open';
+    const isClosed = state === 'closed';
+    const isMerged = state === 'merged';
 
     return html`
       <div class="detail-actions">
