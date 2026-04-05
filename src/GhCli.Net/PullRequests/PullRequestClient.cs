@@ -161,7 +161,6 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
             "--body", body,
             "--head", headBranch,
             "--base", baseBranch,
-            "--json", DetailFields
         };
 
         if (draft)
@@ -171,10 +170,15 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
         if (labelList is { Count: > 0 })
             args.AddRange(["--label", string.Join(",", labelList)]);
 
-        var json = await runner.RunAsync([.. args]);
+        var output = await runner.RunAsync([.. args]);
 
-        return JsonSerializer.Deserialize<PullRequestDetail>(json, JsonOptions)
-            ?? throw new InvalidOperationException("Pull Request konnte nicht erstellt werden.");
+        // gh pr create returns the PR URL, e.g. https://github.com/owner/repo/pull/42
+        var match = System.Text.RegularExpressions.Regex.Match(output.Trim(), @"/pull/(\d+)");
+        if (!match.Success)
+            throw new InvalidOperationException("Pull Request wurde erstellt, aber die PR-Nummer konnte nicht ermittelt werden.");
+
+        var number = int.Parse(match.Groups[1].Value);
+        return await GetDetailAsync(owner, repo, number);
     }
 
     public async Task MergeAsync(string owner, string repo, int number, PullRequestMergeMethod method = PullRequestMergeMethod.Merge, string? commitTitle = null, string? commitBody = null)
