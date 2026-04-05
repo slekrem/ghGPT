@@ -361,4 +361,90 @@ public class PullRequestClientTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             _sut.EditAsync("slekrem", "ghGPT", 0));
     }
+
+    [Fact]
+    public async Task CreateAsync_ReturnsPullRequestDetail()
+    {
+        // Arrange
+        var json = JsonSerializer.Serialize(new
+        {
+            number = 99,
+            title = "feat: neue Funktion",
+            state = "OPEN",
+            author = new { login = "slekrem" },
+            headRefName = "feature-branch",
+            baseRefName = "main",
+            isDraft = false,
+            body = "Beschreibung",
+            labels = Array.Empty<object>(),
+            reviews = Array.Empty<object>(),
+            files = Array.Empty<object>(),
+            statusCheckRollup = Array.Empty<object>(),
+            url = "https://github.com/slekrem/ghGPT/pull/99",
+            createdAt = "2026-04-05T10:00:00Z",
+            updatedAt = "2026-04-05T10:00:00Z"
+        });
+        _runner.RunAsync("pr", "create", "--repo", "slekrem/ghGPT", "--title", "feat: neue Funktion",
+                "--body", "Beschreibung", "--head", "feature-branch", "--base", "main",
+                "--json", Arg.Any<string>())
+            .Returns(json);
+
+        // Act
+        var result = await _sut.CreateAsync("slekrem", "ghGPT", "feat: neue Funktion", "Beschreibung", "feature-branch", "main");
+
+        // Assert
+        Assert.Equal(99, result.Number);
+        Assert.Equal("feat: neue Funktion", result.Title);
+        Assert.Equal("feature-branch", result.HeadRefName);
+        Assert.False(result.IsDraft);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithDraftAndLabels_IncludesFlags()
+    {
+        // Arrange
+        var json = JsonSerializer.Serialize(new
+        {
+            number = 100,
+            title = "WIP: draft PR",
+            state = "OPEN",
+            author = new { login = "slekrem" },
+            headRefName = "draft-branch",
+            baseRefName = "main",
+            isDraft = true,
+            body = string.Empty,
+            labels = Array.Empty<object>(),
+            reviews = Array.Empty<object>(),
+            files = Array.Empty<object>(),
+            statusCheckRollup = Array.Empty<object>(),
+            url = "https://github.com/slekrem/ghGPT/pull/100",
+            createdAt = "2026-04-05T10:00:00Z",
+            updatedAt = "2026-04-05T10:00:00Z"
+        });
+        _runner.RunAsync("pr", "create", "--repo", "slekrem/ghGPT", "--title", "WIP: draft PR",
+                "--body", "", "--head", "draft-branch", "--base", "main",
+                "--json", Arg.Any<string>(), "--draft", "--label", "wip,enhancement")
+            .Returns(json);
+
+        // Act
+        var result = await _sut.CreateAsync("slekrem", "ghGPT", "WIP: draft PR", "", "draft-branch", "main", draft: true, labels: ["wip", "enhancement"]);
+
+        // Assert
+        Assert.Equal(100, result.Number);
+        Assert.True(result.IsDraft);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ThrowsWhenTitleIsEmpty()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _sut.CreateAsync("slekrem", "ghGPT", "", "body", "head", "main"));
+    }
+
+    [Fact]
+    public async Task CreateAsync_ThrowsWhenHeadBranchIsEmpty()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _sut.CreateAsync("slekrem", "ghGPT", "title", "body", "", "main"));
+    }
 }

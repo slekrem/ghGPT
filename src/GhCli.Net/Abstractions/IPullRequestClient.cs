@@ -12,4 +12,5 @@ public interface IPullRequestClient
     Task CloseAsync(string owner, string repo, int number);
     Task ReopenAsync(string owner, string repo, int number);
     Task EditAsync(string owner, string repo, int number, string? title = null, string? body = null, IEnumerable<string>? addLabels = null, IEnumerable<string>? removeLabels = null);
+    Task<PullRequestDetail> CreateAsync(string owner, string repo, string title, string body, string headBranch, string baseBranch, bool draft = false, IEnumerable<string>? labels = null);
 }

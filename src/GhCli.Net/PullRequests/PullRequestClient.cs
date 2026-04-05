@@ -144,4 +144,36 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
 
         await runner.RunAsync([.. args]);
     }
+
+    public async Task<PullRequestDetail> CreateAsync(string owner, string repo, string title, string body, string headBranch, string baseBranch, bool draft = false, IEnumerable<string>? labels = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(headBranch);
+        ArgumentException.ThrowIfNullOrWhiteSpace(baseBranch);
+
+        var args = new List<string>
+        {
+            "pr", "create",
+            "--repo", $"{owner}/{repo}",
+            "--title", title,
+            "--body", body,
+            "--head", headBranch,
+            "--base", baseBranch,
+            "--json", DetailFields
+        };
+
+        if (draft)
+            args.Add("--draft");
+
+        var labelList = labels?.ToList();
+        if (labelList is { Count: > 0 })
+            args.AddRange(["--label", string.Join(",", labelList)]);
+
+        var json = await runner.RunAsync([.. args]);
+
+        return JsonSerializer.Deserialize<PullRequestDetail>(json, JsonOptions)
+            ?? throw new InvalidOperationException("Pull Request konnte nicht erstellt werden.");
+    }
 }
