@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace ghGPT.Infrastructure.Ai;
 
-internal sealed class ToolDispatcher(IRepositoryService repositoryService)
+internal sealed class ToolDispatcher(IRepositoryService repositoryService) : IToolDispatcher
 {
     public async Task<(string Result, string DisplayArgs, bool Success)> DispatchAsync(
         ToolCall toolCall,

@@ -10,7 +10,8 @@ internal sealed class ChatService(
     IOllamaClient ollamaClient,
     IRepositoryService repositoryService,
     IPullRequestService pullRequestService,
-    IChatHistoryService historyService) : IChatService
+    IChatHistoryService historyService,
+    IToolDispatcher toolDispatcher) : IChatService
 {
     private const int MaxToolRounds = 5;
 
@@ -26,7 +27,6 @@ internal sealed class ChatService(
         // Tool-Loop: nur wenn ein Repo aktiv ist
         if (!string.IsNullOrEmpty(request.RepoId))
         {
-            var dispatcher = new ToolDispatcher(repositoryService);
             var messageList = messages.ToList();
             var tools = ToolDefinitions.All;
             string? toolLoopAnswer = null;
@@ -52,7 +52,7 @@ internal sealed class ChatService(
                 // Jedes Tool ausführen und Ergebnis als Event liefern
                 foreach (var toolCall in toolResponse.ToolCalls)
                 {
-                    var (result, displayArgs, success) = await dispatcher.DispatchAsync(toolCall, request.RepoId, cancellationToken);
+                    var (result, displayArgs, success) = await toolDispatcher.DispatchAsync(toolCall, request.RepoId, cancellationToken);
 
                     yield return new ToolExecutedEvent(
                         ToolName: toolCall.Name,
