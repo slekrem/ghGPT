@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { repositoryService, type RepositoryInfo, type BranchInfo, type GitOperationProgressEvent, type AccountInfo } from '../services/repository-service';
-import { onHubEvent, offHubEvent, onHubStateChange, getHubState, type HubConnectionStatus } from '../services/hub-client';
+import { onHubEvent, offHubEvent, onHubStateChange, offHubStateChange, getHubState, type HubConnectionStatus } from '../services/hub-client';
 import { startHub } from '../services/hub-client';
 import './repo-dialog';
 import './changes-view';
@@ -479,9 +479,11 @@ export class AppShell extends LitElement {
   @state() private hubState: HubConnectionStatus = 'disconnected';
   @state() private showChat = false;
 
+  private _onHubStateChange = (state: HubConnectionStatus) => { this.hubState = state; };
+
   async connectedCallback() {
     super.connectedCallback();
-    onHubStateChange(state => { this.hubState = state; });
+    onHubStateChange(this._onHubStateChange);
     startHub()
       .then(() => { this.hubState = getHubState(); })
       .catch(err => console.warn('SignalR connection failed:', err));
@@ -494,6 +496,7 @@ export class AppShell extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    offHubStateChange(this._onHubStateChange);
     offHubEvent<GitOperationProgressEvent>('git-operation-progress', this.onGitOperationProgress);
     offHubEvent('status-changed', this.onStatusChanged);
     offHubEvent('branch-changed', this.onHubBranchChanged);

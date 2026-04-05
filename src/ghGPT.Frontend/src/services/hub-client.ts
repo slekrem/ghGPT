@@ -33,10 +33,18 @@ export function getHubState(): HubConnectionStatus {
   }
 }
 
+const _stateSubscribers = new Set<(state: HubConnectionStatus) => void>();
+
+hub.onclose(() => _stateSubscribers.forEach(cb => cb('disconnected')));
+hub.onreconnecting(() => _stateSubscribers.forEach(cb => cb('reconnecting')));
+hub.onreconnected(() => _stateSubscribers.forEach(cb => cb('connected')));
+
 export function onHubStateChange(cb: (state: HubConnectionStatus) => void): void {
-  hub.onclose(() => cb('disconnected'));
-  hub.onreconnecting(() => cb('reconnecting'));
-  hub.onreconnected(() => cb('connected'));
+  _stateSubscribers.add(cb);
+}
+
+export function offHubStateChange(cb: (state: HubConnectionStatus) => void): void {
+  _stateSubscribers.delete(cb);
 }
 
 export { hub };
