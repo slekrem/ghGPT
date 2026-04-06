@@ -23,7 +23,7 @@ export class AppShell extends AppElement {
       display: flex;
       height: 100vh;
       width: 100vw;
-      font-family: var(--bs-font-sans-serif, system-ui, sans-serif);
+      font-family: system-ui, sans-serif;
     }
 
     .main {
