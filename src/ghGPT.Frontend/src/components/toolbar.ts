@@ -1,146 +1,10 @@
-import { html, css } from 'lit';
+import { html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { AppElement } from '../app-element';
 import { repositoryService, type RepositoryInfo, type BranchInfo } from '../services/repository-service';
 
 @customElement('app-toolbar')
 export class AppToolbar extends AppElement {
-  static styles = css`
-    :host {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      background-color: #1e1e2e;
-      border-bottom: 1px solid #313244;
-    }
-
-    .toolbar-branch {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.3rem 0.75rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: transparent;
-      color: #cdd6f4;
-      font-size: 0.875rem;
-      cursor: pointer;
-    }
-
-    .toolbar-branch:hover { background-color: #313244; }
-    .toolbar-branch:disabled { opacity: 0.45; cursor: not-allowed; }
-
-    .branch-dropdown-wrapper {
-      position: relative;
-    }
-
-    .branch-dropdown {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0;
-      min-width: 220px;
-      background: #1e1e2e;
-      border: 1px solid #45475a;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      z-index: 200;
-      overflow: hidden;
-    }
-
-    .branch-dropdown-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.45rem 0.75rem;
-      font-size: 0.875rem;
-      color: #cdd6f4;
-      cursor: pointer;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .branch-dropdown-item:hover { background-color: #313244; }
-
-    .branch-dropdown-item.active {
-      color: #89b4fa;
-      background-color: #89b4fa11;
-    }
-
-    .branch-dropdown-item .check { font-size: 0.75rem; flex-shrink: 0; }
-
-    .branch-dropdown-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-    }
-
-    .branch-dropdown-ahead-behind {
-      display: inline-flex;
-      gap: 0.35rem;
-      flex-shrink: 0;
-      font-size: 0.72rem;
-      color: #6c7086;
-    }
-
-    .branch-dropdown-ahead { color: #a6e3a1; }
-    .branch-dropdown-behind { color: #f38ba8; }
-
-    .branch-dropdown-separator {
-      height: 1px;
-      background: #313244;
-      margin: 0.25rem 0;
-    }
-
-    .branch-dropdown-section {
-      padding: 0.25rem 0.75rem 0.1rem;
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #6c7086;
-    }
-
-    .branch-dropdown-footer {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.45rem 0.75rem;
-      font-size: 0.8rem;
-      color: #6c7086;
-      cursor: pointer;
-      border-top: 1px solid #313244;
-    }
-
-    .branch-dropdown-footer:hover { background-color: #313244; color: #cdd6f4; }
-
-    .toolbar-spacer { flex: 1; }
-
-    .toolbar-btn {
-      padding: 0.3rem 0.75rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: transparent;
-      color: #cdd6f4;
-      font-size: 0.875rem;
-      cursor: pointer;
-    }
-
-    .toolbar-btn:hover { background-color: #313244; }
-
-    .toolbar-btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-
-    .toolbar-btn.active {
-      background: #89b4fa22;
-      border-color: #89b4fa;
-      color: #89b4fa;
-    }
-  `;
-
   @property({ attribute: false }) activeRepo: RepositoryInfo | undefined = undefined;
   @property({ attribute: false }) gitOperation: 'fetch' | 'pull' | 'push' | null = null;
   @property({ type: Boolean }) showChat = false;
@@ -207,10 +71,10 @@ export class AppToolbar extends AppElement {
   private _renderAheadBehind(branch: BranchInfo) {
     if (!branch.trackingBranch) return null;
     const parts = [];
-    if (branch.aheadBy > 0) parts.push(html`<span class="branch-dropdown-ahead">↑${branch.aheadBy}</span>`);
-    if (branch.behindBy > 0) parts.push(html`<span class="branch-dropdown-behind">↓${branch.behindBy}</span>`);
+    if (branch.aheadBy > 0) parts.push(html`<span class="text-cat-green">↑${branch.aheadBy}</span>`);
+    if (branch.behindBy > 0) parts.push(html`<span class="text-cat-red">↓${branch.behindBy}</span>`);
     return parts.length > 0
-      ? html`<span class="branch-dropdown-ahead-behind">${parts}</span>`
+      ? html`<span class="inline-flex gap-[0.35rem] shrink-0 text-[0.72rem] text-cat-subtle">${parts}</span>`
       : null;
   }
 
@@ -235,37 +99,41 @@ export class AppToolbar extends AppElement {
   }
 
   render() {
+    const branchBtnBase = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-cat-border bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay disabled:opacity-45 disabled:cursor-not-allowed';
+    const toolbarBtnBase = 'px-3 py-1.5 rounded-md border border-cat-border bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay disabled:opacity-45 disabled:cursor-not-allowed';
+
     return html`
-      <div class="branch-dropdown-wrapper">
-        <button class="toolbar-branch" ?disabled=${!this.activeRepo}
+      <div class="branch-dropdown-wrapper relative">
+        <button class="${branchBtnBase}" ?disabled=${!this.activeRepo}
           @click=${() => this.showBranchDropdown ? this._closeDropdown() : this._openDropdown()}>
           🌿 ${this.activeRepo?.currentBranch ?? '–'} ▾
         </button>
         ${this.showBranchDropdown ? html`
-          <div class="branch-dropdown">
+          <div class="absolute top-[calc(100%+4px)] left-0 min-w-[220px] bg-cat-surface border border-cat-border rounded-lg shadow-2xl z-[200] overflow-hidden">
             ${this.branches.filter(b => !b.isRemote).length > 0 ? html`
-              <div class="branch-dropdown-section">Lokale Branches</div>
+              <div class="px-3 pt-1 pb-0.5 text-[0.65rem] uppercase tracking-widest text-cat-subtle">Lokale Branches</div>
               ${this.branches.filter(b => !b.isRemote).map(b => html`
-                <div class="branch-dropdown-item ${b.isHead ? 'active' : ''}"
+                <div class="flex items-center gap-2 px-3 py-[0.45rem] text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis
+                            ${b.isHead ? 'text-cat-blue bg-[rgba(137,180,250,0.07)]' : 'text-cat-text hover:bg-cat-overlay'}"
                   @click=${() => !b.isHead && this._checkoutBranch(b.name)}>
-                  <span class="check">${b.isHead ? '✓' : ' '}</span>
-                  <span class="branch-dropdown-name">${b.name}</span>
+                  <span class="text-xs shrink-0">${b.isHead ? '✓' : ' '}</span>
+                  <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${b.name}</span>
                   ${this._renderAheadBehind(b)}
                 </div>
               `)}
             ` : ''}
             ${this.branches.filter(b => b.isRemote).length > 0 ? html`
-              <div class="branch-dropdown-separator"></div>
-              <div class="branch-dropdown-section">Remote Branches</div>
+              <div class="h-px bg-cat-overlay my-1"></div>
+              <div class="px-3 pt-1 pb-0.5 text-[0.65rem] uppercase tracking-widest text-cat-subtle">Remote Branches</div>
               ${this.branches.filter(b => b.isRemote).map(b => html`
-                <div class="branch-dropdown-item"
+                <div class="flex items-center gap-2 px-3 py-[0.45rem] text-sm text-cat-text cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis hover:bg-cat-overlay"
                   @click=${() => this._checkoutBranch(b.name)}>
-                  <span class="check"> </span>
+                  <span class="text-xs shrink-0"> </span>
                   <span>☁ ${b.name}</span>
                 </div>
               `)}
             ` : ''}
-            <div class="branch-dropdown-footer"
+            <div class="flex items-center gap-1.5 px-3 py-[0.45rem] text-[0.8rem] text-cat-subtle cursor-pointer border-t border-cat-overlay hover:bg-cat-overlay hover:text-cat-text"
               @click=${() => { this._closeDropdown(); this._emit('navigate', 'branches'); }}>
               ⚙ Branch verwalten…
             </div>
@@ -273,18 +141,18 @@ export class AppToolbar extends AppElement {
         ` : ''}
       </div>
 
-      <div class="toolbar-spacer"></div>
+      <div class="flex-1"></div>
 
-      <button class="toolbar-btn"
+      <button class="${toolbarBtnBase}"
         ?disabled=${!this.activeRepo || !!this.gitOperation}
         @click=${() => this._emit('git-operation', 'fetch')}>↓ Fetch</button>
-      <button class="toolbar-btn"
+      <button class="${toolbarBtnBase}"
         ?disabled=${!this.activeRepo || !!this.gitOperation}
         @click=${() => this._emit('git-operation', 'pull')}>${this._renderPullLabel()}</button>
-      <button class="toolbar-btn"
+      <button class="${toolbarBtnBase}"
         ?disabled=${!this.activeRepo || !!this.gitOperation}
         @click=${() => this._emit('git-operation', 'push')}>${this._renderPushLabel()}</button>
-      <button class="toolbar-btn ${this.showChat ? 'active' : ''}"
+      <button class="${toolbarBtnBase} ${this.showChat ? 'bg-[rgba(137,180,250,0.13)] border-cat-blue text-cat-blue' : ''}"
         @click=${() => this._emit('toggle-chat')}
         title="KI-Assistent">✦</button>
     `;

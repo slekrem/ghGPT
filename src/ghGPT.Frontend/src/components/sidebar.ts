@@ -1,4 +1,4 @@
-import { html, css } from 'lit';
+import { html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { AppElement } from '../app-element';
 import type { RepositoryInfo, AccountInfo } from '../services/repository-service';
@@ -8,178 +8,6 @@ type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'settings';
 
 @customElement('app-sidebar')
 export class AppSidebar extends AppElement {
-  static styles = css`
-    :host {
-      display: flex;
-      flex-direction: column;
-      width: 240px;
-      min-width: 240px;
-      background-color: #1e1e2e;
-      color: #cdd6f4;
-      border-right: 1px solid #313244;
-    }
-
-    .sidebar-header {
-      padding: 1rem;
-      font-size: 1.1rem;
-      font-weight: 600;
-      border-bottom: 1px solid #313244;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .sidebar-section {
-      padding: 0.5rem 0;
-      flex: 1;
-      overflow-y: auto;
-    }
-
-    .sidebar-section-title {
-      padding: 0.25rem 1rem;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #6c7086;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .add-btn {
-      background: none;
-      border: none;
-      color: #6c7086;
-      cursor: pointer;
-      font-size: 1rem;
-      padding: 0 0.25rem;
-      line-height: 1;
-    }
-
-    .add-btn:hover { color: #cdd6f4; }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 1rem;
-      cursor: pointer;
-      font-size: 0.875rem;
-      color: #cdd6f4;
-      transition: background-color 0.1s;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .nav-item:hover { background-color: #313244; }
-
-    .nav-item.active {
-      background-color: #45475a;
-      color: #cba6f7;
-    }
-
-    .repo-item {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 1rem;
-      cursor: pointer;
-      font-size: 0.875rem;
-      color: #cdd6f4;
-      transition: background-color 0.1s;
-    }
-
-    .repo-item:hover { background-color: #313244; }
-
-    .repo-item.active {
-      background-color: #45475a;
-      color: #cba6f7;
-    }
-
-    .repo-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-    }
-
-    .repo-remove-btn {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      margin-left: auto;
-      flex-shrink: 0;
-      width: 16px;
-      height: 16px;
-      border: none;
-      background: none;
-      color: #6c7086;
-      cursor: pointer;
-      font-size: 0.75rem;
-      line-height: 1;
-      border-radius: 3px;
-      padding: 0;
-    }
-
-    .repo-item:hover .repo-remove-btn { display: flex; }
-
-    .repo-remove-btn:hover {
-      color: #f38ba8;
-      background-color: #45475a;
-    }
-
-    .sidebar-footer {
-      padding: 0.75rem 1rem;
-      border-top: 1px solid #313244;
-      font-size: 0.8rem;
-      color: #6c7086;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .sidebar-footer:hover { color: #cdd6f4; }
-
-    .account-avatar {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-
-    .account-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-    }
-
-    .account-badge {
-      font-size: 0.65rem;
-      padding: 0.1rem 0.35rem;
-      border-radius: 4px;
-      background: #a6e3a133;
-      color: #a6e3a1;
-      flex-shrink: 0;
-    }
-
-    .hub-status {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-
-    .hub-status--connected    { background: #a6e3a1; }
-    .hub-status--reconnecting { background: #f9e2af; }
-    .hub-status--disconnected { background: #f38ba8; }
-  `;
-
   @property({ attribute: false }) repos: RepositoryInfo[] = [];
   @property({ attribute: false }) activeRepoId: string | null = null;
   @property({ type: String }) activeView: View = 'changes';
@@ -191,26 +19,37 @@ export class AppSidebar extends AppElement {
   }
 
   render() {
+    const hubDotColor =
+      this.hubState === 'connected'    ? 'bg-cat-green' :
+      this.hubState === 'reconnecting' ? 'bg-[#f9e2af]' :
+                                         'bg-cat-red';
+
     return html`
-      <div class="sidebar-header">
+      <div class="flex items-center gap-2 px-4 py-4 text-[1.1rem] font-semibold border-b border-cat-overlay">
         <span>⚡</span>
         <span>ghGPT</span>
-        <span class="hub-status hub-status--${this.hubState}" title="${this.hubState}"></span>
+        <span class="w-[7px] h-[7px] rounded-full ml-auto shrink-0 ${hubDotColor}" title="${this.hubState}"></span>
       </div>
 
-      <div class="sidebar-section">
-        <div class="sidebar-section-title">
+      <div class="py-2 flex-1 overflow-y-auto">
+        <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle">
           <span>Repositories</span>
-          <button class="add-btn" title="Repository hinzufügen"
+          <button class="bg-transparent border-none text-cat-subtle cursor-pointer text-base px-1 py-0 leading-none hover:text-cat-text"
+            title="Repository hinzufügen"
             @click=${() => this.dispatch('add-repo')}>＋</button>
         </div>
 
         ${this.repos.map(repo => html`
-          <div class="repo-item ${repo.id === this.activeRepoId ? 'active' : ''}"
+          <div class="group flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors
+                      ${repo.id === this.activeRepoId
+                        ? 'bg-[#45475a] text-[#cba6f7]'
+                        : 'text-cat-text hover:bg-cat-overlay'}"
             @click=${() => this.dispatch('activate-repo', repo.id)}>
             <span>📁</span>
-            <span class="repo-name">${repo.name}</span>
-            <button class="repo-remove-btn"
+            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${repo.name}</span>
+            <button class="hidden group-hover:flex items-center justify-center ml-auto shrink-0 w-4 h-4
+                           border-none bg-transparent text-cat-subtle cursor-pointer text-xs leading-none rounded-[3px] p-0
+                           hover:text-cat-red hover:bg-[#45475a]"
               title="Aus Tracking entfernen"
               @click=${(e: Event) => { e.stopPropagation(); this.dispatch('remove-repo', repo.id); }}>
               ×
@@ -218,43 +57,49 @@ export class AppSidebar extends AppElement {
           </div>
         `)}
 
-        <div class="sidebar-section-title" style="margin-top:0.5rem">Workspace</div>
-        <div class="nav-item ${this.activeView === 'changes' ? 'active' : ''}"
+        <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle mt-2">Workspace</div>
+        <div class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+                    ${this.activeView === 'changes' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'changes')}>
           <span>✏️</span> Änderungen
         </div>
-        <div class="nav-item ${this.activeView === 'history' ? 'active' : ''}"
+        <div class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+                    ${this.activeView === 'history' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'history')}>
           <span>🕐</span> History
         </div>
 
-        <div class="sidebar-section-title" style="margin-top:0.5rem">Repository</div>
-        <div class="nav-item ${this.activeView === 'branches' ? 'active' : ''}"
+        <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle mt-2">Repository</div>
+        <div class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+                    ${this.activeView === 'branches' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'branches')}>
           <span>🌿</span> Branches
         </div>
-        <div class="nav-item ${this.activeView === 'pull-requests' ? 'active' : ''}"
+        <div class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+                    ${this.activeView === 'pull-requests' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'pull-requests')}>
           <span>🔀</span> Pull Requests
         </div>
 
-        <div class="sidebar-section-title" style="margin-top:0.5rem">App</div>
-        <div class="nav-item ${this.activeView === 'settings' ? 'active' : ''}"
+        <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle mt-2">App</div>
+        <div class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+                    ${this.activeView === 'settings' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'settings')}>
           <span>⚙</span> Einstellungen
         </div>
       </div>
 
-      <div class="sidebar-footer" @click=${() => this.dispatch('navigate', 'settings')}>
+      <div class="flex items-center gap-2 px-4 py-3 border-t border-cat-overlay text-[0.8rem] text-cat-subtle cursor-pointer select-none hover:text-cat-text"
+        @click=${() => this.dispatch('navigate', 'settings')}>
         ${this.account
           ? html`
-            <img class="account-avatar" src="${this.account.avatarUrl}" alt="${this.account.login}" />
-            <span class="account-name">${this.account.name}</span>
-            <span class="account-badge">✓</span>
+            <img class="w-[22px] h-[22px] rounded-full object-cover shrink-0" src="${this.account.avatarUrl}" alt="${this.account.login}" />
+            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${this.account.name}</span>
+            <span class="text-[0.65rem] px-[0.35rem] py-[0.1rem] rounded bg-[#a6e3a133] text-cat-green shrink-0">✓</span>
           `
           : html`
             <span>👤</span>
-            <span class="account-name">Nicht verbunden</span>
+            <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">Nicht verbunden</span>
           `}
       </div>
     `;

@@ -1,4 +1,4 @@
-import { html, css } from 'lit';
+import { html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { AppElement } from '../app-element';
 import type { RepositoryInfo, AccountInfo } from '../services/repository-service';
@@ -18,60 +18,6 @@ type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'settings';
 
 @customElement('app-shell')
 export class AppShell extends AppElement {
-  static styles = css`
-    :host {
-      display: flex;
-      height: 100vh;
-      width: 100vw;
-      font-family: system-ui, sans-serif;
-    }
-
-    .main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      background-color: #1a1b26;
-      overflow: hidden;
-    }
-
-    .content {
-      flex: 1;
-      overflow: hidden;
-      color: #cdd6f4;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .content.padded {
-      padding: 1rem;
-      overflow: auto;
-    }
-
-    .placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #6c7086;
-      gap: 0.75rem;
-    }
-
-    .placeholder-icon { font-size: 2.5rem; }
-
-    .placeholder-btn {
-      padding: 0.4rem 1.25rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: transparent;
-      color: #cdd6f4;
-      font-size: 0.875rem;
-      cursor: pointer;
-    }
-
-    .placeholder-btn:hover { background-color: #313244; }
-  `;
-
   private readonly _appState = new AppStateController(this);
 
   @state() private activeView: View = 'changes';
@@ -133,6 +79,8 @@ export class AppShell extends AppElement {
 
   render() {
     const s = this._appState;
+    const isPadded = this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests';
+    const contentClass = `flex flex-col flex-1 overflow-hidden text-cat-text${isPadded ? ' p-4 overflow-auto' : ''}`;
     return html`
       <app-sidebar
         .repos=${s.repos}
@@ -146,7 +94,7 @@ export class AppShell extends AppElement {
         @navigate=${this._onNavigate}>
       </app-sidebar>
 
-      <main class="main">
+      <main class="flex flex-col flex-1 bg-cat-base overflow-hidden">
         <app-toolbar
           .activeRepo=${s.activeRepo}
           .gitOperation=${s.gitOperation}
@@ -158,13 +106,13 @@ export class AppShell extends AppElement {
           @navigate=${this._onNavigate}>
         </app-toolbar>
 
-        <div class="content ${this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' ? 'padded' : ''}"
+        <div class="${contentClass}"
           style="${this.activeView === 'settings' ? 'overflow:auto' : ''}">
           ${s.activeRepo || this.activeView === 'settings' ? this._renderView() : html`
-            <div class="placeholder">
-              <span class="placeholder-icon">📂</span>
+            <div class="flex flex-col items-center justify-center h-full text-cat-subtle gap-3">
+              <span class="text-4xl">📂</span>
               <span>Kein Repository geöffnet</span>
-              <button class="placeholder-btn" @click=${() => this.showDialog = true}>
+              <button class="px-5 py-1.5 rounded-md border border-cat-border bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay" @click=${() => this.showDialog = true}>
                 Repository hinzufügen
               </button>
             </div>
