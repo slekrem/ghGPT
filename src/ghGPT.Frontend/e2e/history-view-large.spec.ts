@@ -31,24 +31,24 @@ test('loads additional commit pages while keeping the rendered DOM small', async
   await page.reload();
   await page.locator('app-shell').waitFor();
 
-  await page.locator('.nav-item').filter({ hasText: 'History' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'History' }).first().click();
   const historyView = page.locator('history-view');
   await historyView.waitFor();
 
   await expect(historyView).toContainText('perf: commit 105');
-  await expect(historyView.locator('.footer-hint')).toContainText('Weitere Commits', { timeout: 5000 });
+  await expect(historyView.locator('[data-testid="footer-hint"]')).toContainText('Weitere Commits', { timeout: 5000 });
 
-  const initialRenderedCount = await historyView.locator('.list-entry').count();
+  const initialRenderedCount = await historyView.locator('[data-testid="commit-entry"]').count();
   expect(initialRenderedCount).toBeLessThan(40);
 
-  const listScroll = historyView.locator('.list-scroll');
+  const listScroll = historyView.locator('[data-testid="commit-list-scroll"]');
   await listScroll.evaluate((element: HTMLElement) => {
     element.scrollTop = element.scrollHeight;
   });
 
-  await expect(historyView.locator('.footer-hint')).toContainText('106 Commits geladen', { timeout: 5000 });
+  await expect(historyView.locator('[data-testid="footer-hint"]')).toContainText('106 Commits geladen', { timeout: 5000 });
   await expect(historyView).toContainText('perf: commit 1', { timeout: 5000 });
 
-  const renderedCountAfterPaging = await historyView.locator('.list-entry').count();
+  const renderedCountAfterPaging = await historyView.locator('[data-testid="commit-entry"]').count();
   expect(renderedCountAfterPaging).toBeLessThan(50);
 });

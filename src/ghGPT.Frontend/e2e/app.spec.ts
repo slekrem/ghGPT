@@ -5,11 +5,11 @@ test.describe('Repository List', () => {
     await page.goto('/');
     await page.locator('app-shell').waitFor();
 
-    const repoItems = page.locator('.repo-item');
+    const repoItems = page.locator('[data-testid="repo-item"]');
     const count = await repoItems.count();
 
     for (let i = 0; i < count; i++) {
-      await expect(repoItems.nth(i).locator('.repo-name')).toBeVisible();
+      await expect(repoItems.nth(i).locator('[data-testid="repo-name"]')).toBeVisible();
     }
   });
 
@@ -31,7 +31,7 @@ test.describe('App Shell', () => {
     await page.goto('/');
     await page.locator('app-shell').waitFor();
 
-    const addBtn = page.locator('.add-btn');
+    const addBtn = page.locator('[data-testid="add-repo-btn"]');
     await expect(addBtn).toBeVisible();
     await addBtn.first().click();
     await expect(page.locator('repo-dialog')).toBeAttached();
@@ -41,7 +41,7 @@ test.describe('App Shell', () => {
     await page.goto('/');
     await page.locator('app-shell').waitFor();
 
-    await page.locator('.add-btn').first().click();
+    await page.locator('[data-testid="add-repo-btn"]').first().click();
     await expect(page.locator('repo-dialog')).toBeAttached();
 
     await page.locator('repo-dialog').locator('button', { hasText: 'Abbrechen' }).click();

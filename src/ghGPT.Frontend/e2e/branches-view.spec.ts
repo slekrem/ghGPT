@@ -37,7 +37,7 @@ async function gotoBranchesView(page: import('@playwright/test').Page) {
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Branches' }).first().click();
   await page.locator('branches-view').waitFor();
 }
 
@@ -49,9 +49,9 @@ test('toolbar "Branch verwalten" navigates to branches view', async ({ page }) =
   await page.reload();
   await page.locator('app-shell').waitFor();
 
-  await page.locator('.toolbar-branch').click();
-  await expect(page.locator('.branch-dropdown')).toBeVisible();
-  await page.locator('.branch-dropdown-footer').click();
+  await page.locator('[data-testid="toolbar-branch"]').click();
+  await expect(page.locator('[data-testid="branch-dropdown"]')).toBeVisible();
+  await page.locator('[data-testid="branch-dropdown-footer"]').click();
   await page.locator('branches-view').waitFor();
   await expect(page.locator('branches-view')).toBeVisible();
 });
@@ -62,98 +62,98 @@ test('toolbar branch button shows current branch name', async ({ page }) => {
   await page.reload();
   await page.locator('app-shell').waitFor();
 
-  await expect(page.locator('.toolbar-branch')).toContainText(/master|main/);
+  await expect(page.locator('[data-testid="toolbar-branch"]')).toContainText(/master|main/);
 });
 
 // --- Anzeige ---
 
 test('shows branches section title in toolbar', async ({ page }) => {
   await gotoBranchesView(page);
-  await expect(page.locator('branches-view .toolbar-title')).toContainText('Branches');
+  await expect(page.locator('branches-view [data-testid="toolbar-title"]')).toContainText('Branches');
 });
 
 test('shows local branches', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
-  await expect(view.locator('.branch-row').filter({ hasText: /master|main/ })).toBeVisible();
-  await expect(view.locator('.branch-row').filter({ hasText: 'develop' })).toBeVisible();
+  await expect(view.locator('[data-testid="branch-row"]').filter({ hasText: /master|main/ })).toBeVisible();
+  await expect(view.locator('[data-testid="branch-row"]').filter({ hasText: 'develop' })).toBeVisible();
 });
 
 test('marks current branch with HEAD badge', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
-  const headRow = view.locator('.branch-row.head');
+  const headRow = view.locator('[data-testid="branch-row"][data-head]');
   await expect(headRow).toBeVisible();
-  await expect(headRow.locator('.head-badge')).toBeVisible();
-  await expect(headRow.locator('.head-badge')).toContainText('HEAD');
+  await expect(headRow.locator('[data-testid="head-badge"]')).toBeVisible();
+  await expect(headRow.locator('[data-testid="head-badge"]')).toContainText('HEAD');
 });
 
 test('shows section title for local branches', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
-  await expect(view.locator('.section-title').filter({ hasText: /Lokale Branches/i })).toBeVisible();
+  await expect(view.locator('[data-testid="section-title"]').filter({ hasText: /Lokale Branches/i })).toBeVisible();
 });
 
 // --- Neuer Branch Dialog ---
 
 test('opens new branch dialog on button click', async ({ page }) => {
   await gotoBranchesView(page);
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  const dialog = page.locator('branches-view .dialog');
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  const dialog = page.locator('branches-view [data-testid="new-branch-dialog"]');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.dialog-title')).toContainText('Neuen Branch erstellen');
+  await expect(dialog.locator('[data-testid="dialog-title"]')).toContainText('Neuen Branch erstellen');
 });
 
 test('closes dialog on Abbrechen click', async ({ page }) => {
   await gotoBranchesView(page);
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  await expect(page.locator('branches-view .dialog')).toBeVisible();
-  await page.locator('branches-view .dialog .btn').filter({ hasText: 'Abbrechen' }).click();
-  await expect(page.locator('branches-view .dialog')).not.toBeVisible();
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  await expect(page.locator('branches-view [data-testid="new-branch-dialog"]')).toBeVisible();
+  await page.locator('branches-view [data-testid="new-branch-dialog"]').locator('button', { hasText: 'Abbrechen' }).click();
+  await expect(page.locator('branches-view [data-testid="new-branch-dialog"]')).not.toBeVisible();
 });
 
 test('shows validation error when creating branch with empty name', async ({ page }) => {
   await gotoBranchesView(page);
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  const dialog = page.locator('branches-view .dialog');
-  await dialog.locator('.btn-primary').filter({ hasText: 'Erstellen' }).click();
-  await expect(dialog.locator('.error-msg')).toBeVisible();
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  const dialog = page.locator('branches-view [data-testid="new-branch-dialog"]');
+  await dialog.locator('[data-testid="create-branch-btn"]').click();
+  await expect(dialog.locator('[data-testid="error-msg"]')).toBeVisible();
 });
 
 test('creates a new branch and shows it in the list', async ({ page }) => {
   await gotoBranchesView(page);
   const branchName = 'feature/e2e-create';
 
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  const dialog = page.locator('branches-view .dialog');
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  const dialog = page.locator('branches-view [data-testid="new-branch-dialog"]');
   await dialog.locator('input[type="text"]').fill(branchName);
-  await dialog.locator('.btn-primary').filter({ hasText: 'Erstellen' }).click();
+  await dialog.locator('[data-testid="create-branch-btn"]').click();
 
-  await expect(page.locator('branches-view .dialog')).not.toBeVisible({ timeout: 5000 });
-  await expect(page.locator('branches-view .branch-row').filter({ hasText: branchName })).toBeVisible();
+  await expect(page.locator('branches-view [data-testid="new-branch-dialog"]')).not.toBeVisible({ timeout: 5000 });
+  await expect(page.locator('branches-view [data-testid="branch-row"]').filter({ hasText: branchName })).toBeVisible();
 });
 
 test('new branch becomes HEAD after creation', async ({ page }) => {
   await gotoBranchesView(page);
   const branchName = 'feature/e2e-head-check';
 
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  const dialog = page.locator('branches-view .dialog');
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  const dialog = page.locator('branches-view [data-testid="new-branch-dialog"]');
   await dialog.locator('input[type="text"]').fill(branchName);
-  await dialog.locator('.btn-primary').filter({ hasText: 'Erstellen' }).click();
+  await dialog.locator('[data-testid="create-branch-btn"]').click();
 
-  await expect(page.locator('branches-view .dialog')).not.toBeVisible({ timeout: 5000 });
+  await expect(page.locator('branches-view [data-testid="new-branch-dialog"]')).not.toBeVisible({ timeout: 5000 });
 
-  const newRow = page.locator('branches-view .branch-row').filter({ hasText: branchName });
-  await expect(newRow.locator('.head-badge')).toBeVisible();
+  const newRow = page.locator('branches-view [data-testid="branch-row"]').filter({ hasText: branchName });
+  await expect(newRow.locator('[data-testid="head-badge"]')).toBeVisible();
 
   checkoutDefaultBranch(repoDir);
 });
 
 test('dialog populates base-branch select with local branches', async ({ page }) => {
   await gotoBranchesView(page);
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  const select = page.locator('branches-view .dialog select');
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  const select = page.locator('branches-view [data-testid="new-branch-dialog"] select');
   await expect(select).toBeVisible();
   const options = await select.locator('option').allTextContents();
   expect(options.length).toBeGreaterThan(0);
@@ -165,21 +165,21 @@ test('checkout button is visible on hover for non-HEAD local branches', async ({
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
 
-  const nonHeadRow = view.locator('.branch-row:not(.head)').filter({ hasText: 'develop' }).first();
+  const nonHeadRow = view.locator('[data-testid="branch-row"]:not([data-head])').filter({ hasText: 'develop' }).first();
   await nonHeadRow.hover();
-  await expect(nonHeadRow.locator('.action-btn', { hasText: 'Checkout' })).toBeVisible();
+  await expect(nonHeadRow.locator('[data-testid="checkout-btn"]', { hasText: 'Checkout' })).toBeVisible();
 });
 
 test('checkout switches to target branch', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
 
-  const developRow = view.locator('.branch-row:not(.head)').filter({ hasText: 'develop' }).first();
+  const developRow = view.locator('[data-testid="branch-row"]:not([data-head])').filter({ hasText: 'develop' }).first();
   await developRow.hover();
-  await developRow.locator('.action-btn', { hasText: 'Checkout' }).click();
+  await developRow.locator('[data-testid="checkout-btn"]', { hasText: 'Checkout' }).click();
 
-  await expect(view.locator('.branch-row.head').filter({ hasText: 'develop' })).toBeVisible({ timeout: 5000 });
-  await expect(view.locator('.branch-row.head').locator('.head-badge')).toBeVisible();
+  await expect(view.locator('[data-testid="branch-row"][data-head]').filter({ hasText: 'develop' })).toBeVisible({ timeout: 5000 });
+  await expect(view.locator('[data-testid="branch-row"][data-head]').locator('[data-testid="head-badge"]')).toBeVisible();
 
   checkoutDefaultBranch(repoDir);
 });
@@ -196,9 +196,9 @@ test('shows alert when checking out with uncommitted changes', async ({ page }) 
     await dialog.accept();
   });
 
-  const developRow = view.locator('.branch-row:not(.head)').filter({ hasText: 'develop' }).first();
+  const developRow = view.locator('[data-testid="branch-row"]:not([data-head])').filter({ hasText: 'develop' }).first();
   await developRow.hover();
-  await developRow.locator('.action-btn', { hasText: 'Checkout' }).click();
+  await developRow.locator('[data-testid="checkout-btn"]', { hasText: 'Checkout' }).click();
 
   await page.waitForEvent('dialog', { timeout: 5000 });
   expect(alertMessage).toMatch(/uncommitted|changes|Änderungen/i);
@@ -213,9 +213,9 @@ test('delete button is visible on hover for non-HEAD branches', async ({ page })
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
 
-  const nonHeadRow = view.locator('.branch-row:not(.head)').filter({ hasText: 'develop' }).first();
+  const nonHeadRow = view.locator('[data-testid="branch-row"]:not([data-head])').filter({ hasText: 'develop' }).first();
   await nonHeadRow.hover();
-  await expect(nonHeadRow.locator('.action-btn.danger')).toBeVisible();
+  await expect(nonHeadRow.locator('[data-testid="delete-btn"]')).toBeVisible();
 });
 
 test('deletes a non-active branch', async ({ page }) => {
@@ -224,27 +224,27 @@ test('deletes a non-active branch', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
 
-  await expect(view.locator('.branch-row').filter({ hasText: 'e2e-delete-me' })).toBeVisible();
+  await expect(view.locator('[data-testid="branch-row"]').filter({ hasText: 'e2e-delete-me' })).toBeVisible();
 
   page.on('dialog', (dialog) => dialog.accept());
 
-  const row = view.locator('.branch-row:not(.head)').filter({ hasText: 'e2e-delete-me' }).first();
+  const row = view.locator('[data-testid="branch-row"]:not([data-head])').filter({ hasText: 'e2e-delete-me' }).first();
   await row.hover();
-  await row.locator('.action-btn.danger').click();
+  await row.locator('[data-testid="delete-btn"]').click();
 
-  await expect(view.locator('.branch-row').filter({ hasText: 'e2e-delete-me' })).not.toBeVisible({ timeout: 5000 });
+  await expect(view.locator('[data-testid="branch-row"]').filter({ hasText: 'e2e-delete-me' })).not.toBeVisible({ timeout: 5000 });
 });
 
 test('toolbar shows updated branch name after checkout', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
 
-  const developRow = view.locator('.branch-row:not(.head)').filter({ hasText: 'develop' }).first();
+  const developRow = view.locator('[data-testid="branch-row"]:not([data-head])').filter({ hasText: 'develop' }).first();
   await developRow.hover();
-  await developRow.locator('.action-btn', { hasText: 'Checkout' }).click();
+  await developRow.locator('[data-testid="checkout-btn"]', { hasText: 'Checkout' }).click();
 
-  await expect(view.locator('.branch-row.head').filter({ hasText: 'develop' })).toBeVisible({ timeout: 5000 });
-  await expect(page.locator('.toolbar-branch')).toContainText('develop', { timeout: 5000 });
+  await expect(view.locator('[data-testid="branch-row"][data-head]').filter({ hasText: 'develop' })).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('[data-testid="toolbar-branch"]')).toContainText('develop', { timeout: 5000 });
 
   checkoutDefaultBranch(repoDir);
 });
@@ -253,8 +253,8 @@ test('active branch has no delete button', async ({ page }) => {
   await gotoBranchesView(page);
   const view = page.locator('branches-view');
 
-  const headRow = view.locator('.branch-row.head').first();
+  const headRow = view.locator('[data-testid="branch-row"][data-head]').first();
   await headRow.hover();
 
-  await expect(headRow.locator('.action-btn.danger')).not.toBeVisible();
+  await expect(headRow.locator('[data-testid="delete-btn"]')).not.toBeVisible();
 });

@@ -34,20 +34,21 @@ export class AppSidebar extends AppElement {
       <div class="py-2 flex-1 overflow-y-auto">
         <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle">
           <span>Repositories</span>
-          <button class="add-btn bg-transparent border-none text-cat-subtle cursor-pointer text-base px-1 py-0 leading-none hover:text-cat-text"
+          <button data-testid="add-repo-btn" class="bg-transparent border-none text-cat-subtle cursor-pointer text-base px-1 py-0 leading-none hover:text-cat-text"
             title="Repository hinzufügen"
             @click=${() => this.dispatch('add-repo')}>＋</button>
         </div>
 
         ${this.repos.map(repo => html`
-          <div class="repo-item ${repo.id === this.activeRepoId ? 'active' : ''} group flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors
+          <div data-testid="repo-item" ?data-active=${repo.id === this.activeRepoId}
+            class="group flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors
                       ${repo.id === this.activeRepoId
                         ? 'bg-[#45475a] text-[#cba6f7]'
                         : 'text-cat-text hover:bg-cat-overlay'}"
             @click=${() => this.dispatch('activate-repo', repo.id)}>
             <span>📁</span>
-            <span class="repo-name flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${repo.name}</span>
-            <button class="repo-remove-btn hidden group-hover:flex items-center justify-center ml-auto shrink-0 w-4 h-4
+            <span data-testid="repo-name" class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${repo.name}</span>
+            <button data-testid="repo-remove-btn" class="hidden group-hover:flex items-center justify-center ml-auto shrink-0 w-4 h-4
                            border-none bg-transparent text-cat-subtle cursor-pointer text-xs leading-none rounded-[3px] p-0
                            hover:text-cat-red hover:bg-[#45475a]"
               title="Aus Tracking entfernen"
@@ -58,31 +59,31 @@ export class AppSidebar extends AppElement {
         `)}
 
         <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle mt-2">Workspace</div>
-        <div class="nav-item flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+        <div data-testid="nav-item" class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
                     ${this.activeView === 'changes' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'changes')}>
           <span>✏️</span> Änderungen
         </div>
-        <div class="nav-item flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+        <div data-testid="nav-item" class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
                     ${this.activeView === 'history' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'history')}>
           <span>🕐</span> History
         </div>
 
         <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle mt-2">Repository</div>
-        <div class="nav-item flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+        <div data-testid="nav-item" class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
                     ${this.activeView === 'branches' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'branches')}>
           <span>🌿</span> Branches
         </div>
-        <div class="nav-item flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+        <div data-testid="nav-item" class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
                     ${this.activeView === 'pull-requests' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'pull-requests')}>
           <span>🔀</span> Pull Requests
         </div>
 
         <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle mt-2">App</div>
-        <div class="nav-item flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+        <div data-testid="nav-item" class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
                     ${this.activeView === 'settings' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'settings')}>
           <span>⚙</span> Einstellungen

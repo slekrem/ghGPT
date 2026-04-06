@@ -32,15 +32,15 @@ test('shows commit history and commit detail diff', async ({ page }) => {
   await page.reload();
   await page.locator('app-shell').waitFor();
 
-  await page.locator('.nav-item').filter({ hasText: 'History' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'History' }).first().click();
   const historyView = page.locator('history-view');
   await historyView.waitFor();
 
   await expect(historyView).toContainText('master');
   await expect(historyView).toContainText('feat: second history commit');
 
-  await historyView.locator('.list-entry').filter({ hasText: 'feat: second history commit' }).first().click();
-  await expect(historyView.locator('.detail-title')).toContainText('feat: second history commit');
-  await expect(historyView.locator('.file-item').filter({ hasText: 'README.md' })).toBeVisible();
-  await expect(historyView.locator('.diff-panel')).toContainText('+Zweiter Stand');
+  await historyView.locator('[data-testid="commit-entry"]').filter({ hasText: 'feat: second history commit' }).first().click();
+  await expect(historyView.locator('[data-testid="commit-detail-title"]')).toContainText('feat: second history commit');
+  await expect(historyView.locator('[data-testid="commit-file-item"]').filter({ hasText: 'README.md' })).toBeVisible();
+  await expect(historyView.locator('[data-testid="diff-panel"]')).toContainText('+Zweiter Stand');
 });
