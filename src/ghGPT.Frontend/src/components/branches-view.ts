@@ -86,7 +86,7 @@ export class BranchesView extends AppElement {
 
   private renderBranchRow(b: BranchInfo) {
     return html`
-      <div class="flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors
+      <div class="group flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors
         ${b.isHead ? 'border-[#89b4fa33] bg-[#89b4fa11]' : 'border-transparent hover:bg-cat-overlay'}"
         @dblclick=${() => !b.isHead && this.checkout(b.name)}>
         <span class="text-sm shrink-0">${b.isRemote ? '☁' : '🌿'}</span>
@@ -94,7 +94,7 @@ export class BranchesView extends AppElement {
           ${b.isHead ? 'text-cat-blue font-medium' : 'text-cat-text'}">${b.name}</span>
         ${b.isHead ? html`<span class="text-[0.65rem] bg-[#89b4fa33] text-cat-blue rounded px-1 shrink-0">HEAD</span>` : nothing}
         ${this.renderAheadBehind(b)}
-        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity [.branch-row:hover_&]:opacity-100">
+        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           ${!b.isHead ? html`
             <button class="px-2 py-0.5 rounded border border-cat-muted bg-transparent text-cat-text text-xs cursor-pointer hover:bg-cat-muted"
               @click=${(e: Event) => { e.stopPropagation(); this.checkout(b.name); }}>
