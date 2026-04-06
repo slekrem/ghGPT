@@ -1,4 +1,4 @@
-import { html, css, nothing } from 'lit';
+import { html, nothing } from 'lit';
 import { AppElement } from '../app-element';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -31,368 +31,6 @@ interface ParsedDiffLine {
 
 @customElement('changes-view')
 export class ChangesView extends AppElement {
-  static styles = css`
-    :host {
-      display: flex;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    .file-list {
-      width: 260px;
-      min-width: 260px;
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid #313244;
-      overflow: hidden;
-    }
-
-    .list-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0.75rem;
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #6c7086;
-      background: #1e1e2e;
-      border-bottom: 1px solid #313244;
-      flex-shrink: 0;
-    }
-
-    .list-header input[type="checkbox"] { cursor: pointer; }
-
-    .file-entries {
-      overflow-y: auto;
-      flex: 1;
-    }
-
-    .file-entry {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.3rem 0.75rem;
-      cursor: pointer;
-      font-size: 0.8rem;
-      color: #cdd6f4;
-      user-select: none;
-    }
-
-    .file-entry:hover { background: #313244; }
-    .file-entry.selected { background: #45475a; }
-
-    .file-entry input[type="checkbox"] {
-      cursor: pointer;
-      flex-shrink: 0;
-      accent-color: #89b4fa;
-      width: 14px;
-      height: 14px;
-    }
-
-    .file-status {
-      font-size: 0.65rem;
-      font-weight: 700;
-      width: 14px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-
-    .status-Modified  { color: #89b4fa; }
-    .status-Added     { color: #a6e3a1; }
-    .status-Deleted   { color: #f38ba8; }
-    .status-Renamed   { color: #fab387; }
-    .status-Untracked { color: #a6e3a1; }
-
-    .file-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-    }
-
-    .empty-hint {
-      padding: 0.5rem 0.75rem;
-      font-size: 0.75rem;
-      color: #45475a;
-      font-style: italic;
-    }
-
-    .diff-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background: #181825;
-    }
-
-    .diff-header {
-      padding: 0.5rem 1rem;
-      font-size: 0.8rem;
-      color: #a6adc8;
-      border-bottom: 1px solid #313244;
-      background: #1e1e2e;
-      flex-shrink: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .diff-header-path {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .review-btn {
-      background: transparent;
-      border: 1px solid #45475a;
-      border-radius: 4px;
-      color: #a6adc8;
-      cursor: pointer;
-      font-size: 0.72rem;
-      padding: 0.15rem 0.55rem;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .review-btn:hover:not(:disabled) { background: #313244; color: #cdd6f4; }
-    .review-btn:disabled { opacity: 0.45; cursor: default; }
-
-    .review-overlay {
-      position: absolute;
-      inset: 0;
-      background: #181825;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .review-overlay-header {
-      padding: 0.6rem 1rem;
-      border-bottom: 1px solid #313244;
-      background: #1e1e2e;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-
-    .review-overlay-title {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #cdd6f4;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .review-close-btn {
-      background: none;
-      border: none;
-      color: #6c7086;
-      cursor: pointer;
-      font-size: 1rem;
-      padding: 0.1rem 0.3rem;
-      border-radius: 4px;
-      line-height: 1;
-    }
-
-    .review-close-btn:hover { color: #cdd6f4; background: #313244; }
-
-    .review-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem 1.25rem;
-      font-size: 0.83rem;
-      line-height: 1.6;
-      color: #cdd6f4;
-    }
-
-    .review-streaming {
-      font-style: italic;
-      color: #6c7086;
-      font-size: 0.78rem;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .review-content h2 { font-size: 0.9rem; color: #cdd6f4; margin: 0.75em 0 0.35em; }
-    .review-content h3 { font-size: 0.84rem; color: #a6adc8; margin: 0.6em 0 0.25em; }
-    .review-content p { margin: 0 0 0.5em; }
-    .review-content p:last-child { margin-bottom: 0; }
-    .review-content ul, .review-content ol { margin: 0.25em 0; padding-left: 1.4em; }
-    .review-content li { margin: 0.15em 0; }
-    .review-content strong { color: #cba6f7; }
-    .review-content code {
-      background: #313244;
-      padding: 0.1em 0.35em;
-      border-radius: 4px;
-      font-family: 'Cascadia Code', monospace;
-      font-size: 0.77rem;
-      color: #89b4fa;
-    }
-    .review-content pre {
-      background: #11111b;
-      border: 1px solid #313244;
-      border-radius: 6px;
-      padding: 0.6rem 0.75rem;
-      overflow-x: auto;
-      margin: 0.4em 0;
-    }
-    .review-content pre code { background: none; padding: 0; color: #cdd6f4; }
-
-    .diff-content {
-      flex: 1;
-      overflow: auto;
-      padding: 0;
-      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-      font-size: 0.78rem;
-      background:
-        linear-gradient(90deg, #202539 0, #202539 28px, transparent 28px);
-    }
-
-    .diff-line {
-      display: flex;
-      align-items: center;
-      min-height: 22px;
-      padding: 0 0.75rem 0 0;
-      line-height: 1.45;
-      white-space: pre;
-      border-left: 3px solid transparent;
-    }
-
-    .diff-line-check {
-      width: 28px;
-      flex-shrink: 0;
-      display: flex;
-      align-self: stretch;
-      justify-content: center;
-      align-items: center;
-      background: rgba(137, 180, 250, 0.04);
-      border-right: 1px solid rgba(69, 71, 90, 0.45);
-    }
-
-    .diff-line-check input {
-      width: 13px;
-      height: 13px;
-      accent-color: #89b4fa;
-      cursor: pointer;
-      margin: 0;
-    }
-
-    .diff-line-num {
-      width: 32px;
-      flex-shrink: 0;
-      color: #585b70;
-      user-select: none;
-      text-align: right;
-      padding-right: 0.45rem;
-    }
-
-    .diff-line-content {
-      flex: 1;
-      overflow-x: auto;
-      padding-left: 0.1rem;
-    }
-
-    .diff-line.is-checked {
-      border-left-color: #89b4fa;
-    }
-
-    .diff-line.is-checked .diff-line-check {
-      background: rgba(137, 180, 250, 0.14);
-    }
-
-    .diff-line.added   { background: rgba(166, 227, 161, 0.12); color: #a6e3a1; }
-    .diff-line.removed { background: rgba(243, 139, 168, 0.12); color: #f38ba8; }
-    .diff-line.context { color: #cdd6f4; }
-
-    .diff-placeholder {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #45475a;
-      font-size: 0.875rem;
-    }
-
-    .commit-form {
-      flex-shrink: 0;
-      padding: 0.6rem 0.75rem;
-      border-top: 1px solid #313244;
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      background: #1e1e2e;
-    }
-
-    .commit-input {
-      background: #181825;
-      border: 1px solid #313244;
-      border-radius: 4px;
-      color: #cdd6f4;
-      font-size: 0.8rem;
-      padding: 0.35rem 0.5rem;
-      width: 100%;
-      box-sizing: border-box;
-      font-family: inherit;
-      resize: none;
-    }
-
-    .commit-input:focus { outline: none; border-color: #89b4fa; }
-    .commit-input::placeholder { color: #45475a; }
-
-    .commit-btn {
-      background: #89b4fa;
-      border: none;
-      border-radius: 4px;
-      color: #1e1e2e;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 600;
-      padding: 0.35rem 0.75rem;
-      width: 100%;
-    }
-
-    .commit-btn:disabled { background: #313244; color: #45475a; cursor: default; }
-    .commit-btn:not(:disabled):hover { background: #b4d0ff; }
-
-    .ai-btn {
-      background: transparent;
-      border: 1px solid #45475a;
-      border-radius: 4px;
-      color: #a6adc8;
-      cursor: pointer;
-      font-size: 0.75rem;
-      padding: 0.2rem 0.6rem;
-      align-self: flex-start;
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .ai-btn:hover:not(:disabled) { background: #313244; color: #cdd6f4; }
-    .ai-btn:disabled { opacity: 0.45; cursor: default; }
-
-    .ai-streaming {
-      font-size: 0.72rem;
-      color: #89b4fa;
-      font-style: italic;
-      min-height: 1em;
-    }
-
-    .commit-error {
-      font-size: 0.72rem;
-      color: #f38ba8;
-    }
-  `;
-
   @property() repoId = '';
   @property({ type: Number }) refreshKey = 0;
   @query('.file-entries') private fileEntries?: HTMLDivElement;
@@ -904,24 +542,27 @@ export class ChangesView extends AppElement {
 
   private renderDiff() {
     if (!this.selectedPath) {
-      return html`<div class="diff-placeholder">Datei auswählen</div>`;
+      return html`<div class="flex items-center justify-center h-full text-cat-muted text-sm">Datei auswählen</div>`;
     }
     if (this.diffError) {
-      return html`<div class="diff-placeholder" style="color:#f38ba8">${this.diffError}</div>`;
+      return html`<div class="flex items-center justify-center h-full text-sm text-cat-red">${this.diffError}</div>`;
     }
     if (!this.combinedDiff) {
-      return html`<div class="diff-placeholder">Kein Diff verfügbar</div>`;
+      return html`<div class="flex items-center justify-center h-full text-cat-muted text-sm">Kein Diff verfügbar</div>`;
     }
 
     return html`
-      <div class="diff-content">
+      <div class="flex-1 overflow-auto p-0 font-mono text-[0.78rem]"
+           style="background: linear-gradient(90deg, #202539 0, #202539 28px, transparent 28px)">
         ${this.combinedHunks.flatMap(hunk => hunk.lines.map(line => {
           const selectable = line.type !== 'context';
           const isChecked = selectable && this.stagedLineKeys.has(line.lineKey);
 
           return html`
-            <div class="diff-line ${line.type} ${isChecked ? 'is-checked' : ''}">
-              <span class="diff-line-check">
+            <div class="diff-line ${line.type} flex leading-[1.5] whitespace-pre">
+              <span class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.oldNum}</span>
+              <span class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.newNum}</span>
+              <span class="w-5 shrink-0 flex items-center justify-center">
                 ${selectable ? html`
                   <input
                     type="checkbox"
@@ -932,9 +573,7 @@ export class ChangesView extends AppElement {
                       this.toggleLine(line.globalIndex, e.shiftKey);
                     }} />` : ''}
               </span>
-              <span class="diff-line-num">${line.oldNum}</span>
-              <span class="diff-line-num">${line.newNum}</span>
-              <span class="diff-line-content">${line.content}</span>
+              <span class="flex-1 min-w-0 overflow-hidden">${line.content}</span>
             </div>`;
         }))}
       </div>`;
@@ -972,10 +611,20 @@ export class ChangesView extends AppElement {
     const isPartiallyStaged = this.status.staged.some(f => f.filePath === filePath)
       && this.status.unstaged.some(f => f.filePath === filePath);
 
+    const statusColorMap: Record<string, string> = {
+      'Modified': 'text-cat-blue',
+      'Added': 'text-cat-green',
+      'Deleted': 'text-cat-red',
+      'Renamed': 'text-cat-peach',
+      'Untracked': 'text-cat-green',
+    };
+    const statusColor = statusColorMap[entry.status] ?? 'text-cat-subtext';
+
     return html`
-      <div class="file-entry ${isSelected ? 'selected' : ''}"
+      <div class="flex items-center gap-2 px-3 py-[0.3rem] cursor-pointer text-[0.8rem] text-cat-text select-none hover:bg-cat-overlay ${isSelected ? 'bg-cat-muted' : ''}"
         @click=${() => this.selectFile(filePath)}>
         <input type="checkbox"
+          class="cursor-pointer shrink-0 accent-cat-blue w-[14px] h-[14px]"
           .checked=${isFullyStaged}
           .indeterminate=${isPartiallyStaged}
           @click=${(e: Event) => {
@@ -989,8 +638,8 @@ export class ChangesView extends AppElement {
               true
             );
           }} />
-        <span class="file-status status-${entry.status}">${this.statusChar(entry.status)}</span>
-        <span class="file-name" title="${filePath}">${filePath}</span>
+        <span class="text-[0.65rem] font-bold w-[14px] text-center shrink-0 ${statusColor}">${this.statusChar(entry.status)}</span>
+        <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1" title="${filePath}">${filePath}</span>
       </div>`;
   }
 
@@ -999,36 +648,45 @@ export class ChangesView extends AppElement {
     const totalCount = this.allFiles.length;
 
     return html`
-      <div class="file-list">
-        <div class="list-header">
+      <div class="w-[260px] min-w-[260px] flex flex-col border-r border-cat-border overflow-hidden">
+        <div class="flex items-center gap-2 px-3 py-[0.4rem] text-[0.7rem] uppercase tracking-[0.08em] text-cat-subtle bg-cat-surface border-b border-cat-border shrink-0">
           <input type="checkbox"
+            class="cursor-pointer"
             .checked=${this.allChecked}
             .indeterminate=${this.someChecked}
             @change=${(e: Event) => this.toggleAll((e.target as HTMLInputElement).checked)} />
           <span>Änderungen (${totalCount})</span>
         </div>
 
-        <div class="file-entries">
+        <div class="file-entries overflow-y-auto flex-1">
           ${totalCount === 0
-            ? html`<div class="empty-hint">Keine Änderungen</div>`
+            ? html`<div class="px-3 py-2 text-[0.75rem] text-cat-muted italic">Keine Änderungen</div>`
             : repeat(this.allFiles, e => e.filePath, e => this.renderFileEntry(e))}
         </div>
 
-        <div class="commit-form">
-          <button class="ai-btn"
+        <div class="shrink-0 px-3 py-[0.6rem] border-t border-cat-border flex flex-col gap-[0.4rem] bg-cat-surface">
+          <button
+            class="bg-transparent border border-cat-muted rounded text-cat-subtext cursor-pointer text-[0.75rem] px-[0.6rem] py-[0.2rem] self-start flex items-center gap-[0.3rem] hover:bg-cat-overlay hover:text-cat-text disabled:opacity-45 disabled:cursor-default"
             ?disabled=${stagedCount === 0 || this.generatingMessage || this.committing}
             @click=${this.generateCommitMessage}>
             ✦ ${this.generatingMessage ? 'Generiere…' : 'KI-Vorschlag'}
           </button>
-          ${this.aiStreamPreview ? html`<div class="ai-streaming">${this.aiStreamPreview}</div>` : ''}
-          <input class="commit-input" type="text" placeholder="Commit-Titel (Pflichtfeld)"
+          ${this.aiStreamPreview ? html`<div class="text-[0.72rem] text-cat-blue italic min-h-[1em]">${this.aiStreamPreview}</div>` : ''}
+          <input
+            class="bg-cat-base border border-cat-border rounded text-cat-text text-[0.8rem] px-2 py-[0.35rem] w-full box-border font-[inherit] focus:outline-none focus:border-cat-blue placeholder:text-cat-muted"
+            type="text"
+            placeholder="Commit-Titel (Pflichtfeld)"
             .value=${this.commitMessage}
             @input=${(e: Event) => { this.commitMessage = (e.target as HTMLInputElement).value; }} />
-          <textarea class="commit-input" rows="2" placeholder="Beschreibung (optional)"
+          <textarea
+            class="bg-cat-base border border-cat-border rounded text-cat-text text-[0.8rem] px-2 py-[0.35rem] w-full box-border font-[inherit] resize-none focus:outline-none focus:border-cat-blue placeholder:text-cat-muted"
+            rows="2"
+            placeholder="Beschreibung (optional)"
             .value=${this.commitDescription}
             @input=${(e: Event) => { this.commitDescription = (e.target as HTMLTextAreaElement).value; }}></textarea>
-          ${this.commitError ? html`<div class="commit-error">${this.commitError}</div>` : ''}
-          <button class="commit-btn"
+          ${this.commitError ? html`<div class="text-[0.72rem] text-cat-red">${this.commitError}</div>` : ''}
+          <button
+            class="bg-cat-blue border-none rounded text-cat-surface cursor-pointer text-[0.8rem] font-semibold px-3 py-[0.35rem] w-full disabled:bg-cat-overlay disabled:text-cat-muted disabled:cursor-default hover:enabled:bg-[#b4d0ff]"
             ?disabled=${!this.commitMessage.trim() || stagedCount === 0 || this.committing}
             @click=${this.doCommit}>
             ${this.committing ? 'Committing...' : `Commit (${stagedCount} Datei${stagedCount !== 1 ? 'en' : ''})`}
@@ -1036,10 +694,11 @@ export class ChangesView extends AppElement {
         </div>
       </div>
 
-      <div class="diff-panel" style="position:relative">
-        <div class="diff-header">
-          <span class="diff-header-path">${this.selectedPath || 'Kein Diff'}</span>
-          <button class="review-btn"
+      <div class="flex-1 flex flex-col overflow-hidden bg-cat-base relative">
+        <div class="flex items-center gap-2 px-4 py-2 text-[0.8rem] text-cat-subtext border-b border-cat-border bg-cat-surface shrink-0 whitespace-nowrap overflow-hidden">
+          <span class="flex-1 overflow-hidden text-ellipsis">${this.selectedPath || 'Kein Diff'}</span>
+          <button
+            class="bg-transparent border border-cat-muted rounded text-cat-subtext cursor-pointer text-[0.72rem] px-[0.55rem] py-[0.15rem] whitespace-nowrap shrink-0 hover:enabled:bg-cat-overlay hover:enabled:text-cat-text disabled:opacity-45 disabled:cursor-default"
             ?disabled=${(this.status.staged.length + this.status.unstaged.length) === 0 || this.reviewStreaming}
             @click=${this.handleReviewClick}>
             ✦ ${this.reviewBtnText}
@@ -1047,16 +706,18 @@ export class ChangesView extends AppElement {
         </div>
         ${this.renderDiff()}
         ${this.showReview ? html`
-          <div class="review-overlay">
-            <div class="review-overlay-header">
-              <span class="review-overlay-title">✦ Code-Review</span>
-              <button class="review-close-btn" @click=${() => { this.showReview = false; }}>✕</button>
+          <div class="absolute inset-0 bg-cat-base z-10 flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-[0.6rem] border-b border-cat-border bg-cat-surface shrink-0">
+              <span class="text-[0.82rem] font-semibold text-cat-text flex items-center gap-[0.4rem]">✦ Code-Review</span>
+              <button
+                class="bg-none border-none text-cat-subtle cursor-pointer text-base px-[0.3rem] py-[0.1rem] rounded leading-none hover:text-cat-text hover:bg-cat-overlay"
+                @click=${() => { this.showReview = false; }}>✕</button>
             </div>
-            <div class="review-content">
+            <div class="review-content flex-1 overflow-y-auto px-5 py-4 text-[0.83rem] leading-relaxed text-cat-text">
               ${this.reviewStreaming && !this.reviewContent
-                ? html`<div class="review-streaming">Analysiere Änderungen…</div>`
+                ? html`<div class="italic text-cat-subtle text-[0.78rem] flex items-center gap-[0.4rem]">Analysiere Änderungen…</div>`
                 : unsafeHTML(DOMPurify.sanitize(marked.parse(this.reviewContent || '') as string, REVIEW_PURIFY_CONFIG) as string)}
-              ${this.reviewStreaming ? html`<div class="review-streaming" style="margin-top:0.5rem">▌</div>` : nothing}
+              ${this.reviewStreaming ? html`<div class="italic text-cat-subtle text-[0.78rem] flex items-center gap-[0.4rem] mt-2">▌</div>` : nothing}
             </div>
           </div>
         ` : nothing}
