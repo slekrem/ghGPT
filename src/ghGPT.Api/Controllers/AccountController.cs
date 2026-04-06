@@ -1,4 +1,3 @@
-using ghGPT.Api.Models;
 using ghGPT.Core.Account;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,28 +12,7 @@ public class AccountController(IAccountService accountService) : ControllerBase
     {
         var account = await accountService.GetAccountAsync();
         if (account is null)
-            return NotFound(new { error = "Kein GitHub-Account verbunden." });
+            return NotFound(new { error = "Kein GitHub-Account verbunden. Bitte 'gh auth login' ausführen." });
         return Ok(account);
-    }
-
-    [HttpPost("token")]
-    public async Task<ActionResult<AccountInfo>> SaveToken([FromBody] SaveTokenRequest request)
-    {
-        try
-        {
-            var account = await accountService.SaveTokenAsync(request.Token);
-            return Ok(account);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    [HttpDelete]
-    public IActionResult RemoveAccount()
-    {
-        accountService.RemoveAccount();
-        return NoContent();
     }
 }

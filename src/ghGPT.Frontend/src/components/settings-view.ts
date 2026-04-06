@@ -18,9 +18,6 @@ export class SettingsView extends AppElement {
   // Account state
   @state() private account: AccountInfo | null = null;
   @state() private accountLoading = true;
-  @state() private patInput = '';
-  @state() private accountError = '';
-  @state() private accountSaving = false;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -83,34 +80,6 @@ export class SettingsView extends AppElement {
     }
   }
 
-  private async saveToken() {
-    if (!this.patInput.trim()) return;
-    this.accountSaving = true;
-    this.accountError = '';
-    try {
-      this.account = await repositoryService.saveToken(this.patInput.trim());
-      this.patInput = '';
-      this.dispatchEvent(new CustomEvent('account-changed', { bubbles: true, composed: true, detail: this.account }));
-    } catch (err) {
-      this.accountError = (err as Error).message;
-    } finally {
-      this.accountSaving = false;
-    }
-  }
-
-  private async removeAccount() {
-    this.accountSaving = true;
-    try {
-      await repositoryService.removeAccount();
-      this.account = null;
-      this.patInput = '';
-      this.accountError = '';
-      this.dispatchEvent(new CustomEvent('account-changed', { bubbles: true, composed: true, detail: null }));
-    } finally {
-      this.accountSaving = false;
-    }
-  }
-
   render() {
     return html`
       <h2 class="text-base font-bold text-[#eef1ff] mb-4">Einstellungen</h2>
@@ -129,29 +98,13 @@ export class SettingsView extends AppElement {
                     <div class="text-xs text-cat-muted">@${this.account.login}</div>
                   </div>
                 </div>
-                <div class="flex gap-2 mt-2">
-                  <button class="px-4 py-1.5 rounded-md border border-cat-red bg-transparent text-cat-red text-sm cursor-pointer hover:bg-[rgba(243,139,168,0.1)] disabled:opacity-45 disabled:cursor-not-allowed" ?disabled=${this.accountSaving} @click=${() => this.removeAccount()}>
-                    Account trennen
-                  </button>
-                </div>
               `
               : html`
-                <div class="flex flex-col gap-1.5">
-                  <label class="text-xs text-cat-muted">Personal Access Token (PAT)</label>
-                  <input
-                    class="px-3 py-2 rounded-md border border-cat-border bg-cat-base text-cat-text text-sm focus:outline-none focus:border-cat-blue"
-                    type="password"
-                    placeholder="ghp_…"
-                    .value=${this.patInput}
-                    @input=${(e: Event) => { this.patInput = (e.target as HTMLInputElement).value; this.accountError = ''; }}
-                    @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.saveToken()}
-                  />
+                <div class="flex items-center gap-2 text-sm text-cat-subtle">
+                  <span>Nicht angemeldet</span>
                 </div>
-                ${this.accountError ? html`<div class="text-xs text-cat-red">${this.accountError}</div>` : ''}
-                <div class="flex gap-2 mt-2">
-                  <button class="px-4 py-1.5 rounded-md border border-cat-blue bg-transparent text-cat-blue text-sm cursor-pointer hover:bg-[rgba(137,180,250,0.1)] disabled:opacity-45 disabled:cursor-not-allowed" ?disabled=${this.accountSaving || !this.patInput.trim()} @click=${() => this.saveToken()}>
-                    ${this.accountSaving ? 'Verbinde…' : 'Verbinden'}
-                  </button>
+                <div class="text-xs text-cat-muted">
+                  Bitte <code class="bg-cat-overlay px-1 py-0.5 rounded text-cat-text">gh auth login</code> im Terminal ausführen.
                 </div>
               `}
         </div>
