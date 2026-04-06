@@ -1,8 +1,9 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 
 @customElement('git-operation-overlay')
-export class GitOperationOverlay extends LitElement {
+export class GitOperationOverlay extends AppElement {
   static styles = css`
     .git-overlay {
       position: fixed;

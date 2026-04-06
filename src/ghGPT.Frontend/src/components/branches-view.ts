@@ -1,9 +1,10 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import { repositoryService, type BranchInfo } from '../services/repository-service';
 
 @customElement('branches-view')
-export class BranchesView extends LitElement {
+export class BranchesView extends AppElement {
   static styles = css`
     :host {
       display: flex;

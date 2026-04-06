@@ -1,4 +1,5 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { html, css, nothing } from 'lit';
+import { AppElement } from '../app-element';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import {
   repositoryService,
@@ -8,7 +9,7 @@ import {
 } from '../services/repository-service';
 
 @customElement('history-view')
-export class HistoryView extends LitElement {
+export class HistoryView extends AppElement {
   static styles = css`
     :host {
       display: flex;

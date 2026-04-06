@@ -1,12 +1,13 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import { repositoryService, type RepositoryInfo } from '../services/repository-service';
 import { onHubEvent, offHubEvent } from '../services/hub-client';
 
 type Tab = 'create' | 'import' | 'clone';
 
 @customElement('repo-dialog')
-export class RepoDialog extends LitElement {
+export class RepoDialog extends AppElement {
   static styles = css`
     .backdrop {
       position: fixed;

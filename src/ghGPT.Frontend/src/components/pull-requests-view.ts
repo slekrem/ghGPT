@@ -1,5 +1,6 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import {
   repositoryService,
   type PullRequestListItem,
@@ -7,7 +8,7 @@ import {
 } from '../services/repository-service';
 
 @customElement('pull-requests-view')
-export class PullRequestsView extends LitElement {
+export class PullRequestsView extends AppElement {
   static styles = css`
     :host {
       display: flex;

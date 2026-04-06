@@ -1,4 +1,5 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { html, css, nothing } from 'lit';
+import { AppElement } from '../app-element';
 import { customElement, property, state } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { marked } from 'marked';
@@ -15,7 +16,7 @@ interface Message {
 }
 
 @customElement('chat-panel')
-export class ChatPanel extends LitElement {
+export class ChatPanel extends AppElement {
   static styles = css`
     :host {
       display: flex;

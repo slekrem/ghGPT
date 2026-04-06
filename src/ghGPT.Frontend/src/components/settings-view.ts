@@ -1,10 +1,11 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import { aiService, type OllamaStatus, type OllamaModelInfo } from '../services/ai-service';
 import { repositoryService, type AccountInfo } from '../services/repository-service';
 
 @customElement('settings-view')
-export class SettingsView extends LitElement {
+export class SettingsView extends AppElement {
   static styles = css`
     :host {
       display: block;

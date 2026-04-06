@@ -1,9 +1,10 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import { repositoryService, type RepositoryInfo, type BranchInfo } from '../services/repository-service';
 
 @customElement('app-toolbar')
-export class AppToolbar extends LitElement {
+export class AppToolbar extends AppElement {
   static styles = css`
     :host {
       display: flex;

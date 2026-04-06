@@ -1,5 +1,6 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import type { RepositoryInfo, AccountInfo } from '../services/repository-service';
 import { AppStateController } from '../services/app-state';
 import './sidebar';
@@ -16,7 +17,7 @@ import './chat-panel';
 type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'settings';
 
 @customElement('app-shell')
-export class AppShell extends LitElement {
+export class AppShell extends AppElement {
   static styles = css`
     :host {
       display: flex;

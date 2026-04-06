@@ -1,4 +1,5 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { html, css, nothing } from 'lit';
+import { AppElement } from '../app-element';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
@@ -29,7 +30,7 @@ interface ParsedDiffLine {
 }
 
 @customElement('changes-view')
-export class ChangesView extends LitElement {
+export class ChangesView extends AppElement {
   static styles = css`
     :host {
       display: flex;

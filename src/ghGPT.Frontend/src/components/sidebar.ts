@@ -1,12 +1,13 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import type { RepositoryInfo, AccountInfo } from '../services/repository-service';
 import type { HubConnectionStatus } from '../services/hub-client';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'settings';
 
 @customElement('app-sidebar')
-export class AppSidebar extends LitElement {
+export class AppSidebar extends AppElement {
   static styles = css`
     :host {
       display: flex;
