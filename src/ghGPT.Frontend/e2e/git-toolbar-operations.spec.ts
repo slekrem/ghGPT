@@ -74,7 +74,7 @@ test('fetch updates behind indicator in branch dropdown and pull button', async 
   await expect.poll(() => {
     const status = execSync('git status --short --branch', { cwd: current.localDir, encoding: 'utf-8' });
     return status;
-  }).toContain('behind 1');
+  }).toMatch(/behind 1|hinterher 1/i);
 
   await expect(page.locator('.git-overlay')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Pull/i })).toContainText('↓1');
@@ -132,5 +132,5 @@ test('pull shows merge conflict error in overlay', async ({ page }) => {
 
   await expect(page.locator('.git-overlay')).toBeVisible();
   await expect(page.locator('.git-overlay-status.error')).toContainText(/Merge-Konflikt/i);
-  await expect(page.locator('.git-overlay-log')).toContainText(/CONFLICT|Automatic merge failed/i);
+  await expect(page.locator('.git-overlay-log')).toContainText(/CONFLICT|KONFLIKT|Automatic merge failed|Automatischer Merge fehlgeschlagen/i);
 });

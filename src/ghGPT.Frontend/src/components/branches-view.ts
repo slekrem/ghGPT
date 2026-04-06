@@ -86,23 +86,23 @@ export class BranchesView extends AppElement {
 
   private renderBranchRow(b: BranchInfo) {
     return html`
-      <div class="group flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors
+      <div class="branch-row ${b.isHead ? 'head' : ''} group flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors
         ${b.isHead ? 'border-[#89b4fa33] bg-[#89b4fa11]' : 'border-transparent hover:bg-cat-overlay'}"
         @dblclick=${() => !b.isHead && this.checkout(b.name)}>
-        <span class="text-sm shrink-0">${b.isRemote ? '☁' : '🌿'}</span>
+        <span class="branch-icon text-sm shrink-0">${b.isRemote ? '☁' : '🌿'}</span>
         <span class="text-sm flex-1 overflow-hidden text-ellipsis whitespace-nowrap
           ${b.isHead ? 'text-cat-blue font-medium' : 'text-cat-text'}">${b.name}</span>
-        ${b.isHead ? html`<span class="text-[0.65rem] bg-[#89b4fa33] text-cat-blue rounded px-1 shrink-0">HEAD</span>` : nothing}
+        ${b.isHead ? html`<span class="head-badge text-[0.65rem] bg-[#89b4fa33] text-cat-blue rounded px-1 shrink-0">HEAD</span>` : nothing}
         ${this.renderAheadBehind(b)}
         <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           ${!b.isHead ? html`
-            <button class="px-2 py-0.5 rounded border border-cat-muted bg-transparent text-cat-text text-xs cursor-pointer hover:bg-cat-muted"
+            <button class="action-btn px-2 py-0.5 rounded border border-cat-muted bg-transparent text-cat-text text-xs cursor-pointer hover:bg-cat-muted"
               @click=${(e: Event) => { e.stopPropagation(); this.checkout(b.name); }}>
               Checkout
             </button>
           ` : nothing}
           ${!b.isHead ? html`
-            <button class="px-2 py-0.5 rounded border border-cat-muted bg-transparent text-cat-red text-xs cursor-pointer hover:bg-cat-muted"
+            <button class="action-btn danger px-2 py-0.5 rounded border border-cat-muted bg-transparent text-cat-red text-xs cursor-pointer hover:bg-cat-muted"
               @click=${(e: Event) => { e.stopPropagation(); this.deleteBranch(b.name); }}>
               ✕
             </button>
@@ -119,8 +119,8 @@ export class BranchesView extends AppElement {
 
     return html`
       <div class="flex items-center gap-2 px-4 py-3 border-b border-cat-border shrink-0">
-        <span class="text-sm font-semibold text-cat-text flex-1">Branches</span>
-        <button class="px-3 py-1 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-xs cursor-pointer hover:bg-cat-sapphire hover:border-cat-sapphire"
+        <span class="toolbar-title text-sm font-semibold text-cat-text flex-1">Branches</span>
+        <button class="btn-primary px-3 py-1 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-xs cursor-pointer hover:bg-cat-sapphire hover:border-cat-sapphire"
           @click=${() => { this.showNewBranchDialog = true; this.newBranchStartPoint = localBranches.find(b => b.isHead)?.name ?? ''; }}>
           + Neuer Branch
         </button>
@@ -129,7 +129,7 @@ export class BranchesView extends AppElement {
       </div>
 
       <div class="flex-1 overflow-y-auto p-4">
-        <div class="text-[0.7rem] uppercase tracking-widest text-cat-subtle mb-2">Lokale Branches</div>
+        <div class="section-title text-[0.7rem] uppercase tracking-widest text-cat-subtle mb-2">Lokale Branches</div>
         <div class="flex flex-col gap-0.5">
           ${localBranches.length > 0
             ? localBranches.map(b => this.renderBranchRow(b))
@@ -137,7 +137,7 @@ export class BranchesView extends AppElement {
         </div>
 
         ${remoteBranches.length > 0 ? html`
-          <div class="text-[0.7rem] uppercase tracking-widest text-cat-subtle mb-2 mt-4">Remote Branches</div>
+          <div class="section-title text-[0.7rem] uppercase tracking-widest text-cat-subtle mb-2 mt-4">Remote Branches</div>
           <div class="flex flex-col gap-0.5">
             ${remoteBranches.map(b => this.renderBranchRow(b))}
           </div>
@@ -147,8 +147,8 @@ export class BranchesView extends AppElement {
       ${this.showNewBranchDialog ? html`
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
           @click=${(e: Event) => { if (e.target === e.currentTarget) this.showNewBranchDialog = false; }}>
-          <div class="bg-cat-surface border border-cat-border rounded-xl p-6 w-[420px] flex flex-col gap-4">
-            <div class="text-base font-semibold text-cat-text">Neuen Branch erstellen</div>
+          <div class="dialog bg-cat-surface border border-cat-border rounded-xl p-6 w-[420px] flex flex-col gap-4">
+            <div class="dialog-title text-base font-semibold text-cat-text">Neuen Branch erstellen</div>
 
             <div class="flex flex-col gap-1.5">
               <label class="text-xs text-cat-subtext">Branch-Name</label>
@@ -174,12 +174,12 @@ export class BranchesView extends AppElement {
               </select>
             </div>
 
-            ${this.dialogError ? html`<span class="text-cat-red text-xs">${this.dialogError}</span>` : nothing}
+            ${this.dialogError ? html`<span class="error-msg text-cat-red text-xs">${this.dialogError}</span>` : nothing}
 
             <div class="flex gap-2 justify-end">
-              <button class="px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
+              <button class="btn px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
                 @click=${() => { this.showNewBranchDialog = false; this.dialogError = ''; }}>Abbrechen</button>
-              <button class="px-3 py-1.5 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-sm cursor-pointer hover:bg-cat-sapphire disabled:opacity-40 disabled:cursor-not-allowed"
+              <button class="btn-primary px-3 py-1.5 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-sm cursor-pointer hover:bg-cat-sapphire disabled:opacity-40 disabled:cursor-not-allowed"
                 ?disabled=${this.loading} @click=${this.onCreateBranch}>
                 ${this.loading ? 'Erstelle…' : 'Erstellen'}
               </button>

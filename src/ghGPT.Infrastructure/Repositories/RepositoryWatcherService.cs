@@ -11,7 +11,7 @@ public class RepositoryWatcherService(
     IRepositoryEventNotifier notifier,
     ILogger<RepositoryWatcherService> logger) : BackgroundService, IRepositoryWatcherService
 {
-    private readonly Dictionary<string, List<FileSystemWatcher>> _watchers = new();
+    private readonly ConcurrentDictionary<string, List<FileSystemWatcher>> _watchers = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _debounce = new();
     private readonly object _debounceLock = new();
 
@@ -69,7 +69,7 @@ public class RepositoryWatcherService(
 
     public void StopWatcher(string id)
     {
-        if (!_watchers.Remove(id, out var watchers))
+        if (!_watchers.TryRemove(id, out var watchers))
             return;
 
         foreach (var watcher in watchers)

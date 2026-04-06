@@ -304,7 +304,7 @@ export class HistoryView extends AppElement {
                     const absoluteIndex = start + index;
                     return html`
                       <div
-                        class="absolute left-0 right-0 h-[88px] px-4 py-3 grid gap-3 border-b border-[rgba(49,50,68,0.8)] cursor-pointer box-border
+                        class="list-entry absolute left-0 right-0 h-[88px] px-4 py-3 grid gap-3 border-b border-[rgba(49,50,68,0.8)] cursor-pointer box-border
                           ${this.selectedCommitSha === entry.sha ? 'bg-cat-overlay' : 'hover:bg-[#25273a]'}"
                         style="top:${absoluteIndex * HistoryView.ROW_HEIGHT}px; grid-template-columns: 34px 1fr"
                         @click=${() => this.selectCommit(entry.sha)}>
@@ -323,7 +323,7 @@ export class HistoryView extends AppElement {
               </div>
             `}
 
-        <div class="px-3.5 py-2 border-t border-cat-border text-[0.72rem] text-[#8f96b3] shrink-0">
+        <div class="footer-hint px-3.5 py-2 border-t border-cat-border text-[0.72rem] text-[#8f96b3] shrink-0">
           ${this.loadingList ? 'Lade weitere Commits…' : this.hasMore ? 'Weitere Commits werden beim Scrollen geladen.' : `${this.entries.length} Commits geladen`}
         </div>
       </section>
@@ -337,7 +337,7 @@ export class HistoryView extends AppElement {
               ? html`<div class="h-full flex items-center justify-center p-4 text-cat-subtle text-center">Commit auswählen</div>`
               : html`
                   <div class="px-4 py-3.5 border-b border-cat-border bg-cat-surface flex flex-col gap-1.5 shrink-0">
-                    <div class="text-base font-bold text-[#eef1ff] whitespace-pre-wrap">${this.selectedCommit.message}</div>
+                    <div class="detail-title text-base font-bold text-[#eef1ff] whitespace-pre-wrap">${this.selectedCommit.message}</div>
                     <div class="text-[0.78rem] text-cat-subtext">
                       ${this.selectedCommit.authorName} &lt;${this.selectedCommit.authorEmail}&gt; ·
                       ${this.formatDate(this.selectedCommit.authorDate)} · ${this.selectedCommit.shortSha}
@@ -348,7 +348,7 @@ export class HistoryView extends AppElement {
                     <div class="w-[280px] min-w-[280px] border-r border-cat-border overflow-auto bg-[#1a1b26]">
                       ${this.selectedCommit.files.map((file, index) => html`
                         <div
-                          class="px-3.5 py-3 border-b border-[rgba(49,50,68,0.75)] cursor-pointer flex flex-col gap-0.5
+                          class="file-item px-3.5 py-3 border-b border-[rgba(49,50,68,0.75)] cursor-pointer flex flex-col gap-0.5
                             ${this.selectedFileIndex === index ? 'bg-cat-overlay' : 'hover:bg-[#25273a]'}"
                           @click=${() => { this.selectedFileIndex = index; }}>
                           <div class="text-[0.8rem] text-[#eef1ff] break-words">${file.path}</div>
@@ -357,7 +357,7 @@ export class HistoryView extends AppElement {
                       `)}
                     </div>
 
-                    <div class="flex-1 overflow-auto min-w-0 font-mono text-[0.78rem]">
+                    <div class="diff-panel flex-1 overflow-auto min-w-0 font-mono text-[0.78rem]">
                       ${this.selectedFile ? this.renderPatch(this.selectedFile.patch) : html`<div class="h-full flex items-center justify-center p-4 text-cat-subtle">Keine Datei ausgewählt</div>`}
                     </div>
                   </div>

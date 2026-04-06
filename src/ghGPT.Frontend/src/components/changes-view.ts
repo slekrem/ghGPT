@@ -542,7 +542,7 @@ export class ChangesView extends AppElement {
 
   private renderDiff() {
     if (!this.selectedPath) {
-      return html`<div class="flex items-center justify-center h-full text-cat-muted text-sm">Datei auswählen</div>`;
+      return html`<div class="diff-placeholder flex items-center justify-center h-full text-cat-muted text-sm">Datei auswählen</div>`;
     }
     if (this.diffError) {
       return html`<div class="flex items-center justify-center h-full text-sm text-cat-red">${this.diffError}</div>`;
@@ -552,7 +552,7 @@ export class ChangesView extends AppElement {
     }
 
     return html`
-      <div class="flex-1 overflow-auto p-0 font-mono text-[0.78rem]"
+      <div class="diff-content flex-1 overflow-auto p-0 font-mono text-[0.78rem]"
            style="background: linear-gradient(90deg, #202539 0, #202539 28px, transparent 28px)">
         ${this.combinedHunks.flatMap(hunk => hunk.lines.map(line => {
           const selectable = line.type !== 'context';
@@ -560,9 +560,9 @@ export class ChangesView extends AppElement {
 
           return html`
             <div class="diff-line ${line.type} flex leading-[1.5] whitespace-pre">
-              <span class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.oldNum}</span>
-              <span class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.newNum}</span>
-              <span class="w-5 shrink-0 flex items-center justify-center">
+              <span class="diff-line-num w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.oldNum}</span>
+              <span class="diff-line-num w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.newNum}</span>
+              <span class="diff-line-check w-5 shrink-0 flex items-center justify-center">
                 ${selectable ? html`
                   <input
                     type="checkbox"
@@ -573,7 +573,7 @@ export class ChangesView extends AppElement {
                       this.toggleLine(line.globalIndex, e.shiftKey);
                     }} />` : ''}
               </span>
-              <span class="flex-1 min-w-0 overflow-hidden">${line.content}</span>
+              <span class="diff-line-content flex-1 min-w-0 overflow-hidden">${line.content}</span>
             </div>`;
         }))}
       </div>`;
@@ -621,7 +621,7 @@ export class ChangesView extends AppElement {
     const statusColor = statusColorMap[entry.status] ?? 'text-cat-subtext';
 
     return html`
-      <div class="flex items-center gap-2 px-3 py-[0.3rem] cursor-pointer text-[0.8rem] text-cat-text select-none hover:bg-cat-overlay ${isSelected ? 'bg-cat-muted' : ''}"
+      <div class="file-entry flex items-center gap-2 px-3 py-[0.3rem] cursor-pointer text-[0.8rem] text-cat-text select-none hover:bg-cat-overlay ${isSelected ? 'bg-cat-muted' : ''}"
         @click=${() => this.selectFile(filePath)}>
         <input type="checkbox"
           class="cursor-pointer shrink-0 accent-cat-blue w-[14px] h-[14px]"
@@ -649,7 +649,7 @@ export class ChangesView extends AppElement {
 
     return html`
       <div class="w-[260px] min-w-[260px] flex flex-col border-r border-cat-border overflow-hidden">
-        <div class="flex items-center gap-2 px-3 py-[0.4rem] text-[0.7rem] uppercase tracking-[0.08em] text-cat-subtle bg-cat-surface border-b border-cat-border shrink-0">
+        <div class="list-header flex items-center gap-2 px-3 py-[0.4rem] text-[0.7rem] uppercase tracking-[0.08em] text-cat-subtle bg-cat-surface border-b border-cat-border shrink-0">
           <input type="checkbox"
             class="cursor-pointer"
             .checked=${this.allChecked}
@@ -673,7 +673,7 @@ export class ChangesView extends AppElement {
           </button>
           ${this.aiStreamPreview ? html`<div class="text-[0.72rem] text-cat-blue italic min-h-[1em]">${this.aiStreamPreview}</div>` : ''}
           <input
-            class="bg-cat-base border border-cat-border rounded text-cat-text text-[0.8rem] px-2 py-[0.35rem] w-full box-border font-[inherit] focus:outline-none focus:border-cat-blue placeholder:text-cat-muted"
+            class="commit-input bg-cat-base border border-cat-border rounded text-cat-text text-[0.8rem] px-2 py-[0.35rem] w-full box-border font-[inherit] focus:outline-none focus:border-cat-blue placeholder:text-cat-muted"
             type="text"
             placeholder="Commit-Titel (Pflichtfeld)"
             .value=${this.commitMessage}
@@ -686,7 +686,7 @@ export class ChangesView extends AppElement {
             @input=${(e: Event) => { this.commitDescription = (e.target as HTMLTextAreaElement).value; }}></textarea>
           ${this.commitError ? html`<div class="text-[0.72rem] text-cat-red">${this.commitError}</div>` : ''}
           <button
-            class="bg-cat-blue border-none rounded text-cat-surface cursor-pointer text-[0.8rem] font-semibold px-3 py-[0.35rem] w-full disabled:bg-cat-overlay disabled:text-cat-muted disabled:cursor-default hover:enabled:bg-[#b4d0ff]"
+            class="commit-btn bg-cat-blue border-none rounded text-cat-surface cursor-pointer text-[0.8rem] font-semibold px-3 py-[0.35rem] w-full disabled:bg-cat-overlay disabled:text-cat-muted disabled:cursor-default hover:enabled:bg-[#b4d0ff]"
             ?disabled=${!this.commitMessage.trim() || stagedCount === 0 || this.committing}
             @click=${this.doCommit}>
             ${this.committing ? 'Committing...' : `Commit (${stagedCount} Datei${stagedCount !== 1 ? 'en' : ''})`}
@@ -694,7 +694,7 @@ export class ChangesView extends AppElement {
         </div>
       </div>
 
-      <div class="flex-1 flex flex-col overflow-hidden bg-cat-base relative">
+      <div class="diff-panel flex-1 flex flex-col overflow-hidden bg-cat-base relative">
         <div class="flex items-center gap-2 px-4 py-2 text-[0.8rem] text-cat-subtext border-b border-cat-border bg-cat-surface shrink-0 whitespace-nowrap overflow-hidden">
           <span class="flex-1 overflow-hidden text-ellipsis">${this.selectedPath || 'Kein Diff'}</span>
           <button
