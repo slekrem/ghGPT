@@ -76,10 +76,10 @@ test('fetch updates behind indicator in branch dropdown and pull button', async 
     return status;
   }).toMatch(/behind 1|hinterher 1/i);
 
-  await expect(page.locator('.git-overlay')).toHaveCount(0);
+  await expect(page.locator('[data-testid="git-overlay"]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Pull/i })).toContainText('↓1');
-  await page.locator('.toolbar-branch').click();
-  await expect(page.locator('.branch-dropdown-item.active .branch-dropdown-behind')).toContainText('↓1');
+  await page.locator('[data-testid="toolbar-branch"]').click();
+  await expect(page.locator('[data-testid="branch-dropdown-item"][data-active] [data-testid="branch-dropdown-behind"]')).toContainText('↓1');
 });
 
 test('pull updates the working tree with remote changes', async ({ page }) => {
@@ -94,8 +94,8 @@ test('pull updates the working tree with remote changes', async ({ page }) => {
   await page.getByRole('button', { name: /Pull/i }).click();
 
   await expect.poll(() => readLocalFile(current, 'README.md')).toContain('Pulled from remote');
-  await page.locator('.toolbar-branch').click();
-  await expect(page.locator('.branch-dropdown-item.active .branch-dropdown-behind')).toHaveCount(0);
+  await page.locator('[data-testid="toolbar-branch"]').click();
+  await expect(page.locator('[data-testid="branch-dropdown-item"][data-active] [data-testid="branch-dropdown-behind"]')).toHaveCount(0);
 });
 
 test('push uploads a local commit to the remote', async ({ page }) => {
@@ -130,7 +130,7 @@ test('pull shows merge conflict error in overlay', async ({ page }) => {
   await gotoRepo(page, current);
   await page.getByRole('button', { name: /Pull/i }).click();
 
-  await expect(page.locator('.git-overlay')).toBeVisible();
-  await expect(page.locator('.git-overlay-status.error')).toContainText(/Merge-Konflikt/i);
-  await expect(page.locator('.git-overlay-log')).toContainText(/CONFLICT|KONFLIKT|Automatic merge failed|Automatischer Merge fehlgeschlagen/i);
+  await expect(page.locator('[data-testid="git-overlay"]')).toBeVisible();
+  await expect(page.locator('[data-testid="git-overlay-status"][data-error]')).toContainText(/Merge-Konflikt/i);
+  await expect(page.locator('[data-testid="git-overlay-log"]')).toContainText(/CONFLICT|KONFLIKT|Automatic merge failed|Automatischer Merge fehlgeschlagen/i);
 });

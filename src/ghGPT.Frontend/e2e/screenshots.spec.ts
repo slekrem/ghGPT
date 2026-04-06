@@ -57,7 +57,7 @@ test('02 - Sidebar mit Repositories', async ({ page }) => {
 test('03 - Repo-Dialog: Clone Tab', async ({ page }) => {
   await page.goto('/');
   await page.locator('app-shell').waitFor();
-  await page.locator('.add-btn').first().click();
+  await page.locator('[data-testid="add-repo-btn"]').first().click();
   await page.locator('repo-dialog').waitFor({ state: 'attached' });
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '03-dialog-clone.png'), fullPage: true });
 });
@@ -65,7 +65,7 @@ test('03 - Repo-Dialog: Clone Tab', async ({ page }) => {
 test('04 - Repo-Dialog: Import Tab', async ({ page }) => {
   await page.goto('/');
   await page.locator('app-shell').waitFor();
-  await page.locator('.add-btn').first().click();
+  await page.locator('[data-testid="add-repo-btn"]').first().click();
   await page.locator('repo-dialog').waitFor({ state: 'attached' });
   await page.locator('repo-dialog').locator('button', { hasText: 'Importieren' }).first().click();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '04-dialog-import.png'), fullPage: true });
@@ -74,7 +74,7 @@ test('04 - Repo-Dialog: Import Tab', async ({ page }) => {
 test('05 - Repo-Dialog: Erstellen Tab', async ({ page }) => {
   await page.goto('/');
   await page.locator('app-shell').waitFor();
-  await page.locator('.add-btn').first().click();
+  await page.locator('[data-testid="add-repo-btn"]').first().click();
   await page.locator('repo-dialog').waitFor({ state: 'attached' });
   await page.locator('repo-dialog').locator('button', { hasText: 'Erstellen' }).first().click();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '05-dialog-create.png'), fullPage: true });
@@ -86,7 +86,7 @@ test('06 - Changes View: Unstaged Änderungen', async ({ page }) => {
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '06-changes-unstaged.png'), fullPage: true });
 });
@@ -97,10 +97,10 @@ test('07 - Changes View: Diff einer Datei', async ({ page }) => {
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
-  await page.locator('changes-view').locator('.file-entry').filter({ hasText: 'README.md' }).first().click();
-  await page.locator('changes-view').locator('.diff-content').waitFor({ timeout: 5000 });
+  await page.locator('changes-view').locator('[data-testid="file-entry"]').filter({ hasText: 'README.md' }).first().click();
+  await page.locator('changes-view').locator('[data-testid="diff-content"]').waitFor({ timeout: 5000 });
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '07-changes-diff.png'), fullPage: true });
 });
 
@@ -110,11 +110,11 @@ test('08 - Changes View: Datei gecheckt', async ({ page }) => {
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
-  await page.locator('changes-view').locator('.file-entry').filter({ hasText: 'README.md' }).first()
+  await page.locator('changes-view').locator('[data-testid="file-entry"]').filter({ hasText: 'README.md' }).first()
     .locator('input[type="checkbox"]').click();
-  await expect(page.locator('changes-view').locator('.commit-btn')).toContainText('Commit (1', { timeout: 5000 });
+  await expect(page.locator('changes-view').locator('[data-testid="commit-btn"]')).toContainText('Commit (1', { timeout: 5000 });
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '08-changes-staged.png'), fullPage: true });
 });
 
@@ -124,13 +124,13 @@ test('09 - Changes View: Commit-Formular mit gemischten Änderungen', async ({ p
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
 
-  await page.locator('changes-view').locator('.list-header input[type="checkbox"]').click();
-  await expect(page.locator('changes-view').locator('.commit-btn')).toContainText(/Commit \([1-9]/, { timeout: 5000 });
+  await page.locator('changes-view').locator('[data-testid="file-list-header"] input[type="checkbox"]').click();
+  await expect(page.locator('changes-view').locator('[data-testid="commit-btn"]')).toContainText(/Commit \([1-9]/, { timeout: 5000 });
 
-  await page.locator('changes-view').locator('.commit-input[type="text"]').fill('feat: neue Funktion');
+  await page.locator('changes-view').locator('[data-testid="commit-input"][type="text"]').fill('feat: neue Funktion');
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '09-commit-form.png'), fullPage: true });
 });
 
@@ -139,7 +139,7 @@ test('10 - Branches View: Branch-Übersicht', async ({ page }) => {
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Branches' }).first().click();
   await page.locator('branches-view').waitFor();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '10-branches-overview.png'), fullPage: true });
 });
@@ -149,11 +149,11 @@ test('11 - Branches View: Neuer Branch Dialog', async ({ page }) => {
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Branches' }).first().click();
   await page.locator('branches-view').waitFor();
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  await page.locator('branches-view .dialog').waitFor();
-  await page.locator('branches-view .dialog input[type="text"]').fill('feature/mein-feature');
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  await page.locator('branches-view [data-testid="new-branch-dialog"]').waitFor();
+  await page.locator('branches-view [data-testid="new-branch-dialog"] input[type="text"]').fill('feature/mein-feature');
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '11-branches-new-dialog.png'), fullPage: true });
 });
 
@@ -162,9 +162,9 @@ test('12 - Branches View: Hover auf Branch-Zeile', async ({ page }) => {
   await page.evaluate((id) => localStorage.setItem('ghgpt:activeRepoId', id), repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Branches' }).first().click();
   await page.locator('branches-view').waitFor();
-  await page.locator('branches-view .branch-row:not(.head)').first().hover();
+  await page.locator('branches-view [data-testid="branch-row"]:not([data-head])').first().hover();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '12-branches-row-hover.png'), fullPage: true });
 });
 
@@ -215,9 +215,9 @@ test('13 - Branches View: Übersicht mit Remote-Branches', async ({ page }) => {
   await setActiveRepo(remoteRepoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Branches' }).first().click();
   await page.locator('branches-view').waitFor();
-  await expect(page.locator('branches-view .section-title').filter({ hasText: /Remote/i })).toBeVisible();
+  await expect(page.locator('branches-view [data-testid="section-title"]').filter({ hasText: /Remote/i })).toBeVisible();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '13-branches-remote-overview.png'), fullPage: true });
 });
 
@@ -227,12 +227,12 @@ test('14 - Branches View: Neuer Branch Dialog mit Remote als Basis', async ({ pa
   await setActiveRepo(remoteRepoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Branches' }).first().click();
   await page.locator('branches-view').waitFor();
-  await page.locator('branches-view .btn-primary').filter({ hasText: 'Neuer Branch' }).click();
-  await page.locator('branches-view .dialog').waitFor();
-  await page.locator('branches-view .dialog input[type="text"]').fill('feature/from-remote');
-  await page.locator('branches-view .dialog select').selectOption({ label: 'origin/feature/remote-branch' });
+  await page.locator('branches-view [data-testid="new-branch-btn"]').click();
+  await page.locator('branches-view [data-testid="new-branch-dialog"]').waitFor();
+  await page.locator('branches-view [data-testid="new-branch-dialog"] input[type="text"]').fill('feature/from-remote');
+  await page.locator('branches-view [data-testid="new-branch-dialog"] select').selectOption({ label: 'origin/feature/remote-branch' });
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '14-branches-remote-new-dialog.png'), fullPage: true });
 });
 
@@ -242,9 +242,9 @@ test('15 - Branches View: Hover auf Remote-Branch-Zeile', async ({ page }) => {
   await setActiveRepo(remoteRepoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Branches' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Branches' }).first().click();
   await page.locator('branches-view').waitFor();
-  await page.locator('branches-view .branch-row').filter({ hasText: 'origin/feature/remote-branch' }).hover();
+  await page.locator('branches-view [data-testid="branch-row"]').filter({ hasText: 'origin/feature/remote-branch' }).hover();
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '15-branches-remote-row-hover.png'), fullPage: true });
 });
 
@@ -260,13 +260,13 @@ test('16 - Changes View: Partial Staging - Zeilen selektiert', async ({ page }) 
   await setActiveRepo(repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
 
-  await page.locator('changes-view .file-entry').filter({ hasText: 'partial-staging.txt' }).first().click();
-  await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
+  await page.locator('changes-view [data-testid="file-entry"]').filter({ hasText: 'partial-staging.txt' }).first().click();
+  await page.locator('changes-view [data-testid="diff-content"]').waitFor({ timeout: 5000 });
 
-  const lineChecks = page.locator('changes-view .diff-line.added .diff-line-check input');
+  const lineChecks = page.locator('changes-view [data-testid="diff-line"][data-type="added"] [data-testid="diff-line-check"] input');
   await expect(lineChecks).toHaveCount(3);
   await lineChecks.nth(0).click();
   await expect(lineChecks.nth(0)).toBeChecked({ timeout: 5000 });
@@ -285,13 +285,13 @@ test('17 - Changes View: Partial Staging - Nach dem Stagen', async ({ page }) =>
   await setActiveRepo(repoId);
   await page.reload();
   await page.locator('app-shell').waitFor();
-  await page.locator('.nav-item').filter({ hasText: 'Änderungen' }).first().click();
+  await page.locator('[data-testid="nav-item"]').filter({ hasText: 'Änderungen' }).first().click();
   await page.locator('changes-view').waitFor();
 
-  await page.locator('changes-view .file-entry').filter({ hasText: 'partial-staging.txt' }).first().click();
-  await page.locator('changes-view .diff-content').waitFor({ timeout: 5000 });
+  await page.locator('changes-view [data-testid="file-entry"]').filter({ hasText: 'partial-staging.txt' }).first().click();
+  await page.locator('changes-view [data-testid="diff-content"]').waitFor({ timeout: 5000 });
 
-  const lineChecks = page.locator('changes-view .diff-line.added .diff-line-check input');
+  const lineChecks = page.locator('changes-view [data-testid="diff-line"][data-type="added"] [data-testid="diff-line-check"] input');
   await expect(lineChecks).toHaveCount(3);
   await lineChecks.nth(0).click();
   await expect(lineChecks.nth(0)).toBeChecked({ timeout: 5000 });
@@ -313,7 +313,7 @@ test('18 - Toolbar: Pull-Button mit Rueckstand', async ({ page }) => {
   await page.reload();
   await page.locator('app-shell').waitFor();
   await page.getByRole('button', { name: /Fetch/i }).click();
-  await expect(page.locator('.git-overlay')).toHaveCount(0);
+  await expect(page.locator('[data-testid="git-overlay"]')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Pull/i })).toContainText('↓1');
 
   await page.screenshot({ path: path.join(SCREENSHOTS_DIR, '18-toolbar-pull-behind.png'), fullPage: true });

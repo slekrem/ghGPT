@@ -83,7 +83,7 @@ export class AppShell extends AppElement {
     const contentClass = `flex flex-col flex-1 overflow-hidden text-cat-text${isPadded ? ' p-4 overflow-auto' : ''}`;
     return html`
       <app-sidebar
-        class="sidebar"
+        data-testid="sidebar"
         .repos=${s.repos}
         .activeRepoId=${s.activeRepoId}
         .activeView=${this.activeView}
