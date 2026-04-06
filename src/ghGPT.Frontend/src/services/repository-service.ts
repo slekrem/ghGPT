@@ -217,6 +217,4 @@ export const repositoryService = {
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),
 
   getAccount: () => api.get<AccountInfo>('/account'),
-  saveToken: (token: string) => api.post<AccountInfo>('/account/token', { token }),
-  removeAccount: () => api.delete<void>('/account'),
 };

@@ -1,14 +1,12 @@
 using ghGPT.Core.Repositories;
-using ghGPT.Infrastructure.Account;
 using LibGit2Sharp;
-using LibGit2Sharp.Handlers;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
 namespace ghGPT.Infrastructure.Repositories;
 
-public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) : IRepositoryService
+public class RepositoryService(IRepositoryStore store) : IRepositoryService
 {
     private readonly List<RepositoryInfo> _repos = [.. store.Load()];
     private string? _activeRepoId;
@@ -59,10 +57,6 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             throw new InvalidOperationException($"'{localPath}' existiert bereits.");
 
         var options = new CloneOptions();
-
-        CredentialsHandler? credentialsHandler = BuildCredentialsHandler();
-        if (credentialsHandler is not null)
-            options.FetchOptions.CredentialsProvider = credentialsHandler;
 
         if (progress is not null)
         {
@@ -594,48 +588,6 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
             throw new InvalidOperationException("Patch enthält keine Änderungen.");
     }
 
-    private CredentialsHandler? BuildCredentialsHandler()
-    {
-        var token = tokenStore.Load();
-        if (token is null) return null;
-        return (_, _, _) => new UsernamePasswordCredentials
-        {
-            Username = "oauth2",
-            Password = token
-        };
-    }
-
-    internal string BuildAuthenticatedArguments(string arguments, string localPath)
-    {
-        var token = tokenStore.Load();
-        if (token is null)
-            return arguments;
-
-        string? remoteUrl;
-        try
-        {
-            using var repo = new LibGit2Sharp.Repository(localPath);
-            remoteUrl = repo.Network.Remotes["origin"]?.Url;
-        }
-        catch
-        {
-            return arguments;
-        }
-
-        if (remoteUrl is null || !remoteUrl.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
-            return arguments;
-
-        if (arguments.Split(' ').Any(a => a == "--all"))
-            return arguments;
-
-        var authenticatedUrl = remoteUrl.Replace("https://github.com/", $"https://oauth2:{token}@github.com/", StringComparison.OrdinalIgnoreCase);
-
-        var parts = arguments.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length == 1
-            ? $"{parts[0]} {authenticatedUrl}"
-            : $"{parts[0]} {authenticatedUrl} {parts[1]}";
-    }
-
     private RepositoryInfo GetRepoById(string id) =>
         _repos.FirstOrDefault(r => r.Id == id)
         ?? throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
@@ -645,7 +597,7 @@ public class RepositoryService(IRepositoryStore store, ITokenStore tokenStore) :
         var info = GetRepoById(id);
         progress?.Report($"> git {arguments}");
 
-        var psi = new ProcessStartInfo("git", BuildAuthenticatedArguments(arguments, info.LocalPath))
+        var psi = new ProcessStartInfo("git", arguments)
         {
             WorkingDirectory = info.LocalPath,
             RedirectStandardOutput = true,

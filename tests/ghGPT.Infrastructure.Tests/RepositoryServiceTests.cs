@@ -1,5 +1,4 @@
 using ghGPT.Core.Repositories;
-using ghGPT.Infrastructure.Account;
 using ghGPT.Infrastructure.Repositories;
 using NSubstitute;
 
@@ -9,7 +8,6 @@ public class RepositoryServiceTests : IDisposable
 {
     private readonly string _tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
     private readonly IRepositoryStore _store = Substitute.For<IRepositoryStore>();
-    private readonly ITokenStore _tokenStore = Substitute.For<ITokenStore>();
 
     public RepositoryServiceTests()
     {
@@ -92,7 +90,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "repo", LocalPath = path, CurrentBranch = "master" };
         _store.Load().Returns([info]);
-        return new RepositoryService(_store, _tokenStore);
+        return new RepositoryService(_store);
     }
 
     // --- Create / Import ---
@@ -101,7 +99,7 @@ public class RepositoryServiceTests : IDisposable
     public async Task CreateAsync_InitializesGitRepo()
     {
         var path = Path.Combine(_tempPath, "new-repo");
-        var service = new RepositoryService(_store, _tokenStore);
+        var service = new RepositoryService(_store);
 
         var result = await service.CreateAsync(path, "new-repo");
 
@@ -117,7 +115,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var path = Path.Combine(_tempPath, "not-a-repo");
         Directory.CreateDirectory(path);
-        var service = new RepositoryService(_store, _tokenStore);
+        var service = new RepositoryService(_store);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ImportAsync(path));
     }
@@ -128,7 +126,7 @@ public class RepositoryServiceTests : IDisposable
         var path = Path.Combine(_tempPath, "existing-repo");
         var existing = new RepositoryInfo { Id = "id-1", Name = "existing-repo", LocalPath = path, CurrentBranch = "main" };
         _store.Load().Returns([existing]);
-        var service = new RepositoryService(_store, _tokenStore);
+        var service = new RepositoryService(_store);
 
         Directory.CreateDirectory(path);
         LibGit2Sharp.Repository.Init(path);
@@ -144,7 +142,7 @@ public class RepositoryServiceTests : IDisposable
             new() { Id = "id-1", Name = "repo-a", LocalPath = "/a", CurrentBranch = "main" },
         };
         _store.Load().Returns(repos);
-        var service = new RepositoryService(_store, _tokenStore);
+        var service = new RepositoryService(_store);
 
         var result = service.GetAll();
 
@@ -157,7 +155,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void GetActive_ReturnsNullInitially()
     {
-        var service = new RepositoryService(_store, _tokenStore);
+        var service = new RepositoryService(_store);
         Assert.Null(service.GetActive());
     }
 
@@ -175,7 +173,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void SetActive_ThrowsForUnknownId()
     {
-        var service = new RepositoryService(_store, _tokenStore);
+        var service = new RepositoryService(_store);
         Assert.Throws<InvalidOperationException>(() => service.SetActive("unknown"));
     }
 
@@ -186,7 +184,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "r", LocalPath = "/x", CurrentBranch = "main" };
         _store.Load().Returns([info]);
-        var service = new RepositoryService(_store, _tokenStore);
+        var service = new RepositoryService(_store);
 
         service.Remove("id-1");
 
@@ -605,19 +603,6 @@ public class RepositoryServiceTests : IDisposable
         Assert.NotNull(remoteBranch);
         Assert.Equal("peer-change", remoteBranch.Tip.MessageShort);
         Assert.NotEmpty(progressLines);
-    }
-
-    [Fact]
-    public void BuildAuthenticatedArguments_DoesNotInjectUrl_WhenAllFlagIsPresent()
-    {
-        var path = CreateGitRepo("fetch-all-repo");
-        Run("git remote add origin https://github.com/fake/repo.git", path);
-        _tokenStore.Load().Returns("fake-token");
-        var service = ServiceWithRepo(path);
-
-        var result = service.BuildAuthenticatedArguments("fetch --all --progress", path);
-
-        Assert.Equal("fetch --all --progress", result);
     }
 
     [Fact]
