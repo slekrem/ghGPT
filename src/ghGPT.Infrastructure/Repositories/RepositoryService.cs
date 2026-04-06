@@ -567,7 +567,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             branchOnRemote = branch.FriendlyName[(remoteName.Length + 1)..];
         }
 
-        await RunGitOperationAsync(id, $"push --delete {branchOnRemote}", null);
+        await RunGitOperationAsync(id, $"push {remoteName} --delete {branchOnRemote}", null);
 
         using var repoAfter = new LibGit2Sharp.Repository(info.LocalPath);
         var trackingBranch = repoAfter.Branches[branchName];

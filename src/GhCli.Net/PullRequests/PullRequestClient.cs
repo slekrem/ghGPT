@@ -160,7 +160,7 @@ internal class PullRequestClient(IGhCliRunner runner) : IPullRequestClient
             "--repo", $"{owner}/{repo}",
             "--title", title,
             "--body", body,
-            "--head", headBranch,
+            "--head", $"{owner}:{headBranch}",
             "--base", baseBranch,
         };
 
