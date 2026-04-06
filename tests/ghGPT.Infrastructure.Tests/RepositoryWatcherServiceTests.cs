@@ -13,7 +13,7 @@ public class RepositoryWatcherServiceTests : IDisposable
     {
         var path = Path.Combine(_tempPath, name);
         Directory.CreateDirectory(path);
-        Run("git init", path);
+        Run("git init -b main", path);
         Run("git config user.email test@test.com", path);
         Run("git config user.name Test", path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Hello\n");
@@ -67,7 +67,7 @@ public class RepositoryWatcherServiceTests : IDisposable
     {
         var path = CreateGitRepo("watcher-repo");
         Run("git checkout -b feature", path);
-        Run("git checkout master || git checkout main", path);
+        Run("git checkout main", path);
 
         var repoId = "watcher-id";
         var info = new RepositoryInfo { Id = repoId, Name = "repo", LocalPath = path, CurrentBranch = "master" };
@@ -92,8 +92,8 @@ public class RepositoryWatcherServiceTests : IDisposable
         // Extern Branch wechseln – schreibt in .git/HEAD
         Run("git checkout feature", path);
 
-        // Warten auf Debounce (300ms) + Puffer
-        await Task.Delay(700);
+        // Warten auf Debounce (300ms) + Puffer für FSEvents-Latenz (macOS)
+        await Task.Delay(1500);
 
         repositoryService.Received().RefreshCurrentBranch(repoId);
         await notifier.Received().NotifyBranchChangedAsync(repoId);

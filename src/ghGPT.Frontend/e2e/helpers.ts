@@ -17,6 +17,7 @@ function configureTestRepo(dir: string) {
   execSync('git config user.email "test@ghgpt.test"', { cwd: dir });
   execSync('git config user.name "ghGPT Test"', { cwd: dir });
   execSync('git config core.autocrlf false', { cwd: dir });
+  execSync('git config pull.rebase false', { cwd: dir });
 }
 
 function createSeedRepo(prefix = 'ghgpt-seed-'): string {
@@ -48,11 +49,15 @@ export function modifyFile(repoDir: string, filename: string, content: string) {
 export function removeTempRepo(dir: string) {
   if (!fs.existsSync(dir)) return;
 
+  // chmod root dir first so we can traverse it
+  try { fs.chmodSync(dir, 0o777); } catch { /* ignore */ }
+
   for (const file of fs.readdirSync(dir, { recursive: true })) {
     const fullPath = path.join(dir, String(file));
     if (fs.existsSync(fullPath)) {
       try {
-        fs.chmodSync(fullPath, 0o666);
+        const stat = fs.lstatSync(fullPath);
+        fs.chmodSync(fullPath, stat.isDirectory() ? 0o777 : 0o666);
       } catch {
         // Ignore transient cleanup issues; rmSync retry handles the rest.
       }

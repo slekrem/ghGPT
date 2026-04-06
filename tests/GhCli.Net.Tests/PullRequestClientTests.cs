@@ -366,7 +366,7 @@ public class PullRequestClientTests
     public async Task CreateAsync_ReturnsPullRequestDetail()
     {
         // Arrange
-        var json = JsonSerializer.Serialize(new
+        var detailJson = JsonSerializer.Serialize(new
         {
             number = 99,
             title = "feat: neue Funktion",
@@ -384,10 +384,13 @@ public class PullRequestClientTests
             createdAt = "2026-04-05T10:00:00Z",
             updatedAt = "2026-04-05T10:00:00Z"
         });
+        // gh pr create returns the PR URL, not JSON
         _runner.RunAsync("pr", "create", "--repo", "slekrem/ghGPT", "--title", "feat: neue Funktion",
-                "--body", "Beschreibung", "--head", "feature-branch", "--base", "main",
-                "--json", Arg.Any<string>())
-            .Returns(json);
+                "--body", "Beschreibung", "--head", "slekrem:feature-branch", "--base", "main")
+            .Returns("https://github.com/slekrem/ghGPT/pull/99");
+        // GetDetailAsync is called afterwards with pr view
+        _runner.RunAsync("pr", "view", "99", "--repo", "slekrem/ghGPT", "--json", Arg.Any<string>())
+            .Returns(detailJson);
 
         // Act
         var result = await _sut.CreateAsync("slekrem", "ghGPT", "feat: neue Funktion", "Beschreibung", "feature-branch", "main");
@@ -403,7 +406,7 @@ public class PullRequestClientTests
     public async Task CreateAsync_WithDraftAndLabels_IncludesFlags()
     {
         // Arrange
-        var json = JsonSerializer.Serialize(new
+        var detailJson = JsonSerializer.Serialize(new
         {
             number = 100,
             title = "WIP: draft PR",
@@ -421,10 +424,14 @@ public class PullRequestClientTests
             createdAt = "2026-04-05T10:00:00Z",
             updatedAt = "2026-04-05T10:00:00Z"
         });
+        // gh pr create returns the PR URL, not JSON
         _runner.RunAsync("pr", "create", "--repo", "slekrem/ghGPT", "--title", "WIP: draft PR",
-                "--body", "", "--head", "draft-branch", "--base", "main",
-                "--json", Arg.Any<string>(), "--draft", "--label", "wip,enhancement")
-            .Returns(json);
+                "--body", "", "--head", "slekrem:draft-branch", "--base", "main",
+                "--draft", "--label", "wip,enhancement")
+            .Returns("https://github.com/slekrem/ghGPT/pull/100");
+        // GetDetailAsync is called afterwards with pr view
+        _runner.RunAsync("pr", "view", "100", "--repo", "slekrem/ghGPT", "--json", Arg.Any<string>())
+            .Returns(detailJson);
 
         // Act
         var result = await _sut.CreateAsync("slekrem", "ghGPT", "WIP: draft PR", "", "draft-branch", "main", draft: true, labels: ["wip", "enhancement"]);

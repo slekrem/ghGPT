@@ -670,7 +670,8 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
         var mergeConflict = relevantLines.FirstOrDefault(line =>
             line.Contains("CONFLICT", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Automatic merge failed", StringComparison.OrdinalIgnoreCase));
+            line.Contains("Automatic merge failed", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("Automatischer Merge fehlgeschlagen", StringComparison.OrdinalIgnoreCase));
         if (mergeConflict is not null)
             return $"Merge-Konflikt beim Aktualisieren des Branches. {mergeConflict}";
 

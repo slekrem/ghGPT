@@ -165,8 +165,9 @@ test('commit appears in history after creating it', async ({ page }) => {
 
 test('commit works when only deleted files are staged', async ({ page }) => {
   const changesView = page.locator('changes-view');
-  const { execSync: exec } = await import('child_process');
-  exec(`del /f "${repoDir}\\main.ts"`, { shell: 'cmd.exe' });
+  const { unlinkSync } = await import('fs');
+  const { join } = await import('path');
+  unlinkSync(join(repoDir, 'main.ts'));
 
   await page.reload();
   await page.locator('app-shell').waitFor();

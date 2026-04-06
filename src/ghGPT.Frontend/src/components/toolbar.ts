@@ -15,7 +15,7 @@ export class AppToolbar extends AppElement {
 
   private _onDocClick = (e: MouseEvent) => {
     const path = e.composedPath();
-    const wrapper = this.shadowRoot?.querySelector('.branch-dropdown-wrapper');
+    const wrapper = this.querySelector('.branch-dropdown-wrapper');
     if (wrapper && !path.includes(wrapper)) {
       this._closeDropdown();
     }
@@ -71,8 +71,8 @@ export class AppToolbar extends AppElement {
   private _renderAheadBehind(branch: BranchInfo) {
     if (!branch.trackingBranch) return null;
     const parts = [];
-    if (branch.aheadBy > 0) parts.push(html`<span class="text-cat-green">↑${branch.aheadBy}</span>`);
-    if (branch.behindBy > 0) parts.push(html`<span class="text-cat-red">↓${branch.behindBy}</span>`);
+    if (branch.aheadBy > 0) parts.push(html`<span class="branch-dropdown-ahead text-cat-green">↑${branch.aheadBy}</span>`);
+    if (branch.behindBy > 0) parts.push(html`<span class="branch-dropdown-behind text-cat-red">↓${branch.behindBy}</span>`);
     return parts.length > 0
       ? html`<span class="inline-flex gap-[0.35rem] shrink-0 text-[0.72rem] text-cat-subtle">${parts}</span>`
       : null;
@@ -104,19 +104,19 @@ export class AppToolbar extends AppElement {
 
     return html`
       <div class="branch-dropdown-wrapper relative">
-        <button class="${branchBtnBase}" ?disabled=${!this.activeRepo}
+        <button class="toolbar-branch ${branchBtnBase}" ?disabled=${!this.activeRepo}
           @click=${() => this.showBranchDropdown ? this._closeDropdown() : this._openDropdown()}>
-          🌿 ${this.activeRepo?.currentBranch ?? '–'} ▾
+          <span class="branch-icon">🌿</span> ${this.activeRepo?.currentBranch ?? '–'} ▾
         </button>
         ${this.showBranchDropdown ? html`
-          <div class="absolute top-[calc(100%+4px)] left-0 min-w-[220px] bg-cat-surface border border-cat-border rounded-lg shadow-2xl z-[200] overflow-hidden">
+          <div class="branch-dropdown absolute top-[calc(100%+4px)] left-0 min-w-[220px] bg-cat-surface border border-cat-border rounded-lg shadow-2xl z-[200] overflow-hidden">
             ${this.branches.filter(b => !b.isRemote).length > 0 ? html`
-              <div class="px-3 pt-1 pb-0.5 text-[0.65rem] uppercase tracking-widest text-cat-subtle">Lokale Branches</div>
+              <div class="branch-dropdown-section px-3 pt-1 pb-0.5 text-[0.65rem] uppercase tracking-widest text-cat-subtle">Lokale Branches</div>
               ${this.branches.filter(b => !b.isRemote).map(b => html`
-                <div class="flex items-center gap-2 px-3 py-[0.45rem] text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis
+                <div class="branch-dropdown-item ${b.isHead ? 'active' : ''} flex items-center gap-2 px-3 py-[0.45rem] text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis
                             ${b.isHead ? 'text-cat-blue bg-[rgba(137,180,250,0.07)]' : 'text-cat-text hover:bg-cat-overlay'}"
                   @click=${() => !b.isHead && this._checkoutBranch(b.name)}>
-                  <span class="text-xs shrink-0">${b.isHead ? '✓' : ' '}</span>
+                  <span class="check text-xs shrink-0">${b.isHead ? '✓' : ' '}</span>
                   <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">${b.name}</span>
                   ${this._renderAheadBehind(b)}
                 </div>
@@ -124,16 +124,16 @@ export class AppToolbar extends AppElement {
             ` : ''}
             ${this.branches.filter(b => b.isRemote).length > 0 ? html`
               <div class="h-px bg-cat-overlay my-1"></div>
-              <div class="px-3 pt-1 pb-0.5 text-[0.65rem] uppercase tracking-widest text-cat-subtle">Remote Branches</div>
+              <div class="branch-dropdown-section px-3 pt-1 pb-0.5 text-[0.65rem] uppercase tracking-widest text-cat-subtle">Remote Branches</div>
               ${this.branches.filter(b => b.isRemote).map(b => html`
-                <div class="flex items-center gap-2 px-3 py-[0.45rem] text-sm text-cat-text cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis hover:bg-cat-overlay"
+                <div class="branch-dropdown-item flex items-center gap-2 px-3 py-[0.45rem] text-sm text-cat-text cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis hover:bg-cat-overlay"
                   @click=${() => this._checkoutBranch(b.name)}>
                   <span class="text-xs shrink-0"> </span>
                   <span>☁ ${b.name}</span>
                 </div>
               `)}
             ` : ''}
-            <div class="flex items-center gap-1.5 px-3 py-[0.45rem] text-[0.8rem] text-cat-subtle cursor-pointer border-t border-cat-overlay hover:bg-cat-overlay hover:text-cat-text"
+            <div class="branch-dropdown-footer flex items-center gap-1.5 px-3 py-[0.45rem] text-[0.8rem] text-cat-subtle cursor-pointer border-t border-cat-overlay hover:bg-cat-overlay hover:text-cat-text"
               @click=${() => { this._closeDropdown(); this._emit('navigate', 'branches'); }}>
               ⚙ Branch verwalten…
             </div>

@@ -11,7 +11,7 @@ public class RepositoryWatcherService(
     IRepositoryEventNotifier notifier,
     ILogger<RepositoryWatcherService> logger) : BackgroundService, IRepositoryWatcherService
 {
-    private readonly Dictionary<string, List<FileSystemWatcher>> _watchers = new();
+    private readonly ConcurrentDictionary<string, List<FileSystemWatcher>> _watchers = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _debounce = new();
     private readonly object _debounceLock = new();
 
@@ -69,7 +69,7 @@ public class RepositoryWatcherService(
 
     public void StopWatcher(string id)
     {
-        if (!_watchers.Remove(id, out var watchers))
+        if (!_watchers.TryRemove(id, out var watchers))
             return;
 
         foreach (var watcher in watchers)
@@ -80,10 +80,13 @@ public class RepositoryWatcherService(
 
         lock (_debounceLock)
         {
-            if (_debounce.TryRemove(id, out var cts))
+            foreach (var suffix in new[] { ":branch", ":status" })
             {
-                cts.Cancel();
-                cts.Dispose();
+                if (_debounce.TryRemove(id + suffix, out var cts))
+                {
+                    cts.Cancel();
+                    cts.Dispose();
+                }
             }
         }
 
@@ -111,7 +114,7 @@ public class RepositoryWatcherService(
             || changedPath.Contains(Path.DirectorySeparatorChar + "refs" + Path.DirectorySeparatorChar);
 
         if (isBranchChange)
-            ScheduleDebounced(repoId, async () =>
+            ScheduleDebounced(repoId + ":branch", async () =>
             {
                 repositoryService.RefreshCurrentBranch(repoId);
                 await notifier.NotifyBranchChangedAsync(repoId);
@@ -122,7 +125,7 @@ public class RepositoryWatcherService(
 
     private void ScheduleStatusNotification(string repoId)
     {
-        ScheduleDebounced(repoId, () => notifier.NotifyStatusChangedAsync(repoId));
+        ScheduleDebounced(repoId + ":status", () => notifier.NotifyStatusChangedAsync(repoId));
     }
 
     internal void ScheduleDebounced(string repoId, Func<Task> action)
