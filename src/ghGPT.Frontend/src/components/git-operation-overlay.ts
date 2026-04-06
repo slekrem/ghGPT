@@ -1,84 +1,9 @@
-import { LitElement, html, css } from 'lit';
+import { html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 
 @customElement('git-operation-overlay')
-export class GitOperationOverlay extends LitElement {
-  static styles = css`
-    .git-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(10, 12, 18, 0.72);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 400;
-      padding: 1.5rem;
-    }
-
-    .git-overlay-card {
-      width: min(720px, 100%);
-      max-height: min(70vh, 620px);
-      display: flex;
-      flex-direction: column;
-      background: #1e1e2e;
-      border: 1px solid #45475a;
-      border-radius: 12px;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
-      overflow: hidden;
-    }
-
-    .git-overlay-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      padding: 0.9rem 1rem;
-      border-bottom: 1px solid #313244;
-    }
-
-    .git-overlay-title {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #cdd6f4;
-      text-transform: capitalize;
-    }
-
-    .git-overlay-status {
-      font-size: 0.75rem;
-      color: #6c7086;
-    }
-
-    .git-overlay-status.error { color: #f38ba8; }
-
-    .git-overlay-close {
-      padding: 0.25rem 0.7rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: transparent;
-      color: #cdd6f4;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-
-    .git-overlay-close:hover { background: #313244; }
-
-    .git-overlay-log {
-      padding: 0.9rem 1rem 1rem;
-      overflow: auto;
-      font-family: 'Cascadia Code', 'Consolas', monospace;
-      font-size: 0.78rem;
-      line-height: 1.5;
-      color: #a6adc8;
-    }
-
-    .git-overlay-line + .git-overlay-line { margin-top: 0.35rem; }
-
-    .git-overlay-empty {
-      color: #6c7086;
-      font-style: italic;
-    }
-  `;
-
+export class GitOperationOverlay extends AppElement {
   @property({ type: String }) operation: 'fetch' | 'pull' | 'push' | null = null;
   @property({ attribute: false }) lines: string[] = [];
   @property({ type: String }) error = '';
@@ -89,13 +14,14 @@ export class GitOperationOverlay extends LitElement {
   }
 
   render() {
+    const statusClass = `text-xs ${this.error ? 'text-cat-red' : 'text-cat-subtle'}`;
     return html`
-      <div class="git-overlay">
-        <div class="git-overlay-card">
-          <div class="git-overlay-header">
+      <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-[400] p-6">
+        <div class="flex flex-col bg-cat-surface border border-cat-border rounded-xl shadow-2xl overflow-hidden w-[min(720px,100%)] max-h-[min(70vh,620px)]">
+          <div class="flex items-center justify-between gap-4 px-4 py-3.5 border-b border-cat-overlay">
             <div>
-              <div class="git-overlay-title">${this.operation}</div>
-              <div class="git-overlay-status ${this.error ? 'error' : ''}">
+              <div class="text-sm font-semibold text-cat-text capitalize">${this.operation}</div>
+              <div class="${statusClass}">
                 ${this.error
                   ? this.error
                   : this.status === 'completed'
@@ -103,16 +29,16 @@ export class GitOperationOverlay extends LitElement {
                     : 'Läuft…'}
               </div>
             </div>
-            <button class="git-overlay-close"
+            <button class="px-3 py-1 rounded-md border border-cat-border bg-transparent text-cat-text cursor-pointer text-xs hover:bg-cat-overlay disabled:opacity-45 disabled:cursor-not-allowed"
               ?disabled=${this._isRunning}
               @click=${() => this.dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }))}>
               Schließen
             </button>
           </div>
-          <div class="git-overlay-log">
+          <div class="p-4 overflow-auto font-mono text-[0.78rem] leading-relaxed text-cat-muted space-y-1.5">
             ${this.lines.length > 0
-              ? this.lines.map(line => html`<div class="git-overlay-line">${line}</div>`)
-              : html`<div class="git-overlay-empty">Warte auf Git-Ausgabe…</div>`}
+              ? this.lines.map(line => html`<div>${line}</div>`)
+              : html`<div class="text-cat-subtle italic">Warte auf Git-Ausgabe…</div>`}
           </div>
         </div>
       </div>

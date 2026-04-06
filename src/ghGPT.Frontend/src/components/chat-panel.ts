@@ -1,4 +1,5 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { html, nothing } from 'lit';
+import { AppElement } from '../app-element';
 import { customElement, property, state } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { marked } from 'marked';
@@ -15,255 +16,7 @@ interface Message {
 }
 
 @customElement('chat-panel')
-export class ChatPanel extends LitElement {
-  static styles = css`
-    :host {
-      display: flex;
-      flex-direction: column;
-      width: 320px;
-      min-width: 320px;
-      height: 100vh;
-      background: #1e1e2e;
-      border-left: 1px solid #313244;
-      font-family: var(--bs-font-sans-serif, system-ui, sans-serif);
-    }
-
-    .panel-header {
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #313244;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-
-    .panel-title {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #cdd6f4;
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
-    .close-btn, .clear-btn {
-      background: none;
-      border: none;
-      color: #6c7086;
-      cursor: pointer;
-      font-size: 1rem;
-      padding: 0.1rem 0.3rem;
-      border-radius: 4px;
-      line-height: 1;
-    }
-
-    .close-btn:hover, .clear-btn:hover { color: #cdd6f4; background: #313244; }
-    .clear-btn { font-size: 0.75rem; }
-
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #6c7086;
-      font-size: 0.8rem;
-      text-align: center;
-      gap: 0.5rem;
-    }
-
-    .empty-icon { font-size: 1.8rem; }
-
-    .message {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-      max-width: 100%;
-    }
-
-    .message-label {
-      font-size: 0.68rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #6c7086;
-    }
-
-    .message.user .message-label { text-align: right; }
-
-    .message-bubble {
-      padding: 0.5rem 0.75rem;
-      border-radius: 8px;
-      font-size: 0.82rem;
-      line-height: 1.5;
-      word-break: break-word;
-    }
-
-    .message.user .message-bubble {
-      background: #313244;
-      color: #cdd6f4;
-      align-self: flex-end;
-      white-space: pre-wrap;
-    }
-
-    .message.assistant .message-bubble {
-      background: #181825;
-      border: 1px solid #313244;
-      color: #cdd6f4;
-    }
-
-    /* Markdown styles inside assistant bubble */
-    .message.assistant .message-bubble p {
-      margin: 0 0 0.5em;
-    }
-    .message.assistant .message-bubble p:last-child { margin-bottom: 0; }
-
-    .message.assistant .message-bubble pre {
-      background: #11111b;
-      border: 1px solid #313244;
-      border-radius: 6px;
-      padding: 0.6rem 0.75rem;
-      overflow-x: auto;
-      margin: 0.4em 0;
-    }
-
-    .message.assistant .message-bubble code {
-      font-family: 'Cascadia Code', 'Consolas', monospace;
-      font-size: 0.78rem;
-    }
-
-    .message.assistant .message-bubble pre code {
-      background: none;
-      padding: 0;
-      color: #cdd6f4;
-    }
-
-    .message.assistant .message-bubble :not(pre) > code {
-      background: #313244;
-      padding: 0.1em 0.35em;
-      border-radius: 4px;
-      color: #89b4fa;
-    }
-
-    .message.assistant .message-bubble ul,
-    .message.assistant .message-bubble ol {
-      margin: 0.3em 0;
-      padding-left: 1.25em;
-    }
-
-    .message.assistant .message-bubble li { margin: 0.1em 0; }
-
-    .message.assistant .message-bubble strong { color: #cba6f7; }
-
-    .message.assistant .message-bubble blockquote {
-      border-left: 3px solid #45475a;
-      margin: 0.4em 0;
-      padding-left: 0.75em;
-      color: #a6adc8;
-    }
-
-    .message.assistant .message-bubble h1,
-    .message.assistant .message-bubble h2,
-    .message.assistant .message-bubble h3 {
-      margin: 0.5em 0 0.25em;
-      color: #cdd6f4;
-      font-size: 0.9rem;
-    }
-
-    .tool-card {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0.65rem;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      border: 1px solid #313244;
-      background: #181825;
-      color: #a6adc8;
-    }
-
-    .tool-card.success { border-color: #a6e3a1; color: #a6e3a1; }
-    .tool-card.error { border-color: #f38ba8; color: #f38ba8; }
-
-    .tool-icon { font-size: 0.9rem; flex-shrink: 0; }
-    .tool-label { flex: 1; font-family: 'Cascadia Code', 'Consolas', monospace; }
-
-    .cursor {
-      display: inline-block;
-      width: 2px;
-      height: 0.9em;
-      background: #89b4fa;
-      margin-left: 1px;
-      vertical-align: text-bottom;
-      animation: blink 1s step-end infinite;
-    }
-
-    @keyframes blink {
-      50% { opacity: 0; }
-    }
-
-    .input-area {
-      padding: 0.75rem;
-      border-top: 1px solid #313244;
-      display: flex;
-      gap: 0.5rem;
-      flex-shrink: 0;
-      align-items: flex-end;
-    }
-
-    textarea {
-      flex: 1;
-      padding: 0.45rem 0.65rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: #181825;
-      color: #cdd6f4;
-      font-size: 0.82rem;
-      font-family: inherit;
-      resize: none;
-      line-height: 1.4;
-      min-height: 36px;
-      max-height: 120px;
-      overflow-y: auto;
-    }
-
-    textarea:focus {
-      outline: none;
-      border-color: #89b4fa;
-    }
-
-    textarea::placeholder { color: #45475a; }
-
-    .send-btn {
-      padding: 0.4rem 0.65rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: transparent;
-      color: #89b4fa;
-      cursor: pointer;
-      font-size: 0.9rem;
-      flex-shrink: 0;
-      height: 36px;
-    }
-
-    .send-btn:hover { background: #313244; }
-    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  `;
-
+export class ChatPanel extends AppElement {
   @property() repoId = '';
   @property() branch = '';
   @property() activeView = '';
@@ -432,7 +185,7 @@ export class ChatPanel extends LitElement {
 
   private scrollToBottom() {
     requestAnimationFrame(() => {
-      const el = this.shadowRoot?.querySelector('.messages');
+      const el = this.querySelector('.messages');
       if (el) el.scrollTop = el.scrollHeight;
     });
   }
@@ -452,7 +205,7 @@ export class ChatPanel extends LitElement {
   }
 
   private resetTextareaHeight() {
-    const ta = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null;
+    const ta = this.querySelector('textarea') as HTMLTextAreaElement | null;
     if (ta) ta.style.height = 'auto';
   }
 
@@ -463,37 +216,46 @@ export class ChatPanel extends LitElement {
 
   render() {
     return html`
-      <div class="panel-header">
-        <span class="panel-title">✦ KI-Assistent</span>
-        <div class="header-actions">
+      <div class="px-4 py-3 border-b border-[#313244] flex items-center justify-between shrink-0">
+        <span class="text-sm font-semibold text-[#cdd6f4] flex items-center gap-1.5">✦ KI-Assistent</span>
+        <div class="flex items-center gap-1">
           ${this.messages.length > 0 && this.repoId ? html`
-            <button class="clear-btn" title="Verlauf löschen" @click=${() => this.clearHistory()}>🗑</button>
+            <button class="bg-transparent border-none text-[#6c7086] cursor-pointer text-xs px-1 py-0.5 rounded hover:text-[#cdd6f4] hover:bg-[#313244]"
+              title="Verlauf löschen" @click=${() => this.clearHistory()}>🗑</button>
           ` : nothing}
-          <button class="close-btn" @click=${() => this.dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }))}>✕</button>
+          <button class="bg-transparent border-none text-[#6c7086] cursor-pointer text-base px-1 py-0.5 rounded leading-none hover:text-[#cdd6f4] hover:bg-[#313244]"
+            @click=${() => this.dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }))}>✕</button>
         </div>
       </div>
 
-      <div class="messages">
+      <div class="messages flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
         ${this.messages.length === 0 ? html`
-          <div class="empty">
-            <span class="empty-icon">✦</span>
+          <div class="flex flex-col items-center justify-center h-full text-[#6c7086] text-[0.8rem] text-center gap-2">
+            <span class="text-[1.8rem]">✦</span>
             <span>Stelle eine Frage oder beschreibe eine Aufgabe</span>
           </div>
         ` : this.messages.map(m => {
           if (m.role === 'tool') {
             const icon = m.toolSuccess ? '✓' : '✗';
-            const cls = m.toolSuccess ? 'success' : 'error';
+            const cls = m.toolSuccess
+              ? 'border-[#a6e3a1] text-[#a6e3a1]'
+              : 'border-[#f38ba8] text-[#f38ba8]';
             return html`
-              <div class="tool-card ${cls}">
-                <span class="tool-icon">${icon}</span>
-                <span class="tool-label">${m.content}</span>
+              <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[0.78rem] border bg-[#181825] ${cls}">
+                <span class="text-[0.9rem] shrink-0">${icon}</span>
+                <span class="flex-1 font-mono">${m.content}</span>
               </div>
             `;
           }
           return html`
-            <div class="message ${m.role}">
-              <span class="message-label">${m.role === 'user' ? 'Du' : 'Assistent'}</span>
-              <div class="message-bubble">
+            <div class="message ${m.role} flex flex-col gap-0.5 max-w-full">
+              <span class="text-[0.68rem] uppercase tracking-wider text-[#6c7086] ${m.role === 'user' ? 'text-right' : ''}">
+                ${m.role === 'user' ? 'Du' : 'Assistent'}
+              </span>
+              <div class="message-bubble px-3 py-2 rounded-lg text-[0.82rem] leading-[1.5] break-words
+                ${m.role === 'user'
+                  ? 'bg-[#313244] text-[#cdd6f4] self-end whitespace-pre-wrap'
+                  : 'bg-[#181825] border border-[#313244] text-[#cdd6f4]'}">
                 ${m.role === 'assistant'
                   ? html`${this.renderMarkdown(m.content)}${m.streaming ? html`<span class="cursor"></span>` : nothing}`
                   : html`${m.content}`}
@@ -503,8 +265,9 @@ export class ChatPanel extends LitElement {
         })}
       </div>
 
-      <div class="input-area">
+      <div class="px-3 py-3 border-t border-[#313244] flex gap-2 shrink-0 items-end">
         <textarea
+          class="flex-1 px-2.5 py-1.5 rounded-md border border-[#45475a] bg-[#181825] text-[#cdd6f4] text-[0.82rem] font-[inherit] resize-none leading-[1.4] min-h-[36px] max-h-[120px] overflow-y-auto outline-none focus:border-[#89b4fa] placeholder:text-[#45475a] disabled:opacity-50"
           placeholder="Nachricht eingeben… (Enter zum Senden)"
           .value=${this.input}
           @input=${this.onInput}
@@ -512,7 +275,8 @@ export class ChatPanel extends LitElement {
           ?disabled=${this.streaming}
           rows="1"
         ></textarea>
-        <button class="send-btn" ?disabled=${this.streaming || !this.input.trim()} @click=${() => this.send()}>
+        <button class="px-2.5 py-1.5 rounded-md border border-[#45475a] bg-transparent text-[#89b4fa] cursor-pointer text-[0.9rem] shrink-0 h-[36px] hover:bg-[#313244] disabled:opacity-40 disabled:cursor-not-allowed"
+          ?disabled=${this.streaming || !this.input.trim()} @click=${() => this.send()}>
           ${this.streaming ? '…' : '↑'}
         </button>
       </div>

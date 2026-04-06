@@ -1,235 +1,10 @@
-import { LitElement, html, css } from 'lit';
+import { html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import { repositoryService, type BranchInfo } from '../services/repository-service';
 
 @customElement('branches-view')
-export class BranchesView extends LitElement {
-  static styles = css`
-    :host {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    .toolbar {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid #313244;
-      flex-shrink: 0;
-    }
-
-    .toolbar-title {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #cdd6f4;
-      flex: 1;
-    }
-
-    .btn {
-      padding: 0.3rem 0.75rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: transparent;
-      color: #cdd6f4;
-      font-size: 0.8rem;
-      cursor: pointer;
-    }
-
-    .btn:hover { background-color: #313244; }
-
-    .btn-primary {
-      background-color: #89b4fa;
-      border-color: #89b4fa;
-      color: #1e1e2e;
-    }
-
-    .btn-primary:hover { background-color: #74c7ec; border-color: #74c7ec; }
-
-    .btn-danger {
-      color: #f38ba8;
-      border-color: #45475a;
-    }
-
-    .btn-danger:hover { background-color: #313244; }
-
-    .btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-    }
-
-    .section-title {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #6c7086;
-      margin-bottom: 0.5rem;
-      margin-top: 1rem;
-    }
-
-    .section-title:first-child { margin-top: 0; }
-
-    .branch-list {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .branch-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0.75rem;
-      border-radius: 6px;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: background-color 0.1s;
-    }
-
-    .branch-row:hover { background-color: #313244; }
-
-    .branch-row.head {
-      border-color: #89b4fa33;
-      background-color: #89b4fa11;
-    }
-
-    .branch-icon {
-      font-size: 0.875rem;
-      flex-shrink: 0;
-    }
-
-    .branch-name {
-      font-size: 0.875rem;
-      color: #cdd6f4;
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .branch-row.head .branch-name {
-      color: #89b4fa;
-      font-weight: 500;
-    }
-
-    .head-badge {
-      font-size: 0.65rem;
-      background: #89b4fa33;
-      color: #89b4fa;
-      border-radius: 4px;
-      padding: 0.1rem 0.4rem;
-      flex-shrink: 0;
-    }
-
-    .ahead-behind {
-      font-size: 0.7rem;
-      color: #6c7086;
-      flex-shrink: 0;
-    }
-
-    .ahead { color: #a6e3a1; }
-    .behind { color: #f38ba8; }
-
-    .branch-actions {
-      display: flex;
-      gap: 0.25rem;
-      opacity: 0;
-      transition: opacity 0.1s;
-    }
-
-    .branch-row:hover .branch-actions { opacity: 1; }
-
-    .action-btn {
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      border: 1px solid #45475a;
-      background: transparent;
-      color: #cdd6f4;
-      font-size: 0.75rem;
-      cursor: pointer;
-    }
-
-    .action-btn:hover { background-color: #45475a; }
-
-    .action-btn.danger { color: #f38ba8; }
-    .action-btn.danger:hover { background-color: #45475a; }
-
-    .empty {
-      color: #6c7086;
-      font-size: 0.875rem;
-      padding: 0.5rem 0;
-    }
-
-    .dialog-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-    }
-
-    .dialog {
-      background: #1e1e2e;
-      border: 1px solid #313244;
-      border-radius: 10px;
-      padding: 1.5rem;
-      width: 420px;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .dialog-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #cdd6f4;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-
-    label {
-      font-size: 0.8rem;
-      color: #a6adc8;
-    }
-
-    input, select {
-      padding: 0.4rem 0.6rem;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: #313244;
-      color: #cdd6f4;
-      font-size: 0.875rem;
-      outline: none;
-    }
-
-    input:focus, select:focus { border-color: #89b4fa; }
-
-    .dialog-actions {
-      display: flex;
-      gap: 0.5rem;
-      justify-content: flex-end;
-    }
-
-    .error-msg {
-      color: #f38ba8;
-      font-size: 0.8rem;
-    }
-  `;
-
+export class BranchesView extends AppElement {
   @property() repoId = '';
   @property({ type: Number }) refreshKey = 0;
   @state() private branches: BranchInfo[] = [];
@@ -301,32 +76,37 @@ export class BranchesView extends LitElement {
   }
 
   private renderAheadBehind(b: BranchInfo) {
-    if (!b.trackingBranch) return '';
+    if (!b.trackingBranch) return nothing;
     const parts = [];
-    if (b.aheadBy > 0) parts.push(html`<span class="ahead">↑${b.aheadBy}</span>`);
-    if (b.behindBy > 0) parts.push(html`<span class="behind">↓${b.behindBy}</span>`);
-    if (parts.length === 0) return '';
-    return html`<span class="ahead-behind">${parts}</span>`;
+    if (b.aheadBy > 0) parts.push(html`<span class="text-cat-green">↑${b.aheadBy}</span>`);
+    if (b.behindBy > 0) parts.push(html`<span class="text-cat-red">↓${b.behindBy}</span>`);
+    if (parts.length === 0) return nothing;
+    return html`<span class="text-xs text-cat-subtle shrink-0">${parts}</span>`;
   }
 
   private renderBranchRow(b: BranchInfo) {
     return html`
-      <div class="branch-row ${b.isHead ? 'head' : ''}" @dblclick=${() => !b.isHead && this.checkout(b.name)}>
-        <span class="branch-icon">${b.isRemote ? '☁' : '🌿'}</span>
-        <span class="branch-name">${b.name}</span>
-        ${b.isHead ? html`<span class="head-badge">HEAD</span>` : ''}
+      <div class="flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors
+        ${b.isHead ? 'border-[#89b4fa33] bg-[#89b4fa11]' : 'border-transparent hover:bg-cat-overlay'}"
+        @dblclick=${() => !b.isHead && this.checkout(b.name)}>
+        <span class="text-sm shrink-0">${b.isRemote ? '☁' : '🌿'}</span>
+        <span class="text-sm flex-1 overflow-hidden text-ellipsis whitespace-nowrap
+          ${b.isHead ? 'text-cat-blue font-medium' : 'text-cat-text'}">${b.name}</span>
+        ${b.isHead ? html`<span class="text-[0.65rem] bg-[#89b4fa33] text-cat-blue rounded px-1 shrink-0">HEAD</span>` : nothing}
         ${this.renderAheadBehind(b)}
-        <div class="branch-actions">
+        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity [.branch-row:hover_&]:opacity-100">
           ${!b.isHead ? html`
-            <button class="action-btn" @click=${(e: Event) => { e.stopPropagation(); this.checkout(b.name); }}>
+            <button class="px-2 py-0.5 rounded border border-cat-muted bg-transparent text-cat-text text-xs cursor-pointer hover:bg-cat-muted"
+              @click=${(e: Event) => { e.stopPropagation(); this.checkout(b.name); }}>
               Checkout
             </button>
-          ` : ''}
+          ` : nothing}
           ${!b.isHead ? html`
-            <button class="action-btn danger" @click=${(e: Event) => { e.stopPropagation(); this.deleteBranch(b.name); }}>
+            <button class="px-2 py-0.5 rounded border border-cat-muted bg-transparent text-cat-red text-xs cursor-pointer hover:bg-cat-muted"
+              @click=${(e: Event) => { e.stopPropagation(); this.deleteBranch(b.name); }}>
               ✕
             </button>
-          ` : ''}
+          ` : nothing}
         </div>
       </div>
     `;
@@ -338,39 +118,43 @@ export class BranchesView extends LitElement {
     const allOptions = [...localBranches, ...remoteBranches].map(b => b.name);
 
     return html`
-      <div class="toolbar">
-        <span class="toolbar-title">Branches</span>
-        <button class="btn btn-primary" @click=${() => { this.showNewBranchDialog = true; this.newBranchStartPoint = localBranches.find(b => b.isHead)?.name ?? ''; }}>
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-cat-border shrink-0">
+        <span class="text-sm font-semibold text-cat-text flex-1">Branches</span>
+        <button class="px-3 py-1 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-xs cursor-pointer hover:bg-cat-sapphire hover:border-cat-sapphire"
+          @click=${() => { this.showNewBranchDialog = true; this.newBranchStartPoint = localBranches.find(b => b.isHead)?.name ?? ''; }}>
           + Neuer Branch
         </button>
-        <button class="btn" @click=${this.loadBranches}>↻ Aktualisieren</button>
+        <button class="px-3 py-1 rounded-md border border-cat-muted bg-transparent text-cat-text text-xs cursor-pointer hover:bg-cat-overlay"
+          @click=${this.loadBranches}>↻ Aktualisieren</button>
       </div>
 
-      <div class="content">
-        <div class="section-title">Lokale Branches</div>
-        <div class="branch-list">
+      <div class="flex-1 overflow-y-auto p-4">
+        <div class="text-[0.7rem] uppercase tracking-widest text-cat-subtle mb-2">Lokale Branches</div>
+        <div class="flex flex-col gap-0.5">
           ${localBranches.length > 0
             ? localBranches.map(b => this.renderBranchRow(b))
-            : html`<span class="empty">Keine lokalen Branches</span>`}
+            : html`<span class="text-cat-subtle text-sm py-1">Keine lokalen Branches</span>`}
         </div>
 
         ${remoteBranches.length > 0 ? html`
-          <div class="section-title">Remote Branches</div>
-          <div class="branch-list">
+          <div class="text-[0.7rem] uppercase tracking-widest text-cat-subtle mb-2 mt-4">Remote Branches</div>
+          <div class="flex flex-col gap-0.5">
             ${remoteBranches.map(b => this.renderBranchRow(b))}
           </div>
-        ` : ''}
+        ` : nothing}
       </div>
 
       ${this.showNewBranchDialog ? html`
-        <div class="dialog-overlay" @click=${(e: Event) => { if (e.target === e.currentTarget) this.showNewBranchDialog = false; }}>
-          <div class="dialog">
-            <div class="dialog-title">Neuen Branch erstellen</div>
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
+          @click=${(e: Event) => { if (e.target === e.currentTarget) this.showNewBranchDialog = false; }}>
+          <div class="bg-cat-surface border border-cat-border rounded-xl p-6 w-[420px] flex flex-col gap-4">
+            <div class="text-base font-semibold text-cat-text">Neuen Branch erstellen</div>
 
-            <div class="form-group">
-              <label>Branch-Name</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-cat-subtext">Branch-Name</label>
               <input
                 type="text"
+                class="px-2.5 py-1.5 rounded-md border border-cat-muted bg-cat-overlay text-cat-text text-sm outline-none focus:border-cat-blue"
                 .value=${this.newBranchName}
                 @input=${(e: Event) => this.newBranchName = (e.target as HTMLInputElement).value}
                 @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.onCreateBranch()}
@@ -379,9 +163,10 @@ export class BranchesView extends LitElement {
               />
             </div>
 
-            <div class="form-group">
-              <label>Basis-Branch</label>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-xs text-cat-subtext">Basis-Branch</label>
               <select
+                class="px-2.5 py-1.5 rounded-md border border-cat-muted bg-cat-overlay text-cat-text text-sm outline-none focus:border-cat-blue"
                 .value=${this.newBranchStartPoint}
                 @change=${(e: Event) => this.newBranchStartPoint = (e.target as HTMLSelectElement).value}
               >
@@ -389,17 +174,19 @@ export class BranchesView extends LitElement {
               </select>
             </div>
 
-            ${this.dialogError ? html`<span class="error-msg">${this.dialogError}</span>` : ''}
+            ${this.dialogError ? html`<span class="text-cat-red text-xs">${this.dialogError}</span>` : nothing}
 
-            <div class="dialog-actions">
-              <button class="btn" @click=${() => { this.showNewBranchDialog = false; this.dialogError = ''; }}>Abbrechen</button>
-              <button class="btn btn-primary" ?disabled=${this.loading} @click=${this.onCreateBranch}>
+            <div class="flex gap-2 justify-end">
+              <button class="px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
+                @click=${() => { this.showNewBranchDialog = false; this.dialogError = ''; }}>Abbrechen</button>
+              <button class="px-3 py-1.5 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-sm cursor-pointer hover:bg-cat-sapphire disabled:opacity-40 disabled:cursor-not-allowed"
+                ?disabled=${this.loading} @click=${this.onCreateBranch}>
                 ${this.loading ? 'Erstelle…' : 'Erstellen'}
               </button>
             </div>
           </div>
         </div>
-      ` : ''}
+      ` : nothing}
     `;
   }
 }

@@ -1,4 +1,5 @@
-import { LitElement, html, css, nothing } from 'lit';
+import { html, nothing } from 'lit';
+import { AppElement } from '../app-element';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import {
   repositoryService,
@@ -8,347 +9,7 @@ import {
 } from '../services/repository-service';
 
 @customElement('history-view')
-export class HistoryView extends LitElement {
-  static styles = css`
-    :host {
-      display: flex;
-      height: 100%;
-      overflow: hidden;
-      background: #181825;
-      color: #cdd6f4;
-      border: 1px solid #313244;
-      border-radius: 10px;
-    }
-
-    .list-panel {
-      width: 360px;
-      min-width: 360px;
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid #313244;
-      background: #1e1e2e;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid #313244;
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-      flex-shrink: 0;
-      background: #1e1e2e;
-    }
-
-    .panel-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #eef1ff;
-    }
-
-    .panel-subtitle {
-      font-size: 0.75rem;
-      color: #8f96b3;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .list-scroll {
-      flex: 1;
-      overflow: auto;
-      position: relative;
-    }
-
-    .list-inner {
-      position: relative;
-    }
-
-    .list-entry {
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 88px;
-      padding: 0.8rem 1rem;
-      display: grid;
-      grid-template-columns: 34px 1fr;
-      gap: 0.75rem;
-      border-bottom: 1px solid rgba(49, 50, 68, 0.8);
-      cursor: pointer;
-      box-sizing: border-box;
-    }
-
-    .list-entry:hover {
-      background: #25273a;
-    }
-
-    .list-entry.selected {
-      background: #313244;
-    }
-
-    .avatar {
-      width: 34px;
-      height: 34px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #89b4fa, #fab387);
-      color: #11111b;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.8rem;
-      font-weight: 700;
-      margin-top: 0.1rem;
-    }
-
-    .entry-body {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .entry-message {
-      font-size: 0.87rem;
-      font-weight: 600;
-      color: #eef1ff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .entry-meta,
-    .entry-sha {
-      font-size: 0.74rem;
-      color: #8f96b3;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .detail-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-width: 0;
-    }
-
-    .detail-header {
-      padding: 0.9rem 1rem;
-      border-bottom: 1px solid #313244;
-      background: #1e1e2e;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      flex-shrink: 0;
-    }
-
-    .detail-title {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #eef1ff;
-      white-space: pre-wrap;
-    }
-
-    .detail-meta {
-      font-size: 0.78rem;
-      color: #a6adc8;
-    }
-
-    .detail-body {
-      flex: 1;
-      display: flex;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .file-list {
-      width: 280px;
-      min-width: 280px;
-      border-right: 1px solid #313244;
-      overflow: auto;
-      background: #1a1b26;
-    }
-
-    .file-item {
-      padding: 0.75rem 0.9rem;
-      border-bottom: 1px solid rgba(49, 50, 68, 0.75);
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-    }
-
-    .file-item:hover {
-      background: #25273a;
-    }
-
-    .file-item.selected {
-      background: #313244;
-    }
-
-    .file-path {
-      font-size: 0.8rem;
-      color: #eef1ff;
-      word-break: break-word;
-    }
-
-    .file-stats {
-      font-size: 0.72rem;
-      color: #8f96b3;
-    }
-
-    .diff-panel {
-      flex: 1;
-      overflow: auto;
-      min-width: 0;
-      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-      font-size: 0.78rem;
-    }
-
-    .diff-line {
-      display: flex;
-      padding: 0 0.75rem;
-      line-height: 1.5;
-      white-space: pre;
-    }
-
-    .diff-line-num {
-      width: 32px;
-      flex-shrink: 0;
-      color: #45475a;
-      user-select: none;
-      text-align: right;
-      padding-right: 0.5rem;
-    }
-
-    .diff-line-content {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: clip;
-    }
-
-    .diff-line.added {
-      background: rgba(166, 227, 161, 0.12);
-      color: #a6e3a1;
-    }
-
-    .diff-line.removed {
-      background: rgba(243, 139, 168, 0.12);
-      color: #f38ba8;
-    }
-
-    .empty,
-    .error,
-    .loading {
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      color: #6c7086;
-      text-align: center;
-    }
-
-    .error {
-      color: #f38ba8;
-    }
-
-    .footer-hint {
-      padding: 0.6rem 0.9rem;
-      border-top: 1px solid #313244;
-      font-size: 0.72rem;
-      color: #8f96b3;
-      flex-shrink: 0;
-    }
-
-    .summarize-btn {
-      background: transparent;
-      border: 1px solid #45475a;
-      border-radius: 4px;
-      color: #a6adc8;
-      cursor: pointer;
-      font-size: 0.72rem;
-      padding: 0.2rem 0.6rem;
-      white-space: nowrap;
-      align-self: flex-start;
-    }
-
-    .summarize-btn:hover:not(:disabled) { background: #313244; color: #cdd6f4; }
-    .summarize-btn:disabled { opacity: 0.45; cursor: default; }
-
-    .summary-overlay {
-      position: absolute;
-      inset: 0;
-      background: #1e1e2e;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid #313244;
-    }
-
-    .summary-overlay-header {
-      padding: 0.7rem 1rem;
-      border-bottom: 1px solid #313244;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-shrink: 0;
-    }
-
-    .summary-overlay-title {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #cdd6f4;
-    }
-
-    .summary-overlay-actions {
-      display: flex;
-      gap: 0.4rem;
-      align-items: center;
-    }
-
-    .summary-copy-btn {
-      background: transparent;
-      border: 1px solid #45475a;
-      border-radius: 4px;
-      color: #a6adc8;
-      cursor: pointer;
-      font-size: 0.72rem;
-      padding: 0.15rem 0.5rem;
-    }
-
-    .summary-copy-btn:hover { background: #313244; color: #cdd6f4; }
-
-    .summary-close-btn {
-      background: none;
-      border: none;
-      color: #6c7086;
-      cursor: pointer;
-      font-size: 1rem;
-      padding: 0.1rem 0.3rem;
-      border-radius: 4px;
-      line-height: 1;
-    }
-
-    .summary-close-btn:hover { color: #cdd6f4; background: #313244; }
-
-    .summary-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-      font-size: 0.85rem;
-      line-height: 1.7;
-      color: #cdd6f4;
-      white-space: pre-wrap;
-    }
-
-    .summary-streaming {
-      color: #6c7086;
-      font-style: italic;
-    }
-  `;
-
+export class HistoryView extends AppElement {
   private static readonly PAGE_SIZE = 100;
   private static readonly ROW_HEIGHT = 88;
   private static readonly OVERSCAN = 6;
@@ -539,7 +200,7 @@ export class HistoryView extends LitElement {
 
   private renderPatch(patch: string) {
     if (!patch) {
-      return html`<div class="empty">Kein Diff verfügbar</div>`;
+      return html`<div class="h-full flex items-center justify-center p-4 text-cat-subtle">Kein Diff verfügbar</div>`;
     }
 
     const isMetadata = (line: string) =>
@@ -584,10 +245,10 @@ export class HistoryView extends LitElement {
       }
 
       return html`
-        <div class="diff-line ${cls}">
-          <span class="diff-line-num">${oldNum}</span>
-          <span class="diff-line-num">${newNum}</span>
-          <span class="diff-line-content">${line}</span>
+        <div class="diff-line ${cls} flex px-3 leading-[1.5] whitespace-pre">
+          <span class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${oldNum}</span>
+          <span class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${newNum}</span>
+          <span class="flex-1 min-w-0 overflow-hidden">${line}</span>
         </div>
       `;
     });
@@ -599,11 +260,11 @@ export class HistoryView extends LitElement {
     const totalHeight = this.entries.length * HistoryView.ROW_HEIGHT;
 
     return html`
-      <section class="list-panel" style="position:relative">
-        <div class="panel-header">
-          <div class="panel-subtitle">History</div>
-          <div class="panel-title">${this.branchName || this.branch || 'Aktueller Branch'}</div>
-          <button class="summarize-btn"
+      <section class="w-[360px] min-w-[360px] flex flex-col border-r border-cat-border bg-cat-surface overflow-hidden relative">
+        <div class="px-4 py-3 border-b border-cat-border flex flex-col gap-1 shrink-0 bg-cat-surface">
+          <div class="text-[0.75rem] text-[#8f96b3] uppercase tracking-widest">History</div>
+          <div class="text-[0.95rem] font-bold text-[#eef1ff]">${this.branchName || this.branch || 'Aktueller Branch'}</div>
+          <button class="self-start bg-transparent border border-cat-muted rounded px-2 py-0.5 text-cat-subtext text-[0.72rem] cursor-pointer whitespace-nowrap hover:bg-cat-overlay hover:text-cat-text disabled:opacity-45 disabled:cursor-default"
             ?disabled=${this.entries.length === 0 || this.summaryStreaming}
             @click=${() => this.startSummary()}>
             ✦ ${this.summaryStreaming ? 'Zusammenfasse…' : 'Zusammenfassen'}
@@ -611,44 +272,49 @@ export class HistoryView extends LitElement {
         </div>
 
         ${this.showSummary ? html`
-          <div class="summary-overlay">
-            <div class="summary-overlay-header">
-              <span class="summary-overlay-title">✦ Zusammenfassung</span>
-              <div class="summary-overlay-actions">
+          <div class="absolute inset-0 bg-cat-surface z-10 flex flex-col border-r border-cat-border">
+            <div class="px-4 py-2.5 border-b border-cat-border flex items-center justify-between shrink-0">
+              <span class="text-[0.82rem] font-semibold text-cat-text">✦ Zusammenfassung</span>
+              <div class="flex gap-1.5 items-center">
                 ${this.summaryContent ? html`
-                  <button class="summary-copy-btn" @click=${() => this.copySummary()}>
+                  <button class="bg-transparent border border-cat-muted rounded px-2 py-0.5 text-cat-subtext text-[0.72rem] cursor-pointer hover:bg-cat-overlay hover:text-cat-text"
+                    @click=${() => this.copySummary()}>
                     ${this.copied ? '✓ Kopiert' : 'Kopieren'}
                   </button>
                 ` : nothing}
-                <button class="summary-close-btn" @click=${() => { this.showSummary = false; }}>✕</button>
+                <button class="bg-none border-none text-cat-subtle cursor-pointer text-base px-1 py-0.5 rounded leading-none hover:text-cat-text hover:bg-cat-overlay"
+                  @click=${() => { this.showSummary = false; }}>✕</button>
               </div>
             </div>
-            <div class="summary-content">
+            <div class="flex-1 overflow-y-auto p-4 text-[0.85rem] leading-[1.7] text-cat-text whitespace-pre-wrap">
               ${this.summaryStreaming && !this.summaryContent
-                ? html`<span class="summary-streaming">Analysiere Commits…</span>`
+                ? html`<span class="text-cat-subtle italic">Analysiere Commits…</span>`
                 : this.summaryContent}
-              ${this.summaryStreaming ? html`<span class="summary-streaming"> ▌</span>` : nothing}
+              ${this.summaryStreaming ? html`<span class="text-cat-subtle italic"> ▌</span>` : nothing}
             </div>
           </div>
         ` : nothing}
 
         ${this.listError
-          ? html`<div class="error">${this.listError}</div>`
+          ? html`<div class="h-full flex items-center justify-center p-4 text-cat-red text-center">${this.listError}</div>`
           : html`
-              <div class="list-scroll" @scroll=${this.onListScroll}>
-                <div class="list-inner" style="height:${totalHeight}px">
+              <div class="list-scroll flex-1 overflow-auto relative" @scroll=${this.onListScroll}>
+                <div style="height:${totalHeight}px; position:relative">
                   ${visibleEntries.map((entry, index) => {
                     const absoluteIndex = start + index;
                     return html`
                       <div
-                        class="list-entry ${this.selectedCommitSha === entry.sha ? 'selected' : ''}"
-                        style="top:${absoluteIndex * HistoryView.ROW_HEIGHT}px"
+                        class="absolute left-0 right-0 h-[88px] px-4 py-3 grid gap-3 border-b border-[rgba(49,50,68,0.8)] cursor-pointer box-border
+                          ${this.selectedCommitSha === entry.sha ? 'bg-cat-overlay' : 'hover:bg-[#25273a]'}"
+                        style="top:${absoluteIndex * HistoryView.ROW_HEIGHT}px; grid-template-columns: 34px 1fr"
                         @click=${() => this.selectCommit(entry.sha)}>
-                        <div class="avatar">${this.initials(entry.authorName)}</div>
-                        <div class="entry-body">
-                          <div class="entry-message">${entry.message}</div>
-                          <div class="entry-meta">${entry.authorName} · ${this.formatDate(entry.authorDate)}</div>
-                          <div class="entry-sha">${entry.shortSha}</div>
+                        <div class="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-[#89b4fa] to-[#fab387] text-[#11111b] flex items-center justify-center text-[0.8rem] font-bold mt-0.5">
+                          ${this.initials(entry.authorName)}
+                        </div>
+                        <div class="min-w-0 flex flex-col gap-1">
+                          <div class="text-[0.87rem] font-semibold text-[#eef1ff] whitespace-nowrap overflow-hidden text-ellipsis">${entry.message}</div>
+                          <div class="text-[0.74rem] text-[#8f96b3] whitespace-nowrap overflow-hidden text-ellipsis">${entry.authorName} · ${this.formatDate(entry.authorDate)}</div>
+                          <div class="text-[0.74rem] text-[#8f96b3] whitespace-nowrap overflow-hidden text-ellipsis">${entry.shortSha}</div>
                         </div>
                       </div>
                     `;
@@ -657,41 +323,42 @@ export class HistoryView extends LitElement {
               </div>
             `}
 
-        <div class="footer-hint">
+        <div class="px-3.5 py-2 border-t border-cat-border text-[0.72rem] text-[#8f96b3] shrink-0">
           ${this.loadingList ? 'Lade weitere Commits…' : this.hasMore ? 'Weitere Commits werden beim Scrollen geladen.' : `${this.entries.length} Commits geladen`}
         </div>
       </section>
 
-      <section class="detail-panel">
+      <section class="flex-1 flex flex-col overflow-hidden min-w-0">
         ${this.loadingDetail
-          ? html`<div class="loading">Commit-Details werden geladen…</div>`
+          ? html`<div class="h-full flex items-center justify-center p-4 text-cat-subtle text-center">Commit-Details werden geladen…</div>`
           : this.detailError
-            ? html`<div class="error">${this.detailError}</div>`
+            ? html`<div class="h-full flex items-center justify-center p-4 text-cat-red text-center">${this.detailError}</div>`
             : !this.selectedCommit
-              ? html`<div class="empty">Commit auswählen</div>`
+              ? html`<div class="h-full flex items-center justify-center p-4 text-cat-subtle text-center">Commit auswählen</div>`
               : html`
-                  <div class="detail-header">
-                    <div class="detail-title">${this.selectedCommit.message}</div>
-                    <div class="detail-meta">
+                  <div class="px-4 py-3.5 border-b border-cat-border bg-cat-surface flex flex-col gap-1.5 shrink-0">
+                    <div class="text-base font-bold text-[#eef1ff] whitespace-pre-wrap">${this.selectedCommit.message}</div>
+                    <div class="text-[0.78rem] text-cat-subtext">
                       ${this.selectedCommit.authorName} &lt;${this.selectedCommit.authorEmail}&gt; ·
                       ${this.formatDate(this.selectedCommit.authorDate)} · ${this.selectedCommit.shortSha}
                     </div>
                   </div>
 
-                  <div class="detail-body">
-                    <div class="file-list">
+                  <div class="flex-1 flex min-h-0 overflow-hidden">
+                    <div class="w-[280px] min-w-[280px] border-r border-cat-border overflow-auto bg-[#1a1b26]">
                       ${this.selectedCommit.files.map((file, index) => html`
                         <div
-                          class="file-item ${this.selectedFileIndex === index ? 'selected' : ''}"
+                          class="px-3.5 py-3 border-b border-[rgba(49,50,68,0.75)] cursor-pointer flex flex-col gap-0.5
+                            ${this.selectedFileIndex === index ? 'bg-cat-overlay' : 'hover:bg-[#25273a]'}"
                           @click=${() => { this.selectedFileIndex = index; }}>
-                          <div class="file-path">${file.path}</div>
-                          <div class="file-stats">${file.status} · +${file.additions} / -${file.deletions}</div>
+                          <div class="text-[0.8rem] text-[#eef1ff] break-words">${file.path}</div>
+                          <div class="text-[0.72rem] text-[#8f96b3]">${file.status} · +${file.additions} / -${file.deletions}</div>
                         </div>
                       `)}
                     </div>
 
-                    <div class="diff-panel">
-                      ${this.selectedFile ? this.renderPatch(this.selectedFile.patch) : html`<div class="empty">Keine Datei ausgewählt</div>`}
+                    <div class="flex-1 overflow-auto min-w-0 font-mono text-[0.78rem]">
+                      ${this.selectedFile ? this.renderPatch(this.selectedFile.patch) : html`<div class="h-full flex items-center justify-center p-4 text-cat-subtle">Keine Datei ausgewählt</div>`}
                     </div>
                   </div>
                 `}

@@ -1,5 +1,6 @@
-import { LitElement, html, css } from 'lit';
+import { html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { AppElement } from '../app-element';
 import {
   repositoryService,
   type PullRequestListItem,
@@ -7,608 +8,7 @@ import {
 } from '../services/repository-service';
 
 @customElement('pull-requests-view')
-export class PullRequestsView extends LitElement {
-  static styles = css`
-    :host {
-      display: flex;
-      height: 100%;
-      overflow: hidden;
-      background: #181825;
-      color: #cdd6f4;
-      border: 1px solid #313244;
-      border-radius: 10px;
-    }
-
-    .list-panel {
-      width: 380px;
-      min-width: 380px;
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid #313244;
-      background: #1e1e2e;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid #313244;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      flex-shrink: 0;
-      background: #1e1e2e;
-    }
-
-    .panel-title-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .panel-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #eef1ff;
-    }
-
-    .create-btn {
-      padding: 0.2rem 0.65rem;
-      font-size: 0.75rem;
-      border: 1px solid #45475a;
-      border-radius: 4px;
-      background: transparent;
-      color: #a6e3a1;
-      border-color: #a6e3a1;
-      cursor: pointer;
-    }
-
-    .create-btn:hover {
-      background: rgba(166, 227, 161, 0.1);
-    }
-
-    .filter-row {
-      display: flex;
-      gap: 0.4rem;
-      align-items: center;
-    }
-
-    .filter-btn {
-      padding: 0.2rem 0.65rem;
-      font-size: 0.75rem;
-      border: 1px solid #45475a;
-      border-radius: 4px;
-      background: transparent;
-      color: #a6adc8;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .filter-btn:hover {
-      background: #313244;
-      color: #cdd6f4;
-    }
-
-    .filter-btn.active {
-      background: #89b4fa;
-      border-color: #89b4fa;
-      color: #11111b;
-      font-weight: 600;
-    }
-
-    .refresh-btn {
-      margin-left: auto;
-      padding: 0.2rem 0.6rem;
-      font-size: 0.75rem;
-      border: 1px solid #45475a;
-      border-radius: 4px;
-      background: transparent;
-      color: #a6adc8;
-      cursor: pointer;
-    }
-
-    .refresh-btn:hover {
-      background: #313244;
-      color: #cdd6f4;
-    }
-
-    .list-scroll {
-      flex: 1;
-      overflow-y: auto;
-    }
-
-    .pr-entry {
-      padding: 0.85rem 1rem;
-      border-bottom: 1px solid rgba(49, 50, 68, 0.8);
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .pr-entry:hover { background: #25273a; }
-    .pr-entry.selected { background: #313244; }
-
-    .pr-entry-top {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-    }
-
-    .pr-number {
-      font-size: 0.75rem;
-      color: #8f96b3;
-      white-space: nowrap;
-      flex-shrink: 0;
-      margin-top: 0.1rem;
-    }
-
-    .pr-title {
-      font-size: 0.87rem;
-      font-weight: 600;
-      color: #eef1ff;
-      line-height: 1.3;
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-    }
-
-    .pr-entry-meta {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.74rem;
-      color: #8f96b3;
-    }
-
-    .pr-branch {
-      font-family: monospace;
-      font-size: 0.72rem;
-      color: #89b4fa;
-    }
-
-    .pr-author {
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
-    .avatar-small {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-
-    .avatar-fallback-small {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #89b4fa, #fab387);
-      color: #11111b;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.55rem;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    .badge {
-      padding: 0.1rem 0.45rem;
-      border-radius: 999px;
-      font-size: 0.68rem;
-      font-weight: 600;
-    }
-
-    .badge-open {
-      background: rgba(166, 227, 161, 0.15);
-      color: #a6e3a1;
-      border: 1px solid rgba(166, 227, 161, 0.3);
-    }
-
-    .badge-closed {
-      background: rgba(243, 139, 168, 0.15);
-      color: #f38ba8;
-      border: 1px solid rgba(243, 139, 168, 0.3);
-    }
-
-    .badge-merged {
-      background: rgba(203, 166, 247, 0.15);
-      color: #cba6f7;
-      border: 1px solid rgba(203, 166, 247, 0.3);
-    }
-
-    .badge-draft {
-      background: rgba(166, 173, 200, 0.15);
-      color: #a6adc8;
-      border: 1px solid rgba(166, 173, 200, 0.3);
-    }
-
-    .badge-label {
-      background: rgba(137, 180, 250, 0.15);
-      color: #89b4fa;
-      border: 1px solid rgba(137, 180, 250, 0.3);
-    }
-
-    .detail-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      min-width: 0;
-    }
-
-    .detail-header {
-      padding: 0.9rem 1rem;
-      border-bottom: 1px solid #313244;
-      background: #1e1e2e;
-      flex-shrink: 0;
-    }
-
-    .detail-header-top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .detail-title {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #eef1ff;
-      line-height: 1.4;
-      flex: 1;
-    }
-
-    .detail-actions {
-      display: flex;
-      gap: 0.4rem;
-      flex-shrink: 0;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .action-btn {
-      padding: 0.3rem 0.75rem;
-      font-size: 0.78rem;
-      border: 1px solid #45475a;
-      border-radius: 6px;
-      background: transparent;
-      color: #cdd6f4;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .action-btn:hover { background: #313244; }
-    .action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-    .action-btn.danger {
-      color: #f38ba8;
-      border-color: #f38ba8;
-    }
-
-    .action-btn.danger:hover { background: rgba(243, 139, 168, 0.1); }
-
-    .action-btn.success {
-      color: #a6e3a1;
-      border-color: #a6e3a1;
-    }
-
-    .action-btn.success:hover { background: rgba(166, 227, 161, 0.1); }
-
-    .action-btn.primary {
-      color: #89b4fa;
-      border-color: #89b4fa;
-    }
-
-    .action-btn.primary:hover { background: rgba(137, 180, 250, 0.1); }
-
-    .merge-wrapper { position: relative; }
-
-    .merge-dropdown {
-      position: absolute;
-      top: calc(100% + 4px);
-      right: 0;
-      background: #1e1e2e;
-      border: 1px solid #45475a;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      z-index: 200;
-      min-width: 160px;
-      overflow: hidden;
-    }
-
-    .merge-option {
-      padding: 0.5rem 0.85rem;
-      font-size: 0.82rem;
-      color: #cdd6f4;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .merge-option:hover { background: #313244; }
-
-    .open-github-btn {
-      padding: 0.3rem 0.75rem;
-      font-size: 0.78rem;
-      border: 1px solid #45475a;
-      border-radius: 6px;
-      background: transparent;
-      color: #89b4fa;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .open-github-btn:hover {
-      background: rgba(137, 180, 250, 0.1);
-      border-color: #89b4fa;
-    }
-
-    .detail-meta {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.78rem;
-      color: #a6adc8;
-    }
-
-    .branch-flow {
-      font-family: monospace;
-      font-size: 0.78rem;
-      color: #89b4fa;
-    }
-
-    .detail-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
-    }
-
-    .section-title {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #a6adc8;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      margin-bottom: 0.5rem;
-    }
-
-    .pr-body {
-      font-size: 0.85rem;
-      color: #cdd6f4;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      font-family: inherit;
-      background: #181825;
-      padding: 0.75rem;
-      border-radius: 6px;
-      border: 1px solid #313244;
-      margin: 0;
-    }
-
-    .ci-indicator {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.78rem;
-    }
-
-    .ci-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .ci-dot.passing { background: #a6e3a1; }
-    .ci-dot.failing { background: #f38ba8; }
-
-    .files-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .file-entry {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.4rem 0.6rem;
-      background: #181825;
-      border-radius: 4px;
-      font-size: 0.8rem;
-    }
-
-    .file-status {
-      font-size: 0.7rem;
-      font-weight: 700;
-      width: 18px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-
-    .file-status-added { color: #a6e3a1; }
-    .file-status-removed { color: #f38ba8; }
-    .file-status-modified { color: #fab387; }
-    .file-status-renamed { color: #89b4fa; }
-
-    .file-name {
-      flex: 1;
-      color: #cdd6f4;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-family: monospace;
-    }
-
-    .file-stats { font-size: 0.72rem; color: #8f96b3; white-space: nowrap; flex-shrink: 0; }
-    .file-stat-add { color: #a6e3a1; }
-    .file-stat-del { color: #f38ba8; }
-
-    .reviews-list { display: flex; flex-direction: column; gap: 0.4rem; }
-
-    .review-entry {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      padding: 0.4rem 0.6rem;
-      background: #181825;
-      border-radius: 4px;
-      font-size: 0.8rem;
-    }
-
-    .review-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-
-    .review-avatar-fallback {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #89b4fa, #fab387);
-      color: #11111b;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.65rem;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    .review-login { color: #cdd6f4; font-weight: 600; }
-    .review-state-approved { color: #a6e3a1; }
-    .review-state-changes { color: #f38ba8; }
-    .review-state-commented { color: #a6adc8; }
-
-    /* Edit form */
-    .edit-form {
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      border-bottom: 1px solid #313244;
-      background: #181825;
-    }
-
-    .edit-form input, .edit-form textarea {
-      background: #1e1e2e;
-      border: 1px solid #45475a;
-      border-radius: 6px;
-      color: #cdd6f4;
-      font-size: 0.875rem;
-      padding: 0.5rem 0.75rem;
-      font-family: inherit;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    .edit-form textarea {
-      min-height: 100px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    .edit-form input:focus, .edit-form textarea:focus {
-      outline: none;
-      border-color: #89b4fa;
-    }
-
-    .edit-form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
-
-    /* Create form */
-    .create-form {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.85rem;
-    }
-
-    .create-form-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #eef1ff;
-      margin-bottom: 0.25rem;
-    }
-
-    .form-label {
-      font-size: 0.78rem;
-      color: #a6adc8;
-      margin-bottom: 0.25rem;
-      display: block;
-    }
-
-    .create-form input, .create-form textarea {
-      background: #1e1e2e;
-      border: 1px solid #45475a;
-      border-radius: 6px;
-      color: #cdd6f4;
-      font-size: 0.875rem;
-      padding: 0.5rem 0.75rem;
-      font-family: inherit;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    .create-form textarea {
-      min-height: 120px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    .create-form input:focus, .create-form textarea:focus {
-      outline: none;
-      border-color: #89b4fa;
-    }
-
-    .form-row { display: flex; gap: 0.75rem; }
-    .form-row > div { flex: 1; }
-
-    .form-check {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      color: #a6adc8;
-      cursor: pointer;
-    }
-
-    .create-form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem; }
-
-    .placeholder-detail {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-      color: #6c7086;
-      font-size: 0.9rem;
-    }
-
-    .placeholder-icon { font-size: 2.5rem; }
-
-    .loading, .error-msg, .empty-msg {
-      padding: 2rem 1rem;
-      text-align: center;
-      color: #6c7086;
-      font-size: 0.88rem;
-    }
-
-    .error-msg { color: #f38ba8; }
-    .action-error { color: #f38ba8; font-size: 0.8rem; padding: 0.5rem 1rem; background: rgba(243,139,168,0.08); border-radius: 4px; }
-  `;
-
+export class PullRequestsView extends AppElement {
   @property() repoId = '';
 
   @state() private prs: PullRequestListItem[] = [];
@@ -789,29 +189,29 @@ export class PullRequestsView extends LitElement {
   }
 
   private renderStateBadge(state: string, isDraft: boolean) {
-    if (isDraft) return html`<span class="badge badge-draft">Draft</span>`;
+    if (isDraft) return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(166,173,200,0.15)] text-cat-subtext border border-[rgba(166,173,200,0.3)]">Draft</span>`;
     const s = state.toLowerCase();
-    if (s === 'merged') return html`<span class="badge badge-merged">Merged</span>`;
-    if (s === 'closed') return html`<span class="badge badge-closed">Closed</span>`;
-    return html`<span class="badge badge-open">Open</span>`;
+    if (s === 'merged') return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(203,166,247,0.15)] text-[#cba6f7] border border-[rgba(203,166,247,0.3)]">Merged</span>`;
+    if (s === 'closed') return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(243,139,168,0.15)] text-cat-red border border-[rgba(243,139,168,0.3)]">Closed</span>`;
+    return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(166,227,161,0.15)] text-cat-green border border-[rgba(166,227,161,0.3)]">Open</span>`;
   }
 
   private renderAvatar(avatarUrl: string, login: string, size: 'small' | 'medium' = 'small') {
     if (size === 'small') {
       return avatarUrl
-        ? html`<img class="avatar-small" src=${avatarUrl} alt=${login} />`
-        : html`<div class="avatar-fallback-small">${login.charAt(0).toUpperCase()}</div>`;
+        ? html`<img class="w-4 h-4 rounded-full object-cover" src=${avatarUrl} alt=${login} />`
+        : html`<div class="w-4 h-4 rounded-full bg-gradient-to-br from-cat-blue to-cat-peach text-[#11111b] flex items-center justify-center text-[0.55rem] font-bold shrink-0">${login.charAt(0).toUpperCase()}</div>`;
     }
     return avatarUrl
-      ? html`<img class="review-avatar" src=${avatarUrl} alt=${login} />`
-      : html`<div class="review-avatar-fallback">${login.charAt(0).toUpperCase()}</div>`;
+      ? html`<img class="w-6 h-6 rounded-full object-cover shrink-0" src=${avatarUrl} alt=${login} />`
+      : html`<div class="w-6 h-6 rounded-full bg-gradient-to-br from-cat-blue to-cat-peach text-[#11111b] flex items-center justify-center text-[0.65rem] font-bold shrink-0">${login.charAt(0).toUpperCase()}</div>`;
   }
 
-  private renderFileStatusClass(status: string) {
-    if (status === 'added') return 'file-status-added';
-    if (status === 'removed') return 'file-status-removed';
-    if (status === 'renamed') return 'file-status-renamed';
-    return 'file-status-modified';
+  private renderFileStatusColor(status: string) {
+    if (status === 'added') return 'text-cat-green';
+    if (status === 'removed') return 'text-cat-red';
+    if (status === 'renamed') return 'text-cat-blue';
+    return 'text-cat-peach';
   }
 
   private renderFileStatusChar(status: string) {
@@ -821,10 +221,10 @@ export class PullRequestsView extends LitElement {
     return 'M';
   }
 
-  private renderReviewStateClass(state: string) {
-    if (state === 'APPROVED') return 'review-state-approved';
-    if (state === 'CHANGES_REQUESTED') return 'review-state-changes';
-    return 'review-state-commented';
+  private renderReviewStateColor(state: string) {
+    if (state === 'APPROVED') return 'text-cat-green';
+    if (state === 'CHANGES_REQUESTED') return 'text-cat-red';
+    return 'text-cat-subtext';
   }
 
   private renderReviewStateLabel(state: string) {
@@ -841,29 +241,33 @@ export class PullRequestsView extends LitElement {
     const isMerged = state === 'merged';
 
     return html`
-      <div class="detail-actions">
+      <div class="flex gap-1.5 shrink-0 flex-wrap items-center">
         ${isOpen ? html`
-          <button class="action-btn" ?disabled=${busy} @click=${this._openEditForm}>Bearbeiten</button>
-          <div class="merge-wrapper">
-            <button class="action-btn success" ?disabled=${busy}
+          <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay disabled:opacity-45 disabled:cursor-not-allowed"
+            ?disabled=${busy} @click=${this._openEditForm}>Bearbeiten</button>
+          <div class="relative">
+            <button class="px-3 py-1 text-[0.78rem] border border-cat-green rounded-md bg-transparent text-cat-green cursor-pointer whitespace-nowrap hover:bg-[rgba(166,227,161,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+              ?disabled=${busy}
               @click=${() => this.showMergeDropdown = !this.showMergeDropdown}>
               ⇝ Mergen ▾
             </button>
             ${this.showMergeDropdown ? html`
-              <div class="merge-dropdown">
-                <div class="merge-option" @click=${() => this._doMerge('merge')}>Merge commit</div>
-                <div class="merge-option" @click=${() => this._doMerge('squash')}>Squash and merge</div>
-                <div class="merge-option" @click=${() => this._doMerge('rebase')}>Rebase and merge</div>
+              <div class="absolute top-[calc(100%+4px)] right-0 bg-cat-surface border border-cat-muted rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.4)] z-[200] min-w-[160px] overflow-hidden">
+                <div class="px-3 py-2 text-[0.82rem] text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay" @click=${() => this._doMerge('merge')}>Merge commit</div>
+                <div class="px-3 py-2 text-[0.82rem] text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay" @click=${() => this._doMerge('squash')}>Squash and merge</div>
+                <div class="px-3 py-2 text-[0.82rem] text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay" @click=${() => this._doMerge('rebase')}>Rebase and merge</div>
               </div>
             ` : ''}
           </div>
-          <button class="action-btn danger" ?disabled=${busy} @click=${this._doClose}>Schließen</button>
+          <button class="px-3 py-1 text-[0.78rem] border border-cat-red rounded-md bg-transparent text-cat-red cursor-pointer whitespace-nowrap hover:bg-[rgba(243,139,168,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+            ?disabled=${busy} @click=${this._doClose}>Schließen</button>
         ` : ''}
         ${isClosed ? html`
-          <button class="action-btn success" ?disabled=${busy} @click=${this._doReopen}>Wiedereröffnen</button>
+          <button class="px-3 py-1 text-[0.78rem] border border-cat-green rounded-md bg-transparent text-cat-green cursor-pointer whitespace-nowrap hover:bg-[rgba(166,227,161,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+            ?disabled=${busy} @click=${this._doReopen}>Wiedereröffnen</button>
         ` : ''}
         ${isMerged ? '' : ''}
-        <button class="open-github-btn"
+        <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-blue cursor-pointer whitespace-nowrap shrink-0 hover:bg-[rgba(137,180,250,0.1)] hover:border-cat-blue"
           @click=${() => window.open(pr.htmlUrl, '_blank')}>
           Auf GitHub ↗
         </button>
@@ -873,181 +277,193 @@ export class PullRequestsView extends LitElement {
 
   render() {
     return html`
-      <div class="list-panel">
-        <div class="panel-header">
-          <div class="panel-title-row">
-            <span class="panel-title">Pull Requests</span>
-            <button class="create-btn" @click=${() => { this.showCreateForm = true; this.selectedNumber = null; this.selectedPr = null; this.actionError = null; }}>
+      <div class="w-[380px] min-w-[380px] flex flex-col border-r border-cat-border bg-cat-surface overflow-hidden">
+        <div class="px-4 py-[0.85rem] border-b border-cat-border flex flex-col gap-2 shrink-0 bg-cat-surface">
+          <div class="flex items-center justify-between">
+            <span class="text-[0.95rem] font-bold text-[#eef1ff]">Pull Requests</span>
+            <button class="px-2.5 py-0.5 text-[0.75rem] border border-cat-green rounded bg-transparent text-cat-green cursor-pointer hover:bg-[rgba(166,227,161,0.1)]"
+              @click=${() => { this.showCreateForm = true; this.selectedNumber = null; this.selectedPr = null; this.actionError = null; }}>
               + Neu
             </button>
           </div>
-          <div class="filter-row">
-            <button class="filter-btn ${this.stateFilter === 'open' ? 'active' : ''}"
+          <div class="flex gap-1.5 items-center">
+            <button class="px-2.5 py-0.5 text-[0.75rem] border border-cat-muted rounded bg-transparent text-cat-subtext cursor-pointer transition-all hover:bg-cat-overlay hover:text-cat-text ${this.stateFilter === 'open' ? 'bg-cat-blue border-cat-blue !text-[#11111b] font-semibold' : ''}"
               @click=${() => this.setFilter('open')}>Open</button>
-            <button class="filter-btn ${this.stateFilter === 'closed' ? 'active' : ''}"
+            <button class="px-2.5 py-0.5 text-[0.75rem] border border-cat-muted rounded bg-transparent text-cat-subtext cursor-pointer transition-all hover:bg-cat-overlay hover:text-cat-text ${this.stateFilter === 'closed' ? 'bg-cat-blue border-cat-blue !text-[#11111b] font-semibold' : ''}"
               @click=${() => this.setFilter('closed')}>Closed</button>
-            <button class="filter-btn ${this.stateFilter === 'all' ? 'active' : ''}"
+            <button class="px-2.5 py-0.5 text-[0.75rem] border border-cat-muted rounded bg-transparent text-cat-subtext cursor-pointer transition-all hover:bg-cat-overlay hover:text-cat-text ${this.stateFilter === 'all' ? 'bg-cat-blue border-cat-blue !text-[#11111b] font-semibold' : ''}"
               @click=${() => this.setFilter('all')}>All</button>
-            <button class="refresh-btn" @click=${() => this.loadPrs()} ?disabled=${this.loading}>
+            <button class="ml-auto px-2.5 py-0.5 text-[0.75rem] border border-cat-muted rounded bg-transparent text-cat-subtext cursor-pointer hover:bg-cat-overlay hover:text-cat-text disabled:opacity-45 disabled:cursor-not-allowed"
+              @click=${() => this.loadPrs()} ?disabled=${this.loading}>
               ↻ Aktualisieren
             </button>
           </div>
         </div>
 
-        <div class="list-scroll">
+        <div class="flex-1 overflow-y-auto">
           ${this.loading
-            ? html`<div class="loading">Lade Pull Requests...</div>`
+            ? html`<div class="p-8 text-center text-cat-subtle text-[0.88rem]">Lade Pull Requests...</div>`
             : this.error
-            ? html`<div class="error-msg">${this.error}</div>`
+            ? html`<div class="p-8 text-center text-cat-red text-[0.88rem]">${this.error}</div>`
             : this.prs.length === 0
-            ? html`<div class="empty-msg">Keine Pull Requests gefunden.</div>`
+            ? html`<div class="p-8 text-center text-cat-subtle text-[0.88rem]">Keine Pull Requests gefunden.</div>`
             : this.prs.map(pr => html`
-              <div class="pr-entry ${this.selectedNumber === pr.number ? 'selected' : ''}"
+              <div class="px-4 py-[0.85rem] border-b border-[rgba(49,50,68,0.8)] cursor-pointer flex flex-col gap-[0.35rem] hover:bg-[#25273a] ${this.selectedNumber === pr.number ? 'bg-cat-overlay' : ''}"
                 @click=${() => this.selectPr(pr.number)}>
-                <div class="pr-entry-top">
-                  <span class="pr-number">#${pr.number}</span>
-                  <span class="pr-title">${pr.title}</span>
+                <div class="flex items-start gap-2">
+                  <span class="text-[0.75rem] text-[#8f96b3] whitespace-nowrap shrink-0 mt-[0.1rem]">#${pr.number}</span>
+                  <span class="text-[0.87rem] font-semibold text-[#eef1ff] leading-[1.3] flex-1 min-w-0 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">${pr.title}</span>
                 </div>
-                <div class="pr-entry-meta">
+                <div class="flex flex-wrap items-center gap-[0.4rem] text-[0.74rem] text-[#8f96b3]">
                   ${this.renderStateBadge(pr.state, pr.isDraft)}
-                  <div class="pr-author">
+                  <div class="flex items-center gap-1">
                     ${this.renderAvatar(pr.authorAvatarUrl, pr.authorLogin)}
                     <span>${pr.authorLogin}</span>
                   </div>
-                  <span class="pr-branch">${pr.headBranch} → ${pr.baseBranch}</span>
-                  ${pr.labels.map(l => html`<span class="badge badge-label">${l}</span>`)}
+                  <span class="font-mono text-[0.72rem] text-cat-blue">${pr.headBranch} → ${pr.baseBranch}</span>
+                  ${pr.labels.map(l => html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(137,180,250,0.15)] text-cat-blue border border-[rgba(137,180,250,0.3)]">${l}</span>`)}
                 </div>
               </div>
             `)}
         </div>
       </div>
 
-      <div class="detail-panel">
+      <div class="flex-1 flex flex-col overflow-hidden min-w-0">
         ${this.showCreateForm ? html`
-          <div class="create-form">
-            <div class="create-form-title">Neuer Pull Request</div>
+          <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-[0.85rem]">
+            <div class="text-[0.95rem] font-bold text-[#eef1ff] mb-1">Neuer Pull Request</div>
 
             <div>
-              <label class="form-label">Titel *</label>
-              <input type="text" .value=${this.createTitle}
+              <label class="block text-[0.78rem] text-cat-subtext mb-1">Titel *</label>
+              <input class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border focus:outline-none focus:border-cat-blue"
+                type="text" .value=${this.createTitle}
                 @input=${(e: Event) => this.createTitle = (e.target as HTMLInputElement).value}
                 placeholder="PR-Titel" />
             </div>
 
-            <div class="form-row">
-              <div>
-                <label class="form-label">Head-Branch *</label>
-                <input type="text" .value=${this.createHead}
+            <div class="flex gap-3">
+              <div class="flex-1">
+                <label class="block text-[0.78rem] text-cat-subtext mb-1">Head-Branch *</label>
+                <input class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border focus:outline-none focus:border-cat-blue"
+                  type="text" .value=${this.createHead}
                   @input=${(e: Event) => this.createHead = (e.target as HTMLInputElement).value}
                   placeholder="feature/mein-feature" />
               </div>
-              <div>
-                <label class="form-label">Base-Branch *</label>
-                <input type="text" .value=${this.createBase}
+              <div class="flex-1">
+                <label class="block text-[0.78rem] text-cat-subtext mb-1">Base-Branch *</label>
+                <input class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border focus:outline-none focus:border-cat-blue"
+                  type="text" .value=${this.createBase}
                   @input=${(e: Event) => this.createBase = (e.target as HTMLInputElement).value}
                   placeholder="main" />
               </div>
             </div>
 
             <div>
-              <label class="form-label">Beschreibung</label>
-              <textarea .value=${this.createBody}
+              <label class="block text-[0.78rem] text-cat-subtext mb-1">Beschreibung</label>
+              <textarea class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border min-h-[120px] resize-y leading-[1.5] focus:outline-none focus:border-cat-blue"
+                .value=${this.createBody}
                 @input=${(e: Event) => this.createBody = (e.target as HTMLTextAreaElement).value}
                 placeholder="Beschreibung des Pull Requests..."></textarea>
             </div>
 
-            <label class="form-check">
+            <label class="flex items-center gap-2 text-[0.85rem] text-cat-subtext cursor-pointer">
               <input type="checkbox" .checked=${this.createDraft}
                 @change=${(e: Event) => this.createDraft = (e.target as HTMLInputElement).checked} />
               Als Draft erstellen
             </label>
 
-            ${this.actionError ? html`<div class="action-error">${this.actionError}</div>` : ''}
+            ${this.actionError ? html`<div class="text-cat-red text-[0.8rem] px-4 py-2 bg-[rgba(243,139,168,0.08)] rounded">${this.actionError}</div>` : ''}
 
-            <div class="create-form-actions">
-              <button class="action-btn" @click=${() => { this.showCreateForm = false; this.actionError = null; }}>
+            <div class="flex gap-2 justify-end mt-1">
+              <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay"
+                @click=${() => { this.showCreateForm = false; this.actionError = null; }}>
                 Abbrechen
               </button>
-              <button class="action-btn primary" ?disabled=${this.actionBusy} @click=${this._doCreate}>
+              <button class="px-3 py-1 text-[0.78rem] border border-cat-blue rounded-md bg-transparent text-cat-blue cursor-pointer whitespace-nowrap hover:bg-[rgba(137,180,250,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+                ?disabled=${this.actionBusy} @click=${this._doCreate}>
                 ${this.actionBusy ? 'Erstelle...' : 'Pull Request erstellen'}
               </button>
             </div>
           </div>
         ` : this.selectedNumber === null
           ? html`
-            <div class="placeholder-detail">
-              <span class="placeholder-icon">🔀</span>
+            <div class="flex-1 flex flex-col items-center justify-center gap-3 text-cat-subtle text-[0.9rem]">
+              <span class="text-[2.5rem]">🔀</span>
               <span>Pull Request auswählen</span>
             </div>
           `
           : this.loadingDetail
-          ? html`<div class="loading">Lade Details...</div>`
+          ? html`<div class="p-8 text-center text-cat-subtle text-[0.88rem]">Lade Details...</div>`
           : this.detailError
-          ? html`<div class="error-msg">${this.detailError}</div>`
+          ? html`<div class="p-8 text-center text-cat-red text-[0.88rem]">${this.detailError}</div>`
           : this.selectedPr
           ? html`
-            <div class="detail-header">
-              <div class="detail-header-top">
-                <div class="detail-title">#${this.selectedPr.number} ${this.selectedPr.title}</div>
+            <div class="px-4 py-[0.9rem] border-b border-cat-border bg-cat-surface shrink-0">
+              <div class="flex items-start justify-between gap-4 mb-2">
+                <div class="text-[1rem] font-bold text-[#eef1ff] leading-[1.4] flex-1">#${this.selectedPr.number} ${this.selectedPr.title}</div>
                 ${this._renderDetailActions(this.selectedPr)}
               </div>
-              <div class="detail-meta">
+              <div class="flex flex-wrap items-center gap-2 text-[0.78rem] text-cat-subtext">
                 ${this.renderStateBadge(this.selectedPr.state, this.selectedPr.isDraft)}
-                <div class="pr-author">
+                <div class="flex items-center gap-1">
                   ${this.renderAvatar(this.selectedPr.authorAvatarUrl, this.selectedPr.authorLogin)}
                   <span>${this.selectedPr.authorLogin}</span>
                 </div>
-                <span class="branch-flow">${this.selectedPr.headBranch} → ${this.selectedPr.baseBranch}</span>
-                ${this.selectedPr.labels.map(l => html`<span class="badge badge-label">${l}</span>`)}
+                <span class="font-mono text-[0.78rem] text-cat-blue">${this.selectedPr.headBranch} → ${this.selectedPr.baseBranch}</span>
+                ${this.selectedPr.labels.map(l => html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(137,180,250,0.15)] text-cat-blue border border-[rgba(137,180,250,0.3)]">${l}</span>`)}
                 ${this.selectedPr.ciHasCombinedStatus ? html`
-                  <div class="ci-indicator">
-                    <div class="ci-dot ${this.selectedPr.ciPassing ? 'passing' : 'failing'}"></div>
+                  <div class="flex items-center gap-1.5 text-[0.78rem]">
+                    <div class="w-2 h-2 rounded-full shrink-0 ${this.selectedPr.ciPassing ? 'bg-cat-green' : 'bg-cat-red'}"></div>
                     <span>CI ${this.selectedPr.ciPassing ? 'bestanden' : 'fehlgeschlagen'}</span>
                   </div>
                 ` : ''}
               </div>
-              ${this.actionError ? html`<div class="action-error" style="margin-top:0.5rem">${this.actionError}</div>` : ''}
+              ${this.actionError ? html`<div class="text-cat-red text-[0.8rem] px-4 py-2 bg-[rgba(243,139,168,0.08)] rounded mt-2">${this.actionError}</div>` : ''}
             </div>
 
             ${this.showEditForm ? html`
-              <div class="edit-form">
-                <input type="text" .value=${this.editTitle}
+              <div class="px-4 py-4 flex flex-col gap-3 border-b border-cat-border bg-cat-base">
+                <input class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border focus:outline-none focus:border-cat-blue"
+                  type="text" .value=${this.editTitle}
                   @input=${(e: Event) => this.editTitle = (e.target as HTMLInputElement).value}
                   placeholder="Titel" />
-                <textarea .value=${this.editBody}
+                <textarea class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border min-h-[100px] resize-y leading-[1.5] focus:outline-none focus:border-cat-blue"
+                  .value=${this.editBody}
                   @input=${(e: Event) => this.editBody = (e.target as HTMLTextAreaElement).value}
                   placeholder="Beschreibung"></textarea>
-                <div class="edit-form-actions">
-                  <button class="action-btn" @click=${() => this.showEditForm = false}>Abbrechen</button>
-                  <button class="action-btn primary" ?disabled=${this.actionBusy} @click=${this._doEdit}>
+                <div class="flex gap-2 justify-end">
+                  <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay"
+                    @click=${() => this.showEditForm = false}>Abbrechen</button>
+                  <button class="px-3 py-1 text-[0.78rem] border border-cat-blue rounded-md bg-transparent text-cat-blue cursor-pointer whitespace-nowrap hover:bg-[rgba(137,180,250,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+                    ?disabled=${this.actionBusy} @click=${this._doEdit}>
                     ${this.actionBusy ? 'Speichere...' : 'Speichern'}
                   </button>
                 </div>
               </div>
             ` : ''}
 
-            <div class="detail-scroll">
+            <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
               ${this.selectedPr.body ? html`
                 <div>
-                  <div class="section-title">Beschreibung</div>
-                  <pre class="pr-body">${this.selectedPr.body}</pre>
+                  <div class="text-[0.8rem] font-bold text-cat-subtext uppercase tracking-[0.07em] mb-2">Beschreibung</div>
+                  <pre class="text-[0.85rem] text-cat-text leading-[1.6] whitespace-pre-wrap font-[inherit] bg-cat-base px-3 py-3 rounded-md border border-cat-border m-0">${this.selectedPr.body}</pre>
                 </div>
               ` : ''}
 
               ${this.selectedPr.files.length > 0 ? html`
                 <div>
-                  <div class="section-title">Geänderte Dateien (${this.selectedPr.files.length})</div>
-                  <div class="files-list">
+                  <div class="text-[0.8rem] font-bold text-cat-subtext uppercase tracking-[0.07em] mb-2">Geänderte Dateien (${this.selectedPr.files.length})</div>
+                  <div class="flex flex-col gap-1">
                     ${this.selectedPr.files.map(f => html`
-                      <div class="file-entry">
-                        <span class="file-status ${this.renderFileStatusClass(f.status)}">
+                      <div class="flex items-center gap-2.5 px-2.5 py-1.5 bg-cat-base rounded text-[0.8rem]">
+                        <span class="text-[0.7rem] font-bold w-[18px] text-center shrink-0 ${this.renderFileStatusColor(f.status)}">
                           ${this.renderFileStatusChar(f.status)}
                         </span>
-                        <span class="file-name">${f.fileName}</span>
-                        <span class="file-stats">
-                          <span class="file-stat-add">+${f.additions}</span>
+                        <span class="flex-1 text-cat-text min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono">${f.fileName}</span>
+                        <span class="text-[0.72rem] text-[#8f96b3] whitespace-nowrap shrink-0">
+                          <span class="text-cat-green">+${f.additions}</span>
                           <span> / </span>
-                          <span class="file-stat-del">-${f.deletions}</span>
+                          <span class="text-cat-red">-${f.deletions}</span>
                         </span>
                       </div>
                     `)}
@@ -1057,13 +473,13 @@ export class PullRequestsView extends LitElement {
 
               ${this.selectedPr.reviews.length > 0 ? html`
                 <div>
-                  <div class="section-title">Reviews (${this.selectedPr.reviews.length})</div>
-                  <div class="reviews-list">
+                  <div class="text-[0.8rem] font-bold text-cat-subtext uppercase tracking-[0.07em] mb-2">Reviews (${this.selectedPr.reviews.length})</div>
+                  <div class="flex flex-col gap-1.5">
                     ${this.selectedPr.reviews.map(r => html`
-                      <div class="review-entry">
+                      <div class="flex items-center gap-2.5 px-2.5 py-1.5 bg-cat-base rounded text-[0.8rem]">
                         ${this.renderAvatar(r.reviewerAvatarUrl, r.reviewerLogin, 'medium')}
-                        <span class="review-login">${r.reviewerLogin}</span>
-                        <span class="${this.renderReviewStateClass(r.state)}">
+                        <span class="text-cat-text font-semibold">${r.reviewerLogin}</span>
+                        <span class="${this.renderReviewStateColor(r.state)}">
                           ${this.renderReviewStateLabel(r.state)}
                         </span>
                       </div>
