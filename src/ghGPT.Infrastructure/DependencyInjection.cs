@@ -11,6 +11,7 @@ public static class DependencyInjection
         services.AddAiServices();
         services.AddRepositoryServices();
         services.AddPullRequestServices();
+        services.AddIssueServices();
         return services;
     }
 }

@@ -85,7 +85,8 @@ branches-view {
   overflow: hidden;
 }
 
-pull-requests-view {
+pull-requests-view,
+issues-view {
   display: flex;
   height: 100%;
   overflow: hidden;
