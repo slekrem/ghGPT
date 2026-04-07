@@ -138,6 +138,16 @@ export interface PullRequestDetail {
   updatedAt: string;
 }
 
+export interface DiscussionItem {
+  number: number;
+  title: string;
+  body: string;
+  url: string;
+  createdAt: string;
+  authorLogin: string;
+  categoryName: string;
+}
+
 export interface IssueLabel {
   name: string;
   color: string;
@@ -261,6 +271,11 @@ export const repositoryService = {
     api.patch<void>(`/repos/${id}/pull-requests/${number}/reopen`, {}),
   mergePullRequest: (id: string, number: number, method: 'merge' | 'squash' | 'rebase' = 'merge', commitTitle?: string, commitBody?: string) =>
     api.post<void>(`/repos/${id}/pull-requests/${number}/merge`, { method, commitTitle, commitBody }),
+
+  getDiscussions: (id: string, limit = 30) =>
+    api.get<DiscussionItem[]>(`/repos/${id}/discussions?limit=${limit}`),
+  createDiscussion: (id: string, title: string, body: string, category?: string) =>
+    api.post<DiscussionItem>(`/repos/${id}/discussions`, { title, body, category }),
 
   getReleases: (id: string, limit = 30) =>
     api.get<ReleaseListItem[]>(`/repos/${id}/releases?limit=${limit}`),

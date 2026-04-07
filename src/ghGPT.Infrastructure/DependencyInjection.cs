@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddPullRequestServices();
         services.AddIssueServices();
         services.AddReleaseServices();
+        services.AddDiscussionServices();
         return services;
     }
 }

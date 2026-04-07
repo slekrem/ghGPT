@@ -87,7 +87,8 @@ branches-view {
 
 pull-requests-view,
 issues-view,
-releases-view {
+releases-view,
+discussions-view {
   display: flex;
   height: 100%;
   overflow: hidden;
