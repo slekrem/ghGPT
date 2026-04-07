@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddRepositoryServices();
         services.AddPullRequestServices();
         services.AddIssueServices();
+        services.AddReleaseServices();
         return services;
     }
 }

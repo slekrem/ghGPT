@@ -167,6 +167,26 @@ export interface IssueDetail {
   url: string;
 }
 
+export interface ReleaseListItem {
+  tagName: string;
+  name: string;
+  publishedAt: string;
+  isDraft: boolean;
+  isPrerelease: boolean;
+  isLatest: boolean;
+}
+
+export interface ReleaseDetail {
+  tagName: string;
+  name: string;
+  body: string | null;
+  publishedAt: string;
+  isDraft: boolean;
+  isPrerelease: boolean;
+  url: string;
+  authorLogin: string;
+}
+
 export interface StageLinesRequest {
   filePath: string;
   patch: string;
@@ -241,6 +261,13 @@ export const repositoryService = {
     api.patch<void>(`/repos/${id}/pull-requests/${number}/reopen`, {}),
   mergePullRequest: (id: string, number: number, method: 'merge' | 'squash' | 'rebase' = 'merge', commitTitle?: string, commitBody?: string) =>
     api.post<void>(`/repos/${id}/pull-requests/${number}/merge`, { method, commitTitle, commitBody }),
+
+  getReleases: (id: string, limit = 30) =>
+    api.get<ReleaseListItem[]>(`/repos/${id}/releases?limit=${limit}`),
+  getLatestRelease: (id: string) =>
+    api.get<ReleaseDetail>(`/repos/${id}/releases/latest`),
+  getReleaseByTag: (id: string, tag: string) =>
+    api.get<ReleaseDetail>(`/repos/${id}/releases/${encodeURIComponent(tag)}`),
 
   getIssues: (id: string, state: 'open' | 'closed' | 'all' = 'open') =>
     api.get<IssueListItem[]>(`/repos/${id}/issues?state=${state}`),
