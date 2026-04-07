@@ -559,7 +559,7 @@ export class ChangesView extends AppElement {
           const isChecked = selectable && this.stagedLineKeys.has(line.lineKey);
 
           return html`
-            <div data-testid="diff-line" data-type=${line.type} class="flex leading-[1.5] whitespace-pre">
+            <div data-testid="diff-line" data-type=${line.type} class="diff-line ${line.type} flex leading-[1.5] whitespace-pre">
               <span data-testid="diff-line-num" class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.oldNum}</span>
               <span data-testid="diff-line-num" class="w-8 shrink-0 text-cat-muted select-none text-right pr-2">${line.newNum}</span>
               <span data-testid="diff-line-check" class="w-5 shrink-0 flex items-center justify-center">
