@@ -12,10 +12,11 @@ import './history-view';
 import './branches-view';
 import './pull-requests-view';
 import './issues-view';
+import './releases-view';
 import './settings-view';
 import './chat-panel';
 
-type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'issues' | 'settings';
+type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'issues' | 'releases' | 'settings';
 
 @customElement('app-shell')
 export class AppShell extends AppElement {
@@ -80,7 +81,7 @@ export class AppShell extends AppElement {
 
   render() {
     const s = this._appState;
-    const isPadded = this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' && this.activeView !== 'issues';
+    const isPadded = this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' && this.activeView !== 'issues' && this.activeView !== 'releases';
     const contentClass = `flex flex-col flex-1 overflow-hidden text-cat-text${isPadded ? ' p-4 overflow-auto' : ''}`;
     return html`
       <app-sidebar
@@ -163,6 +164,8 @@ export class AppShell extends AppElement {
         return html`<pull-requests-view .repoId=${s.activeRepoId ?? ''}></pull-requests-view>`;
       case 'issues':
         return html`<issues-view .repoId=${s.activeRepoId ?? ''}></issues-view>`;
+      case 'releases':
+        return html`<releases-view .repoId=${s.activeRepoId ?? ''}></releases-view>`;
       case 'settings':
         return html`<settings-view @account-changed=${this._onAccountChanged}></settings-view>`;
     }
