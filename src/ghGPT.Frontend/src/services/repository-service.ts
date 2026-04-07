@@ -138,6 +138,35 @@ export interface PullRequestDetail {
   updatedAt: string;
 }
 
+export interface IssueLabel {
+  name: string;
+  color: string;
+}
+
+export interface IssueListItem {
+  number: number;
+  title: string;
+  state: string;
+  authorLogin: string;
+  labels: IssueLabel[];
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+}
+
+export interface IssueDetail {
+  number: number;
+  title: string;
+  state: string;
+  authorLogin: string;
+  labels: IssueLabel[];
+  assignees: string[];
+  body: string | null;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+}
+
 export interface StageLinesRequest {
   filePath: string;
   patch: string;
@@ -212,6 +241,15 @@ export const repositoryService = {
     api.patch<void>(`/repos/${id}/pull-requests/${number}/reopen`, {}),
   mergePullRequest: (id: string, number: number, method: 'merge' | 'squash' | 'rebase' = 'merge', commitTitle?: string, commitBody?: string) =>
     api.post<void>(`/repos/${id}/pull-requests/${number}/merge`, { method, commitTitle, commitBody }),
+
+  getIssues: (id: string, state: 'open' | 'closed' | 'all' = 'open') =>
+    api.get<IssueListItem[]>(`/repos/${id}/issues?state=${state}`),
+  getIssueDetail: (id: string, number: number) =>
+    api.get<IssueDetail>(`/repos/${id}/issues/${number}`),
+  createIssue: (id: string, title: string, body: string, labels?: string[]) =>
+    api.post<IssueListItem>(`/repos/${id}/issues`, { title, body, labels }),
+  addIssueComment: (id: string, number: number, body: string) =>
+    api.post<void>(`/repos/${id}/issues/${number}/comments`, { body }),
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),

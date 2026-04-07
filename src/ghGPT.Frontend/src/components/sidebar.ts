@@ -4,7 +4,7 @@ import { AppElement } from '../app-element';
 import type { RepositoryInfo, AccountInfo } from '../services/repository-service';
 import type { HubConnectionStatus } from '../services/hub-client';
 
-type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'settings';
+type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'issues' | 'settings';
 
 @customElement('app-sidebar')
 export class AppSidebar extends AppElement {
@@ -80,6 +80,11 @@ export class AppSidebar extends AppElement {
                     ${this.activeView === 'pull-requests' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
           @click=${() => this.dispatch('navigate', 'pull-requests')}>
           <span>🔀</span> Pull Requests
+        </div>
+        <div data-testid="nav-item" class="flex items-center gap-2 px-4 py-[0.4rem] cursor-pointer text-sm transition-colors whitespace-nowrap overflow-hidden text-ellipsis
+                    ${this.activeView === 'issues' ? 'bg-[#45475a] text-[#cba6f7]' : 'text-cat-text hover:bg-cat-overlay'}"
+          @click=${() => this.dispatch('navigate', 'issues')}>
+          <span>🐛</span> Issues
         </div>
 
         <div class="flex items-center justify-between px-4 py-1 text-[0.65rem] uppercase tracking-widest text-cat-subtle mt-2">App</div>
