@@ -23,7 +23,7 @@ public interface IRepositoryService
     Task PushAsync(string id, IProgress<string>? progress = null);
     void Remove(string id);
     IReadOnlyList<BranchInfo> GetBranches(string id);
-    void CheckoutBranch(string id, string branchName);
+    void CheckoutBranch(string id, string branchName, CheckoutStrategy strategy = CheckoutStrategy.Normal, string? stashMessage = null);
     BranchInfo CreateBranch(string id, string name, string? startPoint = null);
     Task DeleteBranch(string id, string branchName);
     void RefreshCurrentBranch(string id);

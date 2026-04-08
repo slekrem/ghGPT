@@ -160,7 +160,7 @@ export class AppShell extends AppElement {
       case 'history':
         return html`<history-view .repoId=${s.activeRepoId ?? ''} .branch=${s.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
-        return html`<branches-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this._onBranchChanged}></branches-view>`;
+        return html`<branches-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this._onBranchChanged} @navigate-to-changes=${() => this.activeView = 'changes'}></branches-view>`;
       case 'pull-requests':
         return html`<pull-requests-view .repoId=${s.activeRepoId ?? ''}></pull-requests-view>`;
       case 'issues':

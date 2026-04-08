@@ -459,7 +459,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             .ToList();
     }
 
-    public void CheckoutBranch(string id, string branchName)
+    public void CheckoutBranch(string id, string branchName, CheckoutStrategy strategy = CheckoutStrategy.Normal, string? stashMessage = null)
     {
         var info = GetRepoById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
@@ -469,8 +469,21 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             e.State != FileStatus.Ignored &&
             e.State != FileStatus.Unaltered);
 
-        if (isDirty)
-            throw new InvalidOperationException("Uncommitted changes vorhanden. Bitte zuerst committen oder stashen.");
+        if (isDirty && strategy == CheckoutStrategy.Normal)
+            throw new UncommittedChangesException();
+
+        if (isDirty && strategy == CheckoutStrategy.Stash)
+        {
+            var sig = repo.Config.BuildSignature(DateTimeOffset.Now);
+            repo.Stashes.Add(sig, stashMessage ?? "Auto-stash vor Branch-Wechsel", StashModifiers.Default);
+        }
+
+        if (isDirty && strategy == CheckoutStrategy.Discard)
+        {
+            repo.Reset(ResetMode.Hard);
+            foreach (var entry in status.Where(e => e.State == FileStatus.NewInWorkdir))
+                File.Delete(Path.Combine(info.LocalPath, entry.FilePath));
+        }
 
         var branch = repo.Branches[branchName]
             ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");

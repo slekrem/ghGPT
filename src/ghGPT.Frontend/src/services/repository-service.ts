@@ -250,8 +250,8 @@ export const repositoryService = {
 
   getBranches: (id: string) =>
     api.get<BranchInfo[]>(`/repos/${id}/branches`),
-  checkoutBranch: (id: string, name: string) =>
-    api.put<void>(`/repos/${id}/branches/checkout`, { name }),
+  checkoutBranch: (id: string, name: string, strategy: 'Normal' | 'Carry' | 'Stash' | 'Discard' = 'Normal', stashMessage?: string) =>
+    api.put<void>(`/repos/${id}/branches/checkout`, { name, strategy, stashMessage }),
   createBranch: (id: string, name: string, startPoint?: string) =>
     api.post<BranchInfo>(`/repos/${id}/branches`, { name, startPoint }),
   deleteBranch: (id: string, name: string) =>
