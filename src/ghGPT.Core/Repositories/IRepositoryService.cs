@@ -35,4 +35,6 @@ public interface IRepositoryService
     void PushStash(string id, string? message = null, string[]? paths = null);
     void PopStash(string id, int index = 0);
     void DropStash(string id, int index);
+    void DiscardFile(string id, string filePath);
+    void DiscardLines(string id, string filePath, string patch);
 }

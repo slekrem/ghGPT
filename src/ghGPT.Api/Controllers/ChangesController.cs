@@ -199,6 +199,36 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
         }
     }
 
+    [HttpPost("discard-file")]
+    public ActionResult DiscardFile(string id, [FromQuery] string file)
+    {
+        try
+        {
+            service.DiscardFile(id, file);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("discard-lines")]
+    public ActionResult DiscardLines(string id, [FromBody] StageLinesRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Patch))
+            return BadRequest(new { error = "Patch darf nicht leer sein." });
+        try
+        {
+            service.DiscardLines(id, request.FilePath, request.Patch);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("fetch")]
     public Task<ActionResult> Fetch(string id) =>
         RunGitOperationAsync(id, "fetch", progress => service.FetchAsync(id, progress));
