@@ -6,6 +6,7 @@ import { repositoryService, type StashEntry, type CommitFileChange } from '../se
 @customElement('stashes-view')
 export class StashesView extends AppElement {
   @property() repoId = '';
+  @property({ type: Number }) refreshKey = 0;
 
   @state() private stashes: StashEntry[] = [];
   @state() private loading = false;
@@ -16,7 +17,7 @@ export class StashesView extends AppElement {
   @state() private selectedFileIndex = 0;
 
   updated(changed: Map<string, unknown>) {
-    if (changed.has('repoId') && this.repoId) this.load();
+    if ((changed.has('repoId') || changed.has('refreshKey')) && this.repoId) this.load();
   }
 
   private async load() {

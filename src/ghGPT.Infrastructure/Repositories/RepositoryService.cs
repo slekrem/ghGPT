@@ -665,6 +665,24 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         throw new InvalidOperationException(message);
     }
 
+    private static void RunGitSync(string workingDirectory, string arguments, string errorPrefix)
+    {
+        var psi = new ProcessStartInfo("git", arguments)
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"{errorPrefix}: {error.Trim()}");
+    }
+
     private static string BuildGitOperationError(IEnumerable<string> outputLines)
     {
         var relevantLines = outputLines
@@ -748,6 +766,27 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             Deletions = entry.LinesDeleted,
             Patch = entry.Patch
         }).ToList();
+    }
+
+    public void PushStash(string id, string? message = null, string[]? paths = null)
+    {
+        var info = GetRepoById(id);
+        var msgArg = message is not null ? $"-m \"{message}\" " : "";
+
+        if (paths is { Length: > 0 })
+        {
+            var pathArgs = string.Join(" ", paths.Select(p => $"\"{p}\""));
+            RunGitSync(info.LocalPath, $"stash push {msgArg}-- {pathArgs}", "Stash fehlgeschlagen");
+        }
+        else
+        {
+            using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+            var sig = repo.Config.BuildSignature(DateTimeOffset.Now);
+            var isDirty = repo.RetrieveStatus().IsDirty;
+            if (!isDirty)
+                throw new InvalidOperationException("Keine Änderungen zum Stashen vorhanden.");
+            repo.Stashes.Add(sig, message ?? "Manueller Stash", StashModifiers.Default);
+        }
     }
 
     public void PopStash(string id, int index = 0)

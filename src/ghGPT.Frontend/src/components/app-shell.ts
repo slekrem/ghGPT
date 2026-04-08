@@ -30,6 +30,7 @@ export class AppShell extends AppElement {
   @state() private historyRefreshKey = 0;
   @state() private changesRefreshKey = 0;
   @state() private branchesRefreshKey = 0;
+  @state() private stashesRefreshKey = 0;
   @state() private showChat = false;
   @state() private dirtyCheckoutRepoId = '';
   @state() private dirtyCheckoutBranch = '';
@@ -186,13 +187,13 @@ export class AppShell extends AppElement {
     const s = this._appState;
     switch (this.activeView) {
       case 'changes':
-        return html`<changes-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.changesRefreshKey} @commit-created=${this._onCommitCreated}></changes-view>`;
+        return html`<changes-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.changesRefreshKey} @commit-created=${this._onCommitCreated} @stash-pushed=${() => this.stashesRefreshKey++}></changes-view>`;
       case 'history':
         return html`<history-view .repoId=${s.activeRepoId ?? ''} .branch=${s.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
         return html`<branches-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this._onBranchChanged} @navigate-to-changes=${() => this.activeView = 'changes'}></branches-view>`;
       case 'stashes':
-        return html`<stashes-view .repoId=${s.activeRepoId ?? ''} @stash-popped=${() => this.changesRefreshKey++}></stashes-view>`;
+        return html`<stashes-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.stashesRefreshKey} @stash-popped=${() => this.changesRefreshKey++}></stashes-view>`;
       case 'pull-requests':
         return html`<pull-requests-view .repoId=${s.activeRepoId ?? ''}></pull-requests-view>`;
       case 'issues':
