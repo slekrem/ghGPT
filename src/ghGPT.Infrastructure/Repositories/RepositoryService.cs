@@ -713,14 +713,41 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
         return repo.Stashes
-            .Select((stash, index) => new StashEntry
+            .Select((stash, index) =>
             {
-                Index = index,
-                Message = stash.Message,
-                Branch = stash.WorkTree?.MessageShort ?? string.Empty,
-                CreatedAt = stash.Index?.Author.When ?? DateTimeOffset.MinValue
+                var raw = stash.WorkTree?.MessageShort ?? stash.Message ?? string.Empty;
+                ParseStashMessage(raw, out var branch, out var message);
+                return new StashEntry
+                {
+                    Index = index,
+                    Message = message,
+                    Branch = branch,
+                    CreatedAt = stash.Index?.Author.When ?? DateTimeOffset.MinValue
+                };
             })
             .ToList();
+    }
+
+    public IReadOnlyList<CommitFileChange> GetStashDiff(string id, int index)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (index < 0 || index >= repo.Stashes.Count())
+            throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
+
+        var stash = repo.Stashes[index];
+        var patch = repo.Diff.Compare<Patch>(stash.Base.Tree, stash.WorkTree.Tree);
+
+        return patch.Select(entry => new CommitFileChange
+        {
+            Path = entry.Path,
+            OldPath = entry.OldPath != entry.Path ? entry.OldPath : null,
+            Status = entry.Status.ToString(),
+            Additions = entry.LinesAdded,
+            Deletions = entry.LinesDeleted,
+            Patch = entry.Patch
+        }).ToList();
     }
 
     public void PopStash(string id, int index = 0)
@@ -747,6 +774,29 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
 
         repo.Stashes.Remove(index);
+    }
+
+    // Git stash messages are formatted as:
+    //   "On <branch>: <user message>"       (when -m is provided)
+    //   "WIP on <branch>: <sha> <commit>"   (auto-generated)
+    private static void ParseStashMessage(string raw, out string branch, out string message)
+    {
+        var onMatch = System.Text.RegularExpressions.Regex.Match(raw, @"^On (.+?): (.+)$");
+        if (onMatch.Success)
+        {
+            branch = onMatch.Groups[1].Value;
+            message = onMatch.Groups[2].Value;
+            return;
+        }
+        var wipMatch = System.Text.RegularExpressions.Regex.Match(raw, @"^WIP on (.+?): \S+ (.+)$");
+        if (wipMatch.Success)
+        {
+            branch = wipMatch.Groups[1].Value;
+            message = wipMatch.Groups[2].Value;
+            return;
+        }
+        branch = string.Empty;
+        message = raw;
     }
 
     private static RepositoryInfo BuildInfo(string localPath)

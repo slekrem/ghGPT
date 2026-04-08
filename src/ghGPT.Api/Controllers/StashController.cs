@@ -20,6 +20,19 @@ public class StashController(IRepositoryService service) : ControllerBase
         }
     }
 
+    [HttpGet("{index}/diff")]
+    public ActionResult<IReadOnlyList<CommitFileChange>> GetStashDiff(string id, int index)
+    {
+        try
+        {
+            return Ok(service.GetStashDiff(id, index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("{index}/pop")]
     public ActionResult PopStash(string id, int index)
     {
