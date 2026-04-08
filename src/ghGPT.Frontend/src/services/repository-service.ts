@@ -302,6 +302,8 @@ export const repositoryService = {
 
   getStashes: (id: string) =>
     api.get<StashEntry[]>(`/repos/${id}/stash`),
+  getStashDiff: (id: string, index: number) =>
+    api.get<CommitFileChange[]>(`/repos/${id}/stash/${index}/diff`),
   popStash: (id: string, index: number) =>
     api.post<void>(`/repos/${id}/stash/${index}/pop`),
   dropStash: (id: string, index: number) =>

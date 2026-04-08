@@ -723,6 +723,28 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             .ToList();
     }
 
+    public IReadOnlyList<CommitFileChange> GetStashDiff(string id, int index)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (index < 0 || index >= repo.Stashes.Count())
+            throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
+
+        var stash = repo.Stashes[index];
+        var patch = repo.Diff.Compare<Patch>(stash.Base.Tree, stash.WorkTree.Tree);
+
+        return patch.Select(entry => new CommitFileChange
+        {
+            Path = entry.Path,
+            OldPath = entry.OldPath != entry.Path ? entry.OldPath : null,
+            Status = entry.Status.ToString(),
+            Additions = entry.LinesAdded,
+            Deletions = entry.LinesDeleted,
+            Patch = entry.Patch
+        }).ToList();
+    }
+
     public void PopStash(string id, int index = 0)
     {
         var info = GetRepoById(id);
