@@ -707,6 +707,48 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
             ?? "Git-Operation fehlgeschlagen.";
     }
 
+    public IReadOnlyList<StashEntry> GetStashes(string id)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        return repo.Stashes
+            .Select((stash, index) => new StashEntry
+            {
+                Index = index,
+                Message = stash.Message,
+                Branch = stash.WorkTree?.MessageShort ?? string.Empty,
+                CreatedAt = stash.Index?.Author.When ?? DateTimeOffset.MinValue
+            })
+            .ToList();
+    }
+
+    public void PopStash(string id, int index = 0)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (index < 0 || index >= repo.Stashes.Count())
+            throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
+
+        var result = repo.Stashes.Pop(index, new StashApplyOptions());
+        if (result == StashApplyStatus.Conflicts)
+            throw new InvalidOperationException("Stash konnte nicht angewendet werden: Konflikte im Working Directory.");
+        if (result != StashApplyStatus.Applied)
+            throw new InvalidOperationException($"Stash konnte nicht angewendet werden: {result}.");
+    }
+
+    public void DropStash(string id, int index)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        if (index < 0 || index >= repo.Stashes.Count())
+            throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
+
+        repo.Stashes.Remove(index);
+    }
+
     private static RepositoryInfo BuildInfo(string localPath)
     {
         using var repo = new LibGit2Sharp.Repository(localPath);
