@@ -6,6 +6,7 @@ public interface IIssueClient
 {
     Task<IReadOnlyList<Issue>> ListAsync(string owner, string repo, string state = "open", int limit = 30);
     Task<IssueDetail> GetDetailAsync(string owner, string repo, int number);
+    Task<IssueDetail?> GetLinkedIssueForBranchAsync(string owner, string repo, string branchName);
     Task<Issue> CreateAsync(string owner, string repo, string title, string body, IEnumerable<string>? labels = null);
     Task AddCommentAsync(string owner, string repo, int number, string body);
 }
