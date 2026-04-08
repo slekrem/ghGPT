@@ -2,6 +2,7 @@ import { html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { AppElement } from '../app-element';
 import { repositoryService, type RepositoryInfo, type BranchInfo } from '../services/repository-service';
+import { ApiError } from '../services/api-client';
 
 @customElement('app-toolbar')
 export class AppToolbar extends AppElement {
@@ -60,7 +61,15 @@ export class AppToolbar extends AppElement {
       this.branches = await repositoryService.getBranches(this.activeRepo.id);
       this.dispatchEvent(new CustomEvent('branch-switched', { bubbles: true, composed: true }));
     } catch (err) {
-      alert((err as Error).message);
+      if (err instanceof ApiError && err.status === 409) {
+        this.dispatchEvent(new CustomEvent('dirty-checkout-requested', {
+          detail: { repoId: this.activeRepo.id, branchName },
+          bubbles: true,
+          composed: true,
+        }));
+      } else {
+        alert((err as Error).message);
+      }
     }
   }
 

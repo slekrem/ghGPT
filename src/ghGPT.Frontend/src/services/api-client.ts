@@ -1,5 +1,14 @@
 const BASE_URL = '/api';
 
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -15,7 +24,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       message = text || response.statusText;
     }
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   const text = await response.text();

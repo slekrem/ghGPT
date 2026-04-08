@@ -1,6 +1,7 @@
 using ghGPT.Api.Models;
 using ghGPT.Core.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
 
 namespace ghGPT.Api.Controllers;
 
@@ -29,8 +30,12 @@ public class BranchesController(IRepositoryService service) : ControllerBase
 
         try
         {
-            service.CheckoutBranch(id, request.Name);
+            service.CheckoutBranch(id, request.Name, request.Strategy, request.StashMessage);
             return NoContent();
+        }
+        catch (UncommittedChangesException)
+        {
+            return Conflict(new { error = "Uncommitted changes vorhanden." });
         }
         catch (InvalidOperationException ex)
         {

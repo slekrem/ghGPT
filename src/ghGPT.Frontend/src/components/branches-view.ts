@@ -2,6 +2,7 @@ import { html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { AppElement } from '../app-element';
 import { repositoryService, type BranchInfo } from '../services/repository-service';
+import { ApiError } from '../services/api-client';
 
 @customElement('branches-view')
 export class BranchesView extends AppElement {
@@ -32,7 +33,15 @@ export class BranchesView extends AppElement {
       await this.loadBranches();
       this.dispatchEvent(new CustomEvent('branch-changed', { bubbles: true, composed: true }));
     } catch (err) {
-      alert((err as Error).message);
+      if (err instanceof ApiError && err.status === 409) {
+        this.dispatchEvent(new CustomEvent('dirty-checkout-requested', {
+          detail: { repoId: this.repoId, branchName: name },
+          bubbles: true,
+          composed: true,
+        }));
+      } else {
+        alert((err as Error).message);
+      }
     }
   }
 
@@ -152,15 +161,13 @@ export class BranchesView extends AppElement {
 
             <div class="flex flex-col gap-1.5">
               <label class="text-xs text-cat-subtext">Branch-Name</label>
-              <input
-                type="text"
+              <input type="text"
                 class="px-2.5 py-1.5 rounded-md border border-cat-muted bg-cat-overlay text-cat-text text-sm outline-none focus:border-cat-blue"
                 .value=${this.newBranchName}
                 @input=${(e: Event) => this.newBranchName = (e.target as HTMLInputElement).value}
                 @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.onCreateBranch()}
                 placeholder="feature/mein-branch"
-                autofocus
-              />
+                autofocus />
             </div>
 
             <div class="flex flex-col gap-1.5">
@@ -168,8 +175,7 @@ export class BranchesView extends AppElement {
               <select
                 class="px-2.5 py-1.5 rounded-md border border-cat-muted bg-cat-overlay text-cat-text text-sm outline-none focus:border-cat-blue"
                 .value=${this.newBranchStartPoint}
-                @change=${(e: Event) => this.newBranchStartPoint = (e.target as HTMLSelectElement).value}
-              >
+                @change=${(e: Event) => this.newBranchStartPoint = (e.target as HTMLSelectElement).value}>
                 ${allOptions.map(name => html`<option value=${name}>${name}</option>`)}
               </select>
             </div>
@@ -177,7 +183,7 @@ export class BranchesView extends AppElement {
             ${this.dialogError ? html`<span data-testid="error-msg" class="text-cat-red text-xs">${this.dialogError}</span>` : nothing}
 
             <div class="flex gap-2 justify-end">
-              <button class="btn px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
+              <button class="px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
                 @click=${() => { this.showNewBranchDialog = false; this.dialogError = ''; }}>Abbrechen</button>
               <button data-testid="create-branch-btn" class="px-3 py-1.5 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-sm cursor-pointer hover:bg-cat-sapphire disabled:opacity-40 disabled:cursor-not-allowed"
                 ?disabled=${this.loading} @click=${this.onCreateBranch}>
