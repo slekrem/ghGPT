@@ -3,6 +3,7 @@ using GhCli.Net.GraphQL;
 using GhCli.Net.Issues.GraphQL;
 using GhCli.Net.Issues.Models;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace GhCli.Net.Issues;
 
@@ -19,6 +20,20 @@ internal class IssueClient(IGhCliRunner runner) : IIssueClient
             id
             labels(first: 100) {
               nodes { id name }
+            }
+          }
+        }
+        """;
+
+    private const string LinkedBranchQuery = """
+        query($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            issue(number: $number) {
+              number title state url body createdAt updatedAt
+              author { login }
+              labels(first: 25) { nodes { name color } }
+              assignees(first: 25) { nodes { login } }
+              linkedBranches(first: 10) { nodes { ref { name } } }
             }
           }
         }
@@ -72,6 +87,56 @@ internal class IssueClient(IGhCliRunner runner) : IIssueClient
 
         return JsonSerializer.Deserialize<IssueDetail>(json, JsonOptions)
             ?? throw new InvalidOperationException($"Issue #{number} konnte nicht abgerufen werden.");
+    }
+
+    public async Task<IssueDetail?> GetLinkedIssueForBranchAsync(string owner, string repo, string branchName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repo);
+        ArgumentException.ThrowIfNullOrWhiteSpace(branchName);
+
+        var match = Regex.Match(branchName, @"^(\d+)-");
+        if (!match.Success)
+            return null;
+
+        var number = int.Parse(match.Groups[1].Value);
+
+        var json = await runner.RunAsync(
+            "api", "graphql",
+            "-f", $"query={LinkedBranchQuery}",
+            "-f", $"owner={owner}",
+            "-f", $"repo={repo}",
+            "-F", $"number={number}");
+
+        var response = JsonSerializer.Deserialize<GraphQlResponse<LinkedBranchQueryData>>(json, JsonOptions);
+        var issue = response?.Data?.Repository?.Issue;
+
+        if (issue is null)
+            return null;
+
+        var isLinked = issue.LinkedBranches?.Nodes
+            .Any(n => string.Equals(n.Ref?.Name, branchName, StringComparison.OrdinalIgnoreCase)) ?? false;
+
+        if (!isLinked)
+            return null;
+
+        return new IssueDetail
+        {
+            Number = issue.Number,
+            Title = issue.Title,
+            State = issue.State,
+            Url = issue.Url,
+            Body = issue.Body,
+            CreatedAt = issue.CreatedAt,
+            UpdatedAt = issue.UpdatedAt,
+            Author = new IssueAuthor { Login = issue.Author?.Login ?? string.Empty },
+            Labels = issue.Labels?.Nodes
+                .Select(l => new IssueLabel { Name = l.Name, Color = l.Color })
+                .ToList() ?? [],
+            Assignees = issue.Assignees?.Nodes
+                .Select(a => new IssueAssignee { Login = a.Login })
+                .ToList() ?? [],
+        };
     }
 
     public async Task<Issue> CreateAsync(string owner, string repo, string title, string body, IEnumerable<string>? labels = null)
