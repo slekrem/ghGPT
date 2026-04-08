@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { AppElement } from '../app-element';
-import { repositoryService, type BranchInfo } from '../services/repository-service';
+import { repositoryService, type BranchInfo, type IssueDetail } from '../services/repository-service';
 import { ApiError } from '../services/api-client';
 
 @customElement('branches-view')
@@ -9,6 +9,7 @@ export class BranchesView extends AppElement {
   @property() repoId = '';
   @property({ type: Number }) refreshKey = 0;
   @state() private branches: BranchInfo[] = [];
+  @state() private linkedIssue: IssueDetail | undefined = undefined;
   @state() private showNewBranchDialog = false;
   @state() private newBranchName = '';
   @state() private newBranchStartPoint = '';
@@ -23,7 +24,10 @@ export class BranchesView extends AppElement {
 
   private async loadBranches() {
     if (!this.repoId) return;
-    this.branches = await repositoryService.getBranches(this.repoId);
+    [this.branches, this.linkedIssue] = await Promise.all([
+      repositoryService.getBranches(this.repoId),
+      repositoryService.getLinkedIssue(this.repoId).catch(() => undefined),
+    ]);
   }
 
   private async checkout(name: string) {
@@ -102,6 +106,12 @@ export class BranchesView extends AppElement {
         <span class="text-sm flex-1 overflow-hidden text-ellipsis whitespace-nowrap
           ${b.isHead ? 'text-cat-blue font-medium' : 'text-cat-text'}">${b.name}</span>
         ${b.isHead ? html`<span data-testid="head-badge" class="text-[0.65rem] bg-[#89b4fa33] text-cat-blue rounded px-1 shrink-0">HEAD</span>` : nothing}
+        ${b.isHead && this.linkedIssue ? html`
+          <span class="text-[0.65rem] text-cat-subtle shrink-0 overflow-hidden text-ellipsis whitespace-nowrap max-w-[160px]"
+            title="${this.linkedIssue.title}">
+            #${this.linkedIssue.number} ${this.linkedIssue.title}
+          </span>
+        ` : nothing}
         ${this.renderAheadBehind(b)}
         <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           ${!b.isHead ? html`
