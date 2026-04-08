@@ -30,6 +30,7 @@ public class ReleaseClientTests
                 isDraft = false,
                 isPrerelease = false,
                 isLatest = true
+                // url is not available from gh release list
             }
         });
         _runner.RunAsync("release", "list", "--repo", "slekrem/ghGPT", "--limit", "30", "--json", Arg.Any<string>())
