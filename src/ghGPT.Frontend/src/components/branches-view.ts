@@ -4,8 +4,6 @@ import { AppElement } from '../app-element';
 import { repositoryService, type BranchInfo } from '../services/repository-service';
 import { ApiError } from '../services/api-client';
 
-type DirtyDialogStep = 'options' | 'stash-name' | 'discard-confirm';
-
 @customElement('branches-view')
 export class BranchesView extends AppElement {
   @property() repoId = '';
@@ -16,12 +14,6 @@ export class BranchesView extends AppElement {
   @state() private newBranchStartPoint = '';
   @state() private dialogError = '';
   @state() private loading = false;
-
-  @state() private dirtyDialogStep: DirtyDialogStep | null = null;
-  @state() private pendingBranch = '';
-  @state() private stashMessage = '';
-  @state() private dirtyActionLoading = false;
-  @state() private dirtyActionError = '';
 
   updated(changedProps: Map<string, unknown>) {
     if ((changedProps.has('repoId') || changedProps.has('refreshKey')) && this.repoId) {
@@ -42,35 +34,14 @@ export class BranchesView extends AppElement {
       this.dispatchEvent(new CustomEvent('branch-changed', { bubbles: true, composed: true }));
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        this.pendingBranch = name;
-        this.stashMessage = '';
-        this.dirtyActionError = '';
-        this.dirtyDialogStep = 'options';
+        this.dispatchEvent(new CustomEvent('dirty-checkout-requested', {
+          detail: { repoId: this.repoId, branchName: name },
+          bubbles: true,
+          composed: true,
+        }));
       } else {
         alert((err as Error).message);
       }
-    }
-  }
-
-  private closeDirtyDialog() {
-    this.dirtyDialogStep = null;
-    this.pendingBranch = '';
-    this.stashMessage = '';
-    this.dirtyActionError = '';
-  }
-
-  private async executeDirtyAction(strategy: 'Carry' | 'Stash' | 'Discard', stashMessage?: string) {
-    this.dirtyActionLoading = true;
-    this.dirtyActionError = '';
-    try {
-      await repositoryService.checkoutBranch(this.repoId, this.pendingBranch, strategy, stashMessage);
-      this.closeDirtyDialog();
-      await this.loadBranches();
-      this.dispatchEvent(new CustomEvent('branch-changed', { bubbles: true, composed: true }));
-    } catch (err) {
-      this.dirtyActionError = (err as Error).message;
-    } finally {
-      this.dirtyActionLoading = false;
     }
   }
 
@@ -150,113 +121,6 @@ export class BranchesView extends AppElement {
     `;
   }
 
-  private renderDirtyDialog() {
-    if (!this.dirtyDialogStep) return nothing;
-
-    return html`
-      <div data-testid="dirty-dialog-overlay" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
-        <div data-testid="dirty-dialog" class="bg-cat-surface border border-cat-border rounded-xl p-6 w-[460px] flex flex-col gap-4">
-
-          ${this.dirtyDialogStep === 'options' ? html`
-            <div class="flex flex-col gap-1">
-              <div class="text-base font-semibold text-cat-text">Ungespeicherte Änderungen</div>
-              <div class="text-sm text-cat-subtext">
-                Wechsel zu <span class="font-mono text-cat-blue">${this.pendingBranch}</span> — was soll mit den Änderungen passieren?
-              </div>
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <button data-testid="dirty-option-stash"
-                class="flex flex-col gap-0.5 text-left px-4 py-3 rounded-lg border border-cat-muted bg-transparent hover:bg-cat-overlay hover:border-cat-blue cursor-pointer transition-colors"
-                @click=${() => { this.dirtyDialogStep = 'stash-name'; this.stashMessage = ''; }}>
-                <span class="text-sm font-medium text-cat-text">📦 Stashen</span>
-                <span class="text-xs text-cat-subtle">Änderungen temporär sichern und später wiederherstellen</span>
-              </button>
-
-              <button data-testid="dirty-option-carry"
-                class="flex flex-col gap-0.5 text-left px-4 py-3 rounded-lg border border-cat-muted bg-transparent hover:bg-cat-overlay hover:border-cat-blue cursor-pointer transition-colors"
-                ?disabled=${this.dirtyActionLoading}
-                @click=${() => this.executeDirtyAction('Carry')}>
-                <span class="text-sm font-medium text-cat-text">🚚 Mitnehmen</span>
-                <span class="text-xs text-cat-subtle">Änderungen in den Ziel-Branch übernehmen (schlägt fehl bei Konflikten)</span>
-              </button>
-
-              <button data-testid="dirty-option-commit"
-                class="flex flex-col gap-0.5 text-left px-4 py-3 rounded-lg border border-cat-muted bg-transparent hover:bg-cat-overlay hover:border-cat-blue cursor-pointer transition-colors"
-                @click=${() => { this.closeDirtyDialog(); this.dispatchEvent(new CustomEvent('navigate-to-changes', { bubbles: true, composed: true })); }}>
-                <span class="text-sm font-medium text-cat-text">✅ Zuerst committen</span>
-                <span class="text-xs text-cat-subtle">Abbrechen und zum Changes-View wechseln</span>
-              </button>
-
-              <button data-testid="dirty-option-discard"
-                class="flex flex-col gap-0.5 text-left px-4 py-3 rounded-lg border border-cat-red/30 bg-transparent hover:bg-[rgba(243,139,168,0.08)] cursor-pointer transition-colors"
-                @click=${() => { this.dirtyDialogStep = 'discard-confirm'; }}>
-                <span class="text-sm font-medium text-cat-red">🗑 Verwerfen</span>
-                <span class="text-xs text-cat-subtle">Alle Änderungen unwiderruflich löschen</span>
-              </button>
-            </div>
-
-            ${this.dirtyActionError ? html`<span class="text-cat-red text-xs">${this.dirtyActionError}</span>` : nothing}
-
-            <div class="flex justify-end">
-              <button class="px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
-                @click=${this.closeDirtyDialog}>Abbrechen</button>
-            </div>
-          ` : nothing}
-
-          ${this.dirtyDialogStep === 'stash-name' ? html`
-            <div class="text-base font-semibold text-cat-text">Stash-Name (optional)</div>
-
-            <input
-              type="text"
-              data-testid="stash-message-input"
-              class="px-2.5 py-1.5 rounded-md border border-cat-muted bg-cat-overlay text-cat-text text-sm outline-none focus:border-cat-blue"
-              placeholder="z.B. WIP: Login-Formular"
-              .value=${this.stashMessage}
-              @input=${(e: Event) => this.stashMessage = (e.target as HTMLInputElement).value}
-              @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.executeDirtyAction('Stash', this.stashMessage || undefined)}
-              autofocus
-            />
-
-            ${this.dirtyActionError ? html`<span class="text-cat-red text-xs">${this.dirtyActionError}</span>` : nothing}
-
-            <div class="flex gap-2 justify-end">
-              <button class="px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
-                @click=${() => { this.dirtyDialogStep = 'options'; this.dirtyActionError = ''; }}>Zurück</button>
-              <button data-testid="confirm-stash-btn"
-                class="px-3 py-1.5 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-sm cursor-pointer hover:bg-cat-sapphire disabled:opacity-40 disabled:cursor-not-allowed"
-                ?disabled=${this.dirtyActionLoading}
-                @click=${() => this.executeDirtyAction('Stash', this.stashMessage || undefined)}>
-                ${this.dirtyActionLoading ? 'Stashe…' : 'Stashen & wechseln'}
-              </button>
-            </div>
-          ` : nothing}
-
-          ${this.dirtyDialogStep === 'discard-confirm' ? html`
-            <div class="flex flex-col gap-1">
-              <div class="text-base font-semibold text-cat-red">Änderungen wirklich verwerfen?</div>
-              <div class="text-sm text-cat-subtext">Diese Aktion kann nicht rückgängig gemacht werden. Alle uncommitted Änderungen gehen verloren.</div>
-            </div>
-
-            ${this.dirtyActionError ? html`<span class="text-cat-red text-xs">${this.dirtyActionError}</span>` : nothing}
-
-            <div class="flex gap-2 justify-end">
-              <button class="px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
-                @click=${() => { this.dirtyDialogStep = 'options'; this.dirtyActionError = ''; }}>Zurück</button>
-              <button data-testid="confirm-discard-btn"
-                class="px-3 py-1.5 rounded-md border border-cat-red bg-cat-red text-cat-base text-sm cursor-pointer hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
-                ?disabled=${this.dirtyActionLoading}
-                @click=${() => this.executeDirtyAction('Discard')}>
-                ${this.dirtyActionLoading ? 'Verwerfe…' : 'Ja, verwerfen & wechseln'}
-              </button>
-            </div>
-          ` : nothing}
-
-        </div>
-      </div>
-    `;
-  }
-
   render() {
     const localBranches = this.localBranches;
     const remoteBranches = this.remoteBranches;
@@ -297,15 +161,13 @@ export class BranchesView extends AppElement {
 
             <div class="flex flex-col gap-1.5">
               <label class="text-xs text-cat-subtext">Branch-Name</label>
-              <input
-                type="text"
+              <input type="text"
                 class="px-2.5 py-1.5 rounded-md border border-cat-muted bg-cat-overlay text-cat-text text-sm outline-none focus:border-cat-blue"
                 .value=${this.newBranchName}
                 @input=${(e: Event) => this.newBranchName = (e.target as HTMLInputElement).value}
                 @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this.onCreateBranch()}
                 placeholder="feature/mein-branch"
-                autofocus
-              />
+                autofocus />
             </div>
 
             <div class="flex flex-col gap-1.5">
@@ -313,8 +175,7 @@ export class BranchesView extends AppElement {
               <select
                 class="px-2.5 py-1.5 rounded-md border border-cat-muted bg-cat-overlay text-cat-text text-sm outline-none focus:border-cat-blue"
                 .value=${this.newBranchStartPoint}
-                @change=${(e: Event) => this.newBranchStartPoint = (e.target as HTMLSelectElement).value}
-              >
+                @change=${(e: Event) => this.newBranchStartPoint = (e.target as HTMLSelectElement).value}>
                 ${allOptions.map(name => html`<option value=${name}>${name}</option>`)}
               </select>
             </div>
@@ -322,7 +183,7 @@ export class BranchesView extends AppElement {
             ${this.dialogError ? html`<span data-testid="error-msg" class="text-cat-red text-xs">${this.dialogError}</span>` : nothing}
 
             <div class="flex gap-2 justify-end">
-              <button class="btn px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
+              <button class="px-3 py-1.5 rounded-md border border-cat-muted bg-transparent text-cat-text text-sm cursor-pointer hover:bg-cat-overlay"
                 @click=${() => { this.showNewBranchDialog = false; this.dialogError = ''; }}>Abbrechen</button>
               <button data-testid="create-branch-btn" class="px-3 py-1.5 rounded-md border border-cat-blue bg-cat-blue text-cat-base text-sm cursor-pointer hover:bg-cat-sapphire disabled:opacity-40 disabled:cursor-not-allowed"
                 ?disabled=${this.loading} @click=${this.onCreateBranch}>
@@ -332,8 +193,6 @@ export class BranchesView extends AppElement {
           </div>
         </div>
       ` : nothing}
-
-      ${this.renderDirtyDialog()}
     `;
   }
 }

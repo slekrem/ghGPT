@@ -16,6 +16,7 @@ import './releases-view';
 import './discussions-view';
 import './settings-view';
 import './chat-panel';
+import './dirty-checkout-dialog';
 
 type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'issues' | 'releases' | 'discussions' | 'settings';
 
@@ -29,6 +30,8 @@ export class AppShell extends AppElement {
   @state() private changesRefreshKey = 0;
   @state() private branchesRefreshKey = 0;
   @state() private showChat = false;
+  @state() private dirtyCheckoutRepoId = '';
+  @state() private dirtyCheckoutBranch = '';
 
   constructor() {
     super();
@@ -80,6 +83,22 @@ export class AppShell extends AppElement {
     this.branchesRefreshKey++;
   };
 
+  private _onDirtyCheckoutRequested = (e: Event) => {
+    const { repoId, branchName } = (e as CustomEvent<{ repoId: string; branchName: string }>).detail;
+    this.dirtyCheckoutRepoId = repoId;
+    this.dirtyCheckoutBranch = branchName;
+  };
+
+  private _onDirtyCheckoutComplete = async () => {
+    this.dirtyCheckoutBranch = '';
+    await this._appState.refreshRepos();
+    this.branchesRefreshKey++;
+  };
+
+  private _onDirtyCheckoutCancelled = () => {
+    this.dirtyCheckoutBranch = '';
+  };
+
   render() {
     const s = this._appState;
     const isPadded = this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' && this.activeView !== 'issues' && this.activeView !== 'releases' && this.activeView !== 'discussions';
@@ -107,11 +126,13 @@ export class AppShell extends AppElement {
           @git-operation=${this._onGitOperation}
           @toggle-chat=${this._onToggleChat}
           @branch-switched=${this._onBranchSwitched}
+          @dirty-checkout-requested=${this._onDirtyCheckoutRequested}
           @navigate=${this._onNavigate}>
         </app-toolbar>
 
         <div class="${contentClass}"
-          style="${this.activeView === 'settings' ? 'overflow:auto' : ''}">
+          style="${this.activeView === 'settings' ? 'overflow:auto' : ''}"
+          @dirty-checkout-requested=${this._onDirtyCheckoutRequested}>
           ${s.activeRepo || this.activeView === 'settings' ? this._renderView() : html`
             <div class="flex flex-col items-center justify-center h-full text-cat-subtle gap-3">
               <span class="text-4xl">📂</span>
@@ -149,6 +170,14 @@ export class AppShell extends AppElement {
           @close=${() => this.showChat = false}>
         </chat-panel>
       ` : ''}
+
+      <dirty-checkout-dialog
+        .repoId=${this.dirtyCheckoutRepoId}
+        .branchName=${this.dirtyCheckoutBranch}
+        @checkout-complete=${this._onDirtyCheckoutComplete}
+        @cancelled=${this._onDirtyCheckoutCancelled}
+        @navigate-to-changes=${() => { this.dirtyCheckoutBranch = ''; this.activeView = 'changes'; }}>
+      </dirty-checkout-dialog>
     `;
   }
 
