@@ -17,8 +17,9 @@ import './discussions-view';
 import './settings-view';
 import './chat-panel';
 import './dirty-checkout-dialog';
+import './stashes-view';
 
-type View = 'changes' | 'history' | 'branches' | 'pull-requests' | 'issues' | 'releases' | 'discussions' | 'settings';
+type View = 'changes' | 'history' | 'branches' | 'stashes' | 'pull-requests' | 'issues' | 'releases' | 'discussions' | 'settings';
 
 @customElement('app-shell')
 export class AppShell extends AppElement {
@@ -101,7 +102,7 @@ export class AppShell extends AppElement {
 
   render() {
     const s = this._appState;
-    const isPadded = this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'pull-requests' && this.activeView !== 'issues' && this.activeView !== 'releases' && this.activeView !== 'discussions';
+    const isPadded = this.activeView !== 'changes' && this.activeView !== 'branches' && this.activeView !== 'stashes' && this.activeView !== 'pull-requests' && this.activeView !== 'issues' && this.activeView !== 'releases' && this.activeView !== 'discussions';
     const contentClass = `flex flex-col flex-1 overflow-hidden text-cat-text${isPadded ? ' p-4 overflow-auto' : ''}`;
     return html`
       <app-sidebar
@@ -190,6 +191,8 @@ export class AppShell extends AppElement {
         return html`<history-view .repoId=${s.activeRepoId ?? ''} .branch=${s.activeRepo?.currentBranch ?? ''} .refreshKey=${this.historyRefreshKey}></history-view>`;
       case 'branches':
         return html`<branches-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.historyRefreshKey} @branch-changed=${this._onBranchChanged} @navigate-to-changes=${() => this.activeView = 'changes'}></branches-view>`;
+      case 'stashes':
+        return html`<stashes-view .repoId=${s.activeRepoId ?? ''} @stash-popped=${() => this.changesRefreshKey++}></stashes-view>`;
       case 'pull-requests':
         return html`<pull-requests-view .repoId=${s.activeRepoId ?? ''}></pull-requests-view>`;
       case 'issues':

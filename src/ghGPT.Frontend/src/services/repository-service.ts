@@ -197,6 +197,13 @@ export interface ReleaseDetail {
   authorLogin: string;
 }
 
+export interface StashEntry {
+  index: number;
+  message: string;
+  branch: string;
+  createdAt: string;
+}
+
 export interface StageLinesRequest {
   filePath: string;
   patch: string;
@@ -292,6 +299,13 @@ export const repositoryService = {
     api.post<IssueListItem>(`/repos/${id}/issues`, { title, body, labels }),
   addIssueComment: (id: string, number: number, body: string) =>
     api.post<void>(`/repos/${id}/issues/${number}/comments`, { body }),
+
+  getStashes: (id: string) =>
+    api.get<StashEntry[]>(`/repos/${id}/stash`),
+  popStash: (id: string, index: number) =>
+    api.post<void>(`/repos/${id}/stash/${index}/pop`),
+  dropStash: (id: string, index: number) =>
+    api.delete<void>(`/repos/${id}/stash/${index}`),
 
   saveActiveId: (id: string) => localStorage.setItem(ACTIVE_REPO_KEY, id),
   loadActiveId: () => localStorage.getItem(ACTIVE_REPO_KEY),

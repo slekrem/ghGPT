@@ -30,4 +30,7 @@ public interface IRepositoryService
     Task<RepositoryInfo> CreateAsync(string localPath, string name);
     Task<RepositoryInfo> ImportAsync(string localPath);
     Task<RepositoryInfo> CloneAsync(string remoteUrl, string localPath, IProgress<string>? progress = null);
+    IReadOnlyList<StashEntry> GetStashes(string id);
+    void PopStash(string id, int index = 0);
+    void DropStash(string id, int index);
 }
