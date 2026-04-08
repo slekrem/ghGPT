@@ -32,6 +32,7 @@ public interface IRepositoryService
     Task<RepositoryInfo> CloneAsync(string remoteUrl, string localPath, IProgress<string>? progress = null);
     IReadOnlyList<StashEntry> GetStashes(string id);
     IReadOnlyList<CommitFileChange> GetStashDiff(string id, int index);
+    void PushStash(string id, string? message = null, string[]? paths = null);
     void PopStash(string id, int index = 0);
     void DropStash(string id, int index);
 }

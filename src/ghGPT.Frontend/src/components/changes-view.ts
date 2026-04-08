@@ -52,6 +52,8 @@ export class ChangesView extends AppElement {
   @state() private commitError = '';
   @state() private committing = false;
   @state() private lineActionInProgress = false;
+  @state() private stashing = false;
+  @state() private stashError = '';
   private lastSelectedLineKey: string | null = null;
 
   updated(changed: Map<string, unknown>) {
@@ -156,6 +158,32 @@ export class ChangesView extends AppElement {
       this.fileEntries.scrollTop = scrollTop;
     }
     return result;
+  }
+
+  private get stagedFilePaths(): string[] {
+    return [...new Set(this.status.staged.map(f => f.filePath))];
+  }
+
+  private async stashSelectedFiles() {
+    const paths = this.stagedFilePaths;
+    if (this.stashing || paths.length === 0) return;
+    this.stashing = true;
+    this.stashError = '';
+    try {
+      await repositoryService.pushStash(this.repoId, undefined, paths);
+      if (paths.includes(this.selectedPath)) {
+        this.selectedPath = '';
+        this.combinedDiff = '';
+        this.stagedDiff = '';
+        this.stagedLineKeyValues = [];
+      }
+      await this.loadStatus();
+      this.dispatchEvent(new CustomEvent('stash-pushed', { bubbles: true, composed: true }));
+    } catch (e: unknown) {
+      this.stashError = e instanceof Error ? e.message : 'Stash fehlgeschlagen';
+    } finally {
+      this.stashing = false;
+    }
   }
 
   private resetReviewState() {
@@ -655,8 +683,16 @@ export class ChangesView extends AppElement {
             .checked=${this.allChecked}
             .indeterminate=${this.someChecked}
             @change=${(e: Event) => this.toggleAll((e.target as HTMLInputElement).checked)} />
-          <span>Änderungen (${totalCount})</span>
+          <span class="flex-1">Änderungen (${totalCount})</span>
+          <button
+            class="bg-transparent border border-cat-muted rounded text-cat-subtext cursor-pointer text-[0.65rem] px-[0.4rem] py-[0.1rem] whitespace-nowrap hover:bg-cat-overlay hover:text-cat-text disabled:opacity-45 disabled:cursor-default"
+            ?disabled=${stagedCount === 0 || this.stashing}
+            title="Markierte Dateien stashen"
+            @click=${() => this.stashSelectedFiles()}>
+            ↓ Stash (${stagedCount})
+          </button>
         </div>
+        ${this.stashError ? html`<div class="px-3 py-1 text-[0.7rem] text-cat-red">${this.stashError}</div>` : ''}
 
         <div class="file-entries overflow-y-auto flex-1">
           ${totalCount === 0

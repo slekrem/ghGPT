@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ghGPT.Api.Controllers;
 
+public record PushStashRequest(string? Message, string[]? Paths);
+
 [ApiController]
 [Route("api/repos/{id}/stash")]
 public class StashController(IRepositoryService service) : ControllerBase
@@ -17,6 +19,20 @@ public class StashController(IRepositoryService service) : ControllerBase
         catch (InvalidOperationException ex)
         {
             return NotFound(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public ActionResult PushStash(string id, [FromBody] PushStashRequest? request = null)
+    {
+        try
+        {
+            service.PushStash(id, request?.Message, request?.Paths);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
     }
 
