@@ -815,6 +815,56 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         repo.Stashes.Remove(index);
     }
 
+    public void DiscardFile(string id, string filePath)
+    {
+        var info = GetRepoById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        var existsInHead = repo.Head.Tip?.Tree?[filePath] is not null;
+
+        if (!existsInHead)
+        {
+            try { Commands.Unstage(repo, filePath); } catch { /* ignore if not staged */ }
+            var fullPath = Path.Combine(info.LocalPath, filePath);
+            if (File.Exists(fullPath)) File.Delete(fullPath);
+        }
+        else
+        {
+            RunGitSync(info.LocalPath, $"restore --source=HEAD --staged --worktree -- \"{filePath}\"",
+                "Änderungen konnten nicht verworfen werden");
+        }
+    }
+
+    public void DiscardLines(string id, string filePath, string patch)
+    {
+        ValidatePatch(patch);
+        var info = GetRepoById(id);
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, patch, Encoding.UTF8);
+            var psi = new ProcessStartInfo("git", $"apply --reverse \"{tempFile}\"")
+            {
+                WorkingDirectory = info.LocalPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var process = Process.Start(psi)
+                ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
+            var error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"Zeilen konnten nicht verworfen werden: {error.Trim()}");
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
     // Git stash messages are formatted as:
     //   "On <branch>: <user message>"       (when -m is provided)
     //   "WIP on <branch>: <sha> <commit>"   (auto-generated)

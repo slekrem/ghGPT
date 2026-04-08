@@ -54,6 +54,9 @@ export class ChangesView extends AppElement {
   @state() private lineActionInProgress = false;
   @state() private stashing = false;
   @state() private stashError = '';
+  @state() private discardConfirmPath = '';
+  @state() private discarding = false;
+  @state() private discardError = '';
   private lastSelectedLineKey: string | null = null;
 
   updated(changed: Map<string, unknown>) {
@@ -183,6 +186,103 @@ export class ChangesView extends AppElement {
       this.stashError = e instanceof Error ? e.message : 'Stash fehlgeschlagen';
     } finally {
       this.stashing = false;
+    }
+  }
+
+  private async discardFile(filePath: string) {
+    this.discardConfirmPath = '';
+    this.discarding = true;
+    this.discardError = '';
+    try {
+      await repositoryService.discardFile(this.repoId, filePath);
+      if (this.selectedPath === filePath) {
+        this.selectedPath = '';
+        this.combinedDiff = '';
+        this.stagedDiff = '';
+        this.stagedLineKeyValues = [];
+      }
+      await this.loadStatus();
+    } catch (e: unknown) {
+      this.discardError = e instanceof Error ? e.message : 'Verwerfen fehlgeschlagen';
+    } finally {
+      this.discarding = false;
+    }
+  }
+
+  private buildDiscardPatch(selectedLineIndices: Set<number>): string {
+    if (!this.selectedPath || this.combinedHunks.length === 0) return '';
+
+    let patchBody = '';
+    const stagedLineKeys = this.stagedLineKeys;
+
+    for (const hunk of this.combinedHunks) {
+      const resultLines: string[] = [];
+
+      for (const line of hunk.lines) {
+        if (line.type === 'context') {
+          resultLines.push(line.content);
+        } else if (line.type === 'added') {
+          if (selectedLineIndices.has(line.globalIndex)) {
+            resultLines.push(line.content);
+          } else {
+            resultLines.push(' ' + line.content.slice(1));
+          }
+        } else { // removed
+          if (selectedLineIndices.has(line.globalIndex)) {
+            resultLines.push(line.content);
+          } else if (stagedLineKeys.has(line.lineKey)) {
+            // Staged removal: not in working dir, skip as context
+          }
+          // Unstaged removal: also not in working dir, skip
+        }
+      }
+
+      const hasChanges = resultLines.some(l => l.startsWith('+') || l.startsWith('-'));
+      if (!hasChanges) continue;
+
+      const oldCount = resultLines.filter(l => !l.startsWith('+')).length;
+      const newCount = resultLines.filter(l => !l.startsWith('-')).length;
+      patchBody += `@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@\n`;
+      patchBody += resultLines.join('\n') + '\n';
+    }
+
+    if (!patchBody) return '';
+
+    return `diff --git a/${this.selectedPath} b/${this.selectedPath}\n--- a/${this.selectedPath}\n+++ b/${this.selectedPath}\n${patchBody}`;
+  }
+
+  private async discardLine(globalIndex: number, shiftKey: boolean) {
+    if (!this.selectedPath) return;
+
+    const line = this.combinedHunks.flatMap(h => h.lines).find(l => l.globalIndex === globalIndex);
+    if (!line || line.type === 'context') return;
+
+    const isChecked = this.stagedLineKeys.has(line.lineKey);
+    if (isChecked) return; // only discard unstaged lines
+
+    const selectedLineIndices = this.collectLineIndices(globalIndex, shiftKey, false);
+    const patch = this.buildDiscardPatch(selectedLineIndices);
+    if (!patch) return;
+
+    this.lineActionInProgress = true;
+    try {
+      await repositoryService.discardLines(this.repoId, {
+        filePath: this.selectedPath,
+        patch,
+      });
+      await this.loadStatus();
+      if (this.allFiles.some(f => f.filePath === this.selectedPath)) {
+        await this.selectFile(this.selectedPath);
+      } else {
+        this.selectedPath = '';
+        this.combinedDiff = '';
+        this.stagedDiff = '';
+        this.stagedLineKeyValues = [];
+      }
+    } catch (e: unknown) {
+      this.diffError = e instanceof Error ? e.message : 'Fehler beim Verwerfen der Zeilen';
+    } finally {
+      this.lineActionInProgress = false;
     }
   }
 
@@ -585,6 +685,7 @@ export class ChangesView extends AppElement {
         ${this.combinedHunks.flatMap(hunk => hunk.lines.map(line => {
           const selectable = line.type !== 'context';
           const isChecked = selectable && this.stagedLineKeys.has(line.lineKey);
+          const discardable = selectable && !isChecked;
 
           return html`
             <div data-testid="diff-line" data-type=${line.type} class="diff-line ${line.type} flex leading-[1.5] whitespace-pre">
@@ -600,6 +701,17 @@ export class ChangesView extends AppElement {
                       e.stopPropagation();
                       this.toggleLine(line.globalIndex, e.shiftKey);
                     }} />` : ''}
+              </span>
+              <span class="w-4 shrink-0 flex items-center justify-center">
+                ${discardable ? html`
+                  <button
+                    title="Zeile(n) verwerfen (Shift für Bereich)"
+                    ?disabled=${this.lineActionInProgress}
+                    class="bg-transparent border-none text-cat-muted cursor-pointer text-[0.65rem] leading-none p-0 hover:text-cat-red disabled:opacity-45 disabled:cursor-default"
+                    @click=${(e: MouseEvent) => {
+                      e.stopPropagation();
+                      this.discardLine(line.globalIndex, e.shiftKey);
+                    }}>✕</button>` : ''}
               </span>
               <span data-testid="diff-line-content" class="flex-1 min-w-0 overflow-hidden">${line.content}</span>
             </div>`;
@@ -648,26 +760,49 @@ export class ChangesView extends AppElement {
     };
     const statusColor = statusColorMap[entry.status] ?? 'text-cat-subtext';
 
+    const isPendingDiscard = this.discardConfirmPath === filePath;
+
     return html`
-      <div data-testid="file-entry" class="flex items-center gap-2 px-3 py-[0.3rem] cursor-pointer text-[0.8rem] text-cat-text select-none hover:bg-cat-overlay ${isSelected ? 'bg-cat-muted' : ''}"
-        @click=${() => this.selectFile(filePath)}>
-        <input type="checkbox"
-          class="cursor-pointer shrink-0 accent-cat-blue w-[14px] h-[14px]"
-          .checked=${isFullyStaged}
-          .indeterminate=${isPartiallyStaged}
-          @click=${(e: Event) => {
-            e.stopPropagation();
-            this.toggleFile(
-              {
-                filePath,
-                status: entry.status,
-                isStaged: isFullyStaged || isPartiallyStaged,
-              },
-              true
-            );
-          }} />
-        <span class="text-[0.65rem] font-bold w-[14px] text-center shrink-0 ${statusColor}">${this.statusChar(entry.status)}</span>
-        <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1" title="${filePath}">${filePath}</span>
+      <div data-testid="file-entry" class="flex flex-col text-[0.8rem] text-cat-text select-none">
+        <div class="flex items-center gap-2 px-3 py-[0.3rem] cursor-pointer hover:bg-cat-overlay ${isSelected ? 'bg-cat-muted' : ''}"
+          @click=${() => this.selectFile(filePath)}>
+          <input type="checkbox"
+            class="cursor-pointer shrink-0 accent-cat-blue w-[14px] h-[14px]"
+            .checked=${isFullyStaged}
+            .indeterminate=${isPartiallyStaged}
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this.toggleFile(
+                {
+                  filePath,
+                  status: entry.status,
+                  isStaged: isFullyStaged || isPartiallyStaged,
+                },
+                true
+              );
+            }} />
+          <span class="text-[0.65rem] font-bold w-[14px] text-center shrink-0 ${statusColor}">${this.statusChar(entry.status)}</span>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1" title="${filePath}">${filePath}</span>
+          <button
+            class="bg-transparent border-none text-cat-muted cursor-pointer text-[0.7rem] px-[0.2rem] leading-none hover:text-cat-red shrink-0 disabled:opacity-45 disabled:cursor-default"
+            title="Änderungen verwerfen"
+            ?disabled=${this.discarding}
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              this.discardConfirmPath = isPendingDiscard ? '' : filePath;
+            }}>✕</button>
+        </div>
+        ${isPendingDiscard ? html`
+          <div class="flex items-center gap-2 px-3 py-[0.25rem] bg-cat-surface border-t border-cat-border text-[0.72rem]">
+            <span class="text-cat-red flex-1">Änderungen unwiderruflich verwerfen?</span>
+            <button
+              class="bg-cat-red border-none rounded text-cat-surface cursor-pointer text-[0.68rem] px-[0.5rem] py-[0.1rem] hover:opacity-80"
+              @click=${(e: Event) => { e.stopPropagation(); this.discardFile(filePath); }}>Ja</button>
+            <button
+              class="bg-transparent border border-cat-muted rounded text-cat-subtext cursor-pointer text-[0.68rem] px-[0.5rem] py-[0.1rem] hover:bg-cat-overlay"
+              @click=${(e: Event) => { e.stopPropagation(); this.discardConfirmPath = ''; }}>Nein</button>
+          </div>
+        ` : nothing}
       </div>`;
   }
 
@@ -693,6 +828,7 @@ export class ChangesView extends AppElement {
           </button>
         </div>
         ${this.stashError ? html`<div class="px-3 py-1 text-[0.7rem] text-cat-red">${this.stashError}</div>` : ''}
+        ${this.discardError ? html`<div class="px-3 py-1 text-[0.7rem] text-cat-red">${this.discardError}</div>` : ''}
 
         <div class="file-entries overflow-y-auto flex-1">
           ${totalCount === 0

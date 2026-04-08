@@ -249,6 +249,10 @@ export const repositoryService = {
     api.post<void>(`/repos/${id}/unstage-lines`, req),
   stageAll: (id: string) => api.post<void>(`/repos/${id}/stage-all`),
   unstageAll: (id: string) => api.post<void>(`/repos/${id}/unstage-all`),
+  discardFile: (id: string, file: string) =>
+    api.post<void>(`/repos/${id}/discard-file?file=${encodeURIComponent(file)}`),
+  discardLines: (id: string, req: StageLinesRequest) =>
+    api.post<void>(`/repos/${id}/discard-lines`, req),
   commit: (id: string, message: string, description?: string) =>
     api.post<void>(`/repos/${id}/commit`, { message, description }),
   fetch: (id: string) => api.post<void>(`/repos/${id}/fetch`),
