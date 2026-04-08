@@ -162,8 +162,6 @@ export class StashesView extends AppElement {
 
   render() {
     return html`
-      <div class="flex h-full overflow-hidden">
-
         <!-- Stash list -->
         <section class="w-[300px] min-w-[300px] flex flex-col border-r border-cat-border bg-cat-surface overflow-hidden">
           <div class="px-4 py-[0.85rem] border-b border-cat-border flex items-center justify-between shrink-0">
@@ -273,7 +271,6 @@ export class StashesView extends AppElement {
             <span>Stash auswählen um Details anzuzeigen</span>
           </div>
         `}
-      </div>
     `;
   }
 }
