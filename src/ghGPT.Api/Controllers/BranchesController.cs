@@ -1,4 +1,5 @@
 using ghGPT.Api.Models;
+using ghGPT.Core.Issues;
 using ghGPT.Core.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -7,7 +8,7 @@ namespace ghGPT.Api.Controllers;
 
 [ApiController]
 [Route("api/repos/{id}/branches")]
-public class BranchesController(IRepositoryService service) : ControllerBase
+public class BranchesController(IRepositoryService service, IIssueService issueService) : ControllerBase
 {
     [HttpGet]
     public ActionResult<IReadOnlyList<BranchInfo>> GetBranches(string id)
@@ -67,6 +68,30 @@ public class BranchesController(IRepositoryService service) : ControllerBase
         {
             await service.DeleteBranch(id, Uri.UnescapeDataString(name));
             return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("linked-issue")]
+    public async Task<ActionResult<IssueDetail>> GetLinkedIssue(string id)
+    {
+        var repo = service.GetAll().FirstOrDefault(r => r.Id == id);
+        if (repo is null)
+            return NotFound(new { error = "Repository nicht gefunden." });
+
+        if (string.IsNullOrEmpty(repo.RemoteUrl))
+            return BadRequest(new { error = "Dieses Repository hat keinen GitHub-Remote." });
+
+        try
+        {
+            var parsed = RemoteUrlParser.Parse(repo.RemoteUrl);
+            var issue = await issueService.GetLinkedIssueForBranchAsync(parsed.Owner, parsed.Repo, repo.CurrentBranch);
+            if (issue is null)
+                return NotFound();
+            return Ok(issue);
         }
         catch (InvalidOperationException ex)
         {

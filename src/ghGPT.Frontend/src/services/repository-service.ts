@@ -299,6 +299,8 @@ export const repositoryService = {
     api.get<IssueListItem[]>(`/repos/${id}/issues?state=${state}`),
   getIssueDetail: (id: string, number: number) =>
     api.get<IssueDetail>(`/repos/${id}/issues/${number}`),
+  getLinkedIssue: (id: string) =>
+    api.get<IssueDetail>(`/repos/${id}/branches/linked-issue`),
   createIssue: (id: string, title: string, body: string, labels?: string[]) =>
     api.post<IssueListItem>(`/repos/${id}/issues`, { title, body, labels }),
   addIssueComment: (id: string, number: number, body: string) =>
