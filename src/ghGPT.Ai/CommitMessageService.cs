@@ -23,19 +23,20 @@ internal sealed class CommitMessageService(
 
         var messages = new List<ChatMessage>
         {
-            new() { Role = "system", Content = BuildSystemPrompt(recentCommits, linkedIssueNumber, linkedIssueTitle, linkedIssueBody) },
-            new() { Role = "user", Content = BuildUserPrompt(diff, recentCommits) }
+            new() { Role = "system", Content = BuildSystemPrompt(recentCommits) },
         };
+
+        var issueContext = BuildIssueContextPrompt(linkedIssueNumber, linkedIssueTitle, linkedIssueBody);
+        if (issueContext is not null)
+            messages.Add(new() { Role = "user", Content = issueContext });
+
+        messages.Add(new() { Role = "user", Content = BuildUserPrompt(diff, recentCommits) });
 
         await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
             yield return token;
     }
 
-    private string BuildSystemPrompt(
-        IReadOnlyList<string> recentCommits,
-        int? linkedIssueNumber,
-        string? linkedIssueTitle,
-        string? linkedIssueBody)
+    private static string BuildSystemPrompt(IReadOnlyList<string> recentCommits)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Du bist ein präziser Git-Assistent. Deine einzige Aufgabe ist es, eine einzelne Commit-Nachricht zu generieren.");
@@ -59,14 +60,6 @@ internal sealed class CommitMessageService(
         sb.AppendLine("- Body: nur wenn der Diff allein nicht erklärt warum — nicht was");
         sb.AppendLine("- Keine Issue-Referenzen hinzufügen");
 
-        if (linkedIssueNumber.HasValue && !string.IsNullOrWhiteSpace(linkedIssueTitle))
-        {
-            sb.AppendLine();
-            sb.AppendLine($"FEATURE-KONTEXT (Issue #{linkedIssueNumber}: {linkedIssueTitle}):");
-            if (!string.IsNullOrWhiteSpace(linkedIssueBody))
-                sb.AppendLine(linkedIssueBody.Trim());
-        }
-
         if (recentCommits.Count > 0)
         {
             sb.AppendLine();
@@ -74,6 +67,19 @@ internal sealed class CommitMessageService(
             foreach (var msg in recentCommits)
                 sb.AppendLine($"  {msg}");
         }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string? BuildIssueContextPrompt(int? linkedIssueNumber, string? linkedIssueTitle, string? linkedIssueBody)
+    {
+        if (!linkedIssueNumber.HasValue || string.IsNullOrWhiteSpace(linkedIssueTitle))
+            return null;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"FEATURE-KONTEXT (Issue #{linkedIssueNumber}: {linkedIssueTitle}):");
+        if (!string.IsNullOrWhiteSpace(linkedIssueBody))
+            sb.AppendLine(linkedIssueBody.Trim());
 
         return sb.ToString().TrimEnd();
     }
