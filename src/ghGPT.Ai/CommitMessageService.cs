@@ -23,19 +23,24 @@ internal sealed class CommitMessageService(
 
         var messages = new List<ChatMessage>
         {
-            new() { Role = "system", Content = BuildSystemPrompt(recentCommits, linkedIssueNumber, linkedIssueTitle, linkedIssueBody) },
-            new() { Role = "user", Content = BuildUserPrompt(diff, recentCommits) }
+            new() { Role = "system", Content = BuildSystemPrompt() },
         };
+
+        var stylePrompt = BuildStylePrompt(recentCommits);
+        if (stylePrompt is not null)
+            messages.Add(new() { Role = "user", Content = stylePrompt });
+
+        var issueContext = BuildIssueContextPrompt(linkedIssueNumber, linkedIssueTitle, linkedIssueBody);
+        if (issueContext is not null)
+            messages.Add(new() { Role = "user", Content = issueContext });
+
+        messages.Add(new() { Role = "user", Content = BuildUserPrompt(diff) });
 
         await foreach (var token in ollamaClient.GenerateAsync(messages, cancellationToken))
             yield return token;
     }
 
-    private string BuildSystemPrompt(
-        IReadOnlyList<string> recentCommits,
-        int? linkedIssueNumber,
-        string? linkedIssueTitle,
-        string? linkedIssueBody)
+    private static string BuildSystemPrompt()
     {
         var sb = new StringBuilder();
         sb.AppendLine("Du bist ein präziser Git-Assistent. Deine einzige Aufgabe ist es, eine einzelne Commit-Nachricht zu generieren.");
@@ -58,41 +63,42 @@ internal sealed class CommitMessageService(
         sb.AppendLine("- Scope: optional, beschreibt das Modul/die Komponente (z.B. 'api', 'ui', 'auth')");
         sb.AppendLine("- Body: nur wenn der Diff allein nicht erklärt warum — nicht was");
         sb.AppendLine("- Keine Issue-Referenzen hinzufügen");
+        return sb.ToString().TrimEnd();
+    }
 
-        if (linkedIssueNumber.HasValue && !string.IsNullOrWhiteSpace(linkedIssueTitle))
-        {
-            sb.AppendLine();
-            sb.AppendLine($"FEATURE-KONTEXT (Issue #{linkedIssueNumber}: {linkedIssueTitle}):");
-            if (!string.IsNullOrWhiteSpace(linkedIssueBody))
-                sb.AppendLine(linkedIssueBody.Trim());
-        }
+    private static string? BuildStylePrompt(IReadOnlyList<string> recentCommits)
+    {
+        if (recentCommits.Count == 0)
+            return null;
 
-        if (recentCommits.Count > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("STIL-VORGABE (übernimm Sprache, Scope-Stil und Detailgrad aus diesen Beispielen):");
-            foreach (var msg in recentCommits)
-                sb.AppendLine($"  {msg}");
-        }
+        var sb = new StringBuilder();
+        sb.AppendLine("STIL-VORGABE (übernimm Sprache, Scope-Stil und Detailgrad aus diesen Beispielen):");
+        foreach (var msg in recentCommits)
+            sb.AppendLine($"  {msg}");
+        return sb.ToString().TrimEnd();
+    }
+
+    private static string? BuildIssueContextPrompt(int? linkedIssueNumber, string? linkedIssueTitle, string? linkedIssueBody)
+    {
+        if (!linkedIssueNumber.HasValue || string.IsNullOrWhiteSpace(linkedIssueTitle))
+            return null;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"FEATURE-KONTEXT (Issue #{linkedIssueNumber}: {linkedIssueTitle}):");
+        if (!string.IsNullOrWhiteSpace(linkedIssueBody))
+            sb.AppendLine(linkedIssueBody.Trim());
 
         return sb.ToString().TrimEnd();
     }
 
-    private static string BuildUserPrompt(string diff, IReadOnlyList<string> recentCommits)
+    private static string BuildUserPrompt(string diff)
     {
         if (string.IsNullOrWhiteSpace(diff))
             return "Es gibt keine gestageten Änderungen.";
 
         var sb = new StringBuilder();
-        sb.AppendLine("Erstelle eine Commit-Nachricht für den folgenden Staged-Diff.");
-
-        if (recentCommits.Count > 0)
-            sb.AppendLine("Halte dich dabei an den Stil der bisherigen Commits aus dem System-Prompt.");
-
-        sb.AppendLine();
-        sb.AppendLine("Staged-Diff:");
+        sb.AppendLine("Erstelle eine Commit-Nachricht für den folgenden Staged-Diff:");
         sb.AppendLine(diff);
-
         return sb.ToString().TrimEnd();
     }
 
