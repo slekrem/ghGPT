@@ -13,6 +13,9 @@ internal sealed class CommitMessageService(
 
     public async IAsyncEnumerable<string> StreamCommitMessageAsync(
         string repoId,
+        int? linkedIssueNumber = null,
+        string? linkedIssueTitle = null,
+        string? linkedIssueBody = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var diff = BuildStagedDiff(repoId);
@@ -20,7 +23,7 @@ internal sealed class CommitMessageService(
 
         var messages = new List<ChatMessage>
         {
-            new() { Role = "system", Content = BuildSystemPrompt(recentCommits) },
+            new() { Role = "system", Content = BuildSystemPrompt(recentCommits, linkedIssueNumber, linkedIssueTitle, linkedIssueBody) },
             new() { Role = "user", Content = BuildUserPrompt(diff, recentCommits) }
         };
 
@@ -28,7 +31,11 @@ internal sealed class CommitMessageService(
             yield return token;
     }
 
-    private string BuildSystemPrompt(IReadOnlyList<string> recentCommits)
+    private string BuildSystemPrompt(
+        IReadOnlyList<string> recentCommits,
+        int? linkedIssueNumber,
+        string? linkedIssueTitle,
+        string? linkedIssueBody)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Du bist ein präziser Git-Assistent. Deine einzige Aufgabe ist es, eine einzelne Commit-Nachricht zu generieren.");
@@ -51,6 +58,14 @@ internal sealed class CommitMessageService(
         sb.AppendLine("- Scope: optional, beschreibt das Modul/die Komponente (z.B. 'api', 'ui', 'auth')");
         sb.AppendLine("- Body: nur wenn der Diff allein nicht erklärt warum — nicht was");
         sb.AppendLine("- Keine Issue-Referenzen hinzufügen");
+
+        if (linkedIssueNumber.HasValue && !string.IsNullOrWhiteSpace(linkedIssueTitle))
+        {
+            sb.AppendLine();
+            sb.AppendLine($"FEATURE-KONTEXT (Issue #{linkedIssueNumber}: {linkedIssueTitle}):");
+            if (!string.IsNullOrWhiteSpace(linkedIssueBody))
+                sb.AppendLine(linkedIssueBody.Trim());
+        }
 
         if (recentCommits.Count > 0)
         {
