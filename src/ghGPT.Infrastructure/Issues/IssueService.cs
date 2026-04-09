@@ -39,6 +39,25 @@ public class IssueService(IIssueClient issueClient) : IIssueService
         };
     }
 
+    public async Task<IssueDetail?> GetLinkedIssueForBranchAsync(string owner, string repo, string branchName)
+    {
+        var i = await issueClient.GetLinkedIssueForBranchAsync(owner, repo, branchName);
+        if (i is null) return null;
+        return new IssueDetail
+        {
+            Number = i.Number,
+            Title = i.Title,
+            State = i.State,
+            AuthorLogin = i.Author.Login,
+            Labels = i.Labels.Select(l => new IssueLabel { Name = l.Name, Color = l.Color }).ToList(),
+            Assignees = i.Assignees.Select(a => a.Login).ToList(),
+            Body = i.Body,
+            CreatedAt = i.CreatedAt,
+            UpdatedAt = i.UpdatedAt,
+            Url = i.Url
+        };
+    }
+
     public async Task<IssueListItem> CreateAsync(string owner, string repo, string title, string body, IEnumerable<string>? labels = null)
     {
         var i = await issueClient.CreateAsync(owner, repo, title, body, labels);

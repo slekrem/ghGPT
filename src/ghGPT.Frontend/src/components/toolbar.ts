@@ -1,7 +1,7 @@
 import { html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { AppElement } from '../app-element';
-import { repositoryService, type RepositoryInfo, type BranchInfo } from '../services/repository-service';
+import { repositoryService, type RepositoryInfo, type BranchInfo, type IssueDetail } from '../services/repository-service';
 import { ApiError } from '../services/api-client';
 
 @customElement('app-toolbar')
@@ -13,6 +13,7 @@ export class AppToolbar extends AppElement {
 
   @state() private branches: BranchInfo[] = [];
   @state() private showBranchDropdown = false;
+  @state() private linkedIssue: IssueDetail | undefined = undefined;
 
   private _onDocClick = (e: MouseEvent) => {
     const path = e.composedPath();
@@ -25,6 +26,7 @@ export class AppToolbar extends AppElement {
   updated(changedProps: Map<string, unknown>) {
     if (changedProps.has('activeRepo') || changedProps.has('branchesRefreshKey')) {
       this._fetchBranches();
+      this._fetchLinkedIssue();
     }
   }
 
@@ -39,6 +41,14 @@ export class AppToolbar extends AppElement {
       return;
     }
     this.branches = await repositoryService.getBranches(this.activeRepo.id).catch(() => []);
+  }
+
+  private async _fetchLinkedIssue() {
+    if (!this.activeRepo) {
+      this.linkedIssue = undefined;
+      return;
+    }
+    this.linkedIssue = await repositoryService.getLinkedIssue(this.activeRepo.id).catch(() => undefined);
   }
 
   private async _openDropdown() {
@@ -150,6 +160,16 @@ export class AppToolbar extends AppElement {
           </div>
         ` : ''}
       </div>
+
+      ${this.linkedIssue ? html`
+        <button
+          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-cat-border bg-transparent text-cat-subtle text-xs cursor-pointer hover:bg-cat-overlay hover:text-cat-text max-w-[240px]"
+          title="${this.linkedIssue.title}"
+          @click=${() => this._emit('navigate', 'issues')}>
+          <span class="shrink-0 text-cat-blue">#${this.linkedIssue.number}</span>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap">${this.linkedIssue.title}</span>
+        </button>
+      ` : ''}
 
       <div class="flex-1"></div>
 

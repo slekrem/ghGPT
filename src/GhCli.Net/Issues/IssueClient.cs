@@ -101,42 +101,14 @@ internal class IssueClient(IGhCliRunner runner) : IIssueClient
 
         var number = int.Parse(match.Groups[1].Value);
 
-        var json = await runner.RunAsync(
-            "api", "graphql",
-            "-f", $"query={LinkedBranchQuery}",
-            "-f", $"owner={owner}",
-            "-f", $"repo={repo}",
-            "-F", $"number={number}");
-
-        var response = JsonSerializer.Deserialize<GraphQlResponse<LinkedBranchQueryData>>(json, JsonOptions);
-        var issue = response?.Data?.Repository?.Issue;
-
-        if (issue is null)
-            return null;
-
-        var isLinked = issue.LinkedBranches?.Nodes
-            .Any(n => string.Equals(n.Ref?.Name, branchName, StringComparison.OrdinalIgnoreCase)) ?? false;
-
-        if (!isLinked)
-            return null;
-
-        return new IssueDetail
+        try
         {
-            Number = issue.Number,
-            Title = issue.Title,
-            State = issue.State,
-            Url = issue.Url,
-            Body = issue.Body,
-            CreatedAt = issue.CreatedAt,
-            UpdatedAt = issue.UpdatedAt,
-            Author = new IssueAuthor { Login = issue.Author?.Login ?? string.Empty },
-            Labels = issue.Labels?.Nodes
-                .Select(l => new IssueLabel { Name = l.Name, Color = l.Color })
-                .ToList() ?? [],
-            Assignees = issue.Assignees?.Nodes
-                .Select(a => new IssueAssignee { Login = a.Login })
-                .ToList() ?? [],
-        };
+            return await GetDetailAsync(owner, repo, number);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async Task<Issue> CreateAsync(string owner, string repo, string title, string body, IEnumerable<string>? labels = null)
