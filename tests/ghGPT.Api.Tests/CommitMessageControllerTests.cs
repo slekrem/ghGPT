@@ -27,10 +27,10 @@ public class CommitMessageControllerTests
     [Fact]
     public async Task StreamCommitMessage_WritesTokensAsSSE()
     {
-        _service.StreamCommitMessageAsync("repo-1", Arg.Any<CancellationToken>())
+        _service.StreamCommitMessageAsync("repo-1", null, null, null, Arg.Any<CancellationToken>())
             .Returns(AsyncEnumerable("feat(api): ", "add endpoint"));
 
-        await _controller.StreamCommitMessage("repo-1", CancellationToken.None);
+        await _controller.StreamCommitMessage("repo-1", null, CancellationToken.None);
 
         var body = ReadResponseBody();
         Assert.Contains("data:", body);
@@ -41,10 +41,10 @@ public class CommitMessageControllerTests
     [Fact]
     public async Task StreamCommitMessage_WritesDoneEvent()
     {
-        _service.StreamCommitMessageAsync("repo-1", Arg.Any<CancellationToken>())
+        _service.StreamCommitMessageAsync("repo-1", null, null, null, Arg.Any<CancellationToken>())
             .Returns(AsyncEnumerable("fix: typo"));
 
-        await _controller.StreamCommitMessage("repo-1", CancellationToken.None);
+        await _controller.StreamCommitMessage("repo-1", null, CancellationToken.None);
 
         var body = ReadResponseBody();
         Assert.Contains("event: done", body);
@@ -53,10 +53,10 @@ public class CommitMessageControllerTests
     [Fact]
     public async Task StreamCommitMessage_SetsSSEContentType()
     {
-        _service.StreamCommitMessageAsync("repo-1", Arg.Any<CancellationToken>())
+        _service.StreamCommitMessageAsync("repo-1", null, null, null, Arg.Any<CancellationToken>())
             .Returns(AsyncEnumerable());
 
-        await _controller.StreamCommitMessage("repo-1", CancellationToken.None);
+        await _controller.StreamCommitMessage("repo-1", null, CancellationToken.None);
 
         Assert.Equal("text/event-stream",
             _controller.HttpContext.Response.Headers.ContentType.ToString());
@@ -65,10 +65,10 @@ public class CommitMessageControllerTests
     [Fact]
     public async Task StreamCommitMessage_OnException_WritesErrorEvent()
     {
-        _service.StreamCommitMessageAsync("repo-1", Arg.Any<CancellationToken>())
+        _service.StreamCommitMessageAsync("repo-1", null, null, null, Arg.Any<CancellationToken>())
             .Returns(ThrowingAsyncEnumerable());
 
-        await _controller.StreamCommitMessage("repo-1", CancellationToken.None);
+        await _controller.StreamCommitMessage("repo-1", null, CancellationToken.None);
 
         var body = ReadResponseBody();
         Assert.Contains("event: error", body);

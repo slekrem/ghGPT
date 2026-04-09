@@ -1,4 +1,6 @@
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Ai;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using System.Net;
 using System.Text;
@@ -44,7 +46,7 @@ public class OllamaClientTests
     public async Task IsAvailableAsync_WhenConnectionFails_ReturnsFalse()
     {
         var handler = new ThrowingHttpMessageHandler(new HttpRequestException("connection refused"));
-        var sut = new OllamaClient(_settingsService, new HttpClient(handler));
+        var sut = new OllamaClient(_settingsService, NullLogger<OllamaClient>.Instance, new HttpClient(handler));
 
         var result = await sut.IsAvailableAsync();
 
@@ -305,7 +307,7 @@ public class OllamaClientTests
     private OllamaClient CreateClient(HttpStatusCode statusCode, string body)
     {
         var handler = new FakeHttpMessageHandler(statusCode, body);
-        return new OllamaClient(_settingsService, new HttpClient(handler));
+        return new OllamaClient(_settingsService, NullLogger<OllamaClient>.Instance, new HttpClient(handler));
     }
 
     private static async Task<List<string>> CollectTokensAsync(OllamaClient client)
