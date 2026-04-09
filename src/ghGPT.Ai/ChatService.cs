@@ -1,3 +1,4 @@
+using ghGPT.Ai.Tools;
 using ghGPT.Core.Ai;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -89,12 +90,12 @@ internal sealed class ChatService(
 
     private static string GetSuccessMessage(string toolName, string displayArgs) => toolName switch
     {
-        "get_status" => "Repository-Status abgerufen",
-        "get_branches" => "Branches abgerufen",
-        "checkout_branch" => $"Branch gewechselt: {displayArgs.Replace("checkout_branch(", "").TrimEnd(')')}",
-        "create_branch" => $"Branch erstellt: {displayArgs.Replace("create_branch(", "").TrimEnd(')')}",
-        "get_history" => "Commit-History abgerufen",
-        "fetch" => "Remote-Stand aktualisiert (fetch)",
+        ToolNames.GetStatus => "Repository-Status abgerufen",
+        ToolNames.GetBranches => "Branches abgerufen",
+        ToolNames.CheckoutBranch => $"Branch gewechselt: {displayArgs.Replace($"{ToolNames.CheckoutBranch}(", "").TrimEnd(')')}",
+        ToolNames.CreateBranch => $"Branch erstellt: {displayArgs.Replace($"{ToolNames.CreateBranch}(", "").TrimEnd(')')}",
+        ToolNames.GetHistory => "Commit-History abgerufen",
+        ToolNames.Fetch => "Remote-Stand aktualisiert (fetch)",
         _ => displayArgs
     };
 }
