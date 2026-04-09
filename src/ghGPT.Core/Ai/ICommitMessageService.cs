@@ -2,5 +2,10 @@ namespace ghGPT.Core.Ai;
 
 public interface ICommitMessageService
 {
-    IAsyncEnumerable<string> StreamCommitMessageAsync(string repoId, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<string> StreamCommitMessageAsync(
+        string repoId,
+        int? linkedIssueNumber = null,
+        string? linkedIssueTitle = null,
+        string? linkedIssueBody = null,
+        CancellationToken cancellationToken = default);
 }
