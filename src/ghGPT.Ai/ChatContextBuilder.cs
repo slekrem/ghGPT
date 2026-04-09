@@ -1,6 +1,7 @@
 using ghGPT.Core.Ai;
 using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
+using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace ghGPT.Ai;
@@ -8,7 +9,8 @@ namespace ghGPT.Ai;
 internal sealed class ChatContextBuilder(
     IRepositoryService repositoryService,
     IPullRequestService pullRequestService,
-    IChatHistoryService historyService) : IChatContextBuilder
+    IChatHistoryService historyService,
+    ILogger<ChatContextBuilder> logger) : IChatContextBuilder
 {
     public async Task<IEnumerable<ChatMessage>> BuildAsync(ChatRequest request)
     {
@@ -77,15 +79,14 @@ internal sealed class ChatContextBuilder(
             }
 
             var status = repositoryService.GetStatus(repoId);
-            var stagedCount = status.Staged.Count;
-            var unstagedCount = status.Unstaged.Count;
-            if (stagedCount > 0 || unstagedCount > 0)
-                sb.AppendLine($"- Änderungen: {stagedCount} staged, {unstagedCount} unstaged");
+            if (status.Staged.Count > 0 || status.Unstaged.Count > 0)
+                sb.AppendLine($"- Änderungen: {status.Staged.Count} staged, {status.Unstaged.Count} unstaged");
 
             return sb.ToString().TrimEnd();
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Repository-Kontext konnte nicht erstellt werden für Repo {RepoId}.", repoId);
             return null;
         }
     }
@@ -106,8 +107,9 @@ internal sealed class ChatContextBuilder(
                 _ => null
             };
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "View-Kontext '{ActiveView}' konnte nicht erstellt werden für Repo {RepoId}.", request.ActiveView, request.RepoId);
             return null;
         }
     }
@@ -139,7 +141,10 @@ internal sealed class ChatContextBuilder(
                 sb.AppendLine(diff);
                 sb.AppendLine("```");
             }
-            catch { /* Datei überspringen */ }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Diff für {FilePath} übersprungen.", file);
+            }
         }
 
         return sb.ToString().TrimEnd();

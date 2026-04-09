@@ -141,8 +141,9 @@ internal sealed class CommitMessageService(
                 .Where(m => !string.IsNullOrWhiteSpace(m))
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Letzte Commits konnten nicht geladen werden für Repo {RepoId}.", repoId);
             return [];
         }
     }
