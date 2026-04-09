@@ -12,7 +12,7 @@ const REVIEW_PURIFY_CONFIG = {
                  'ul', 'ol', 'li', 'blockquote'],
   ALLOWED_ATTR: ['href', 'title', 'rel'],
 };
-import { repositoryService, type FileStatusEntry, type RepositoryStatusResult } from '../services/repository-service';
+import { repositoryService, type FileStatusEntry, type IssueDetail, type RepositoryStatusResult } from '../services/repository-service';
 
 interface ParsedHunk {
   oldStart: number;
@@ -52,6 +52,7 @@ export class ChangesView extends AppElement {
   @state() private commitError = '';
   @state() private committing = false;
   @state() private lineActionInProgress = false;
+  @state() private linkedIssue: IssueDetail | undefined = undefined;
   @state() private stashing = false;
   @state() private stashError = '';
   @state() private discardConfirmPath = '';
@@ -69,6 +70,7 @@ export class ChangesView extends AppElement {
       this._orderedPaths = [];
       this.resetReviewState();
       this.loadStatus();
+      this._fetchLinkedIssue();
     } else if (changed.has('refreshKey') && this.repoId) {
       this.resetReviewState();
       const prevPath = this.selectedPath;
@@ -348,15 +350,29 @@ export class ChangesView extends AppElement {
     }
   }
 
+  private async _fetchLinkedIssue() {
+    this.linkedIssue = await repositoryService.getLinkedIssue(this.repoId).catch(() => undefined);
+  }
+
   private async generateCommitMessage() {
     if (this.generatingMessage || this.status.staged.length === 0) return;
     this.generatingMessage = true;
     this.aiStreamPreview = '';
     this.commitMessage = '';
 
+    const body = this.linkedIssue
+      ? JSON.stringify({
+          linkedIssueNumber: this.linkedIssue.number,
+          linkedIssueTitle: this.linkedIssue.title,
+          linkedIssueBody: this.linkedIssue.body,
+        })
+      : undefined;
+
     try {
       const response = await fetch(`/api/repos/${encodeURIComponent(this.repoId)}/ai/commit-message`, {
         method: 'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body,
       });
       if (!response.ok || !response.body) throw new Error('Anfrage fehlgeschlagen');
 

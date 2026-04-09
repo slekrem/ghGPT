@@ -1,3 +1,4 @@
+using ghGPT.Api.Models;
 using ghGPT.Core.Ai;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
@@ -10,7 +11,7 @@ namespace ghGPT.Api.Controllers;
 public class CommitMessageController(ICommitMessageService commitMessageService) : ControllerBase
 {
     [HttpPost("commit-message")]
-    public async Task StreamCommitMessage(string id, CancellationToken cancellationToken)
+    public async Task StreamCommitMessage(string id, [FromBody] CommitMessageRequest? request, CancellationToken cancellationToken)
     {
         Response.Headers.ContentType = "text/event-stream";
         Response.Headers.CacheControl = "no-cache";
@@ -20,7 +21,12 @@ public class CommitMessageController(ICommitMessageService commitMessageService)
 
         try
         {
-            await foreach (var token in commitMessageService.StreamCommitMessageAsync(id, cancellationToken))
+            await foreach (var token in commitMessageService.StreamCommitMessageAsync(
+                id,
+                request?.LinkedIssueNumber,
+                request?.LinkedIssueTitle,
+                request?.LinkedIssueBody,
+                cancellationToken))
             {
                 var data = JsonSerializer.Serialize(token);
                 var bytes = Encoding.UTF8.GetBytes($"data: {data}\n\n");
