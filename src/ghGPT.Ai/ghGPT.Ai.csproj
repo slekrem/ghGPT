@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ghGPT.Core\ghGPT.Core.csproj" />
+    <ProjectReference Include="..\ghGPT.Ai.Ollama\ghGPT.Ai.Ollama.csproj" />
+    <ProjectReference Include="..\ghGPT.Ai.Tools\ghGPT.Ai.Tools.csproj" />
   </ItemGroup>
 
   <ItemGroup>
