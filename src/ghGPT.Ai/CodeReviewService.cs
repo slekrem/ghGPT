@@ -9,6 +9,7 @@ namespace ghGPT.Ai;
 internal sealed class CodeReviewService(
     IOllamaClient ollamaClient,
     IRepositoryService repositoryService,
+    DiffService diffService,
     ILogger<CodeReviewService> logger) : ICodeReviewService
 {
     private const string SessionFileName = ".review-session.md";
@@ -18,7 +19,7 @@ internal sealed class CodeReviewService(
         string repoId,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var diff = BuildCombinedDiff(repoId);
+        var diff = diffService.BuildCombinedDiff(repoId);
         var reviewContext = LoadFileContext(repoId, "REVIEW.md");
         var sessionContext = LoadFileContext(repoId, SessionFileName);
 
@@ -135,41 +136,6 @@ internal sealed class CodeReviewService(
         {
             logger.LogWarning(ex, "{FileName} konnte nicht geladen werden für Repo {RepoId}.", fileName, repoId);
             return null;
-        }
-    }
-
-    private string BuildCombinedDiff(string repoId)
-    {
-        try
-        {
-            var status = repositoryService.GetStatus(repoId);
-            var allFiles = status.Staged
-                .Select(f => f.FilePath)
-                .Concat(status.Unstaged.Select(f => f.FilePath))
-                .Distinct()
-                .ToList();
-
-            if (allFiles.Count == 0) return string.Empty;
-
-            var sb = new StringBuilder();
-            foreach (var file in allFiles)
-            {
-                try
-                {
-                    var diff = repositoryService.GetCombinedDiff(repoId, file);
-                    if (!string.IsNullOrEmpty(diff))
-                    {
-                        sb.AppendLine($"### {file}");
-                        sb.AppendLine(diff);
-                    }
-                }
-                catch { /* Datei überspringen */ }
-            }
-            return sb.ToString().TrimEnd();
-        }
-        catch
-        {
-            return string.Empty;
         }
     }
 }
