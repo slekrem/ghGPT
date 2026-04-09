@@ -1,5 +1,6 @@
 using ghGPT.Api.Controllers;
 using ghGPT.Api.Models;
+using ghGPT.Core.Issues;
 using ghGPT.Core.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
@@ -10,11 +11,12 @@ namespace ghGPT.Api.Tests;
 public class BranchesControllerTests
 {
     private readonly IRepositoryService _service = Substitute.For<IRepositoryService>();
+    private readonly IIssueService _issueService = Substitute.For<IIssueService>();
     private readonly BranchesController _controller;
 
     public BranchesControllerTests()
     {
-        _controller = new BranchesController(_service);
+        _controller = new BranchesController(_service, _issueService);
     }
 
     // --- GetBranches ---
