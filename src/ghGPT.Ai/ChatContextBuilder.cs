@@ -1,3 +1,4 @@
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Ai;
 using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
