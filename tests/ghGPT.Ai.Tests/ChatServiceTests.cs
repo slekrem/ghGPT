@@ -1,3 +1,5 @@
+using ghGPT.Ai.Ollama;
+using ghGPT.Ai.Tools;
 using ghGPT.Core.Ai;
 using NSubstitute;
 

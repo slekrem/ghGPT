@@ -1,5 +1,4 @@
 using ghGPT.Ai.Ollama;
-using ghGPT.Core.Ai;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using System.Net;

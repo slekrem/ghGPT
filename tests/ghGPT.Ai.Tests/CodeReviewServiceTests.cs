@@ -1,3 +1,4 @@
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Ai;
 using ghGPT.Core.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;

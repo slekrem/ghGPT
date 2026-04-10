@@ -1,4 +1,4 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Ollama;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 

@@ -1,3 +1,4 @@
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Ai;
 using Microsoft.AspNetCore.Mvc;
 

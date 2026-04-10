@@ -1,4 +1,6 @@
-namespace ghGPT.Core.Ai;
+using ghGPT.Core.Ai;
+
+namespace ghGPT.Ai.Ollama;
 
 public interface IOllamaClient
 {
