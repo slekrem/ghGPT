@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ghGPT.Core\ghGPT.Core.csproj" />
     <ProjectReference Include="..\ghGPT.Ai.Abstractions\ghGPT.Ai.Abstractions.csproj" />
+    <ProjectReference Include="..\ghGPT.Ai\ghGPT.Ai.csproj" />
     <ProjectReference Include="..\ghGPT.Infrastructure\ghGPT.Infrastructure.csproj" />
   </ItemGroup>
 

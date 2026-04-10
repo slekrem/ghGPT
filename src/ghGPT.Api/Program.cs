@@ -1,3 +1,4 @@
+using ghGPT.Ai;
 using ghGPT.Api.Hubs;
 using ghGPT.Core.Repositories;
 using ghGPT.Infrastructure;
@@ -10,6 +11,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRepositoryEventNotifier, RepositoryEventNotifier>();
 builder.Services.AddInfrastructure();
+builder.Services.AddAiServices();
 
 var app = builder.Build();
 
