@@ -36,7 +36,7 @@ internal sealed class OllamaClient(
         }
     }
 
-    public async Task<IReadOnlyList<OllamaModelInfo>> GetModelsAsync()
+    public async Task<IReadOnlyList<AiModelInfo>> GetModelsAsync()
     {
         var settings = settingsService.Load();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -44,7 +44,7 @@ internal sealed class OllamaClient(
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<OpenAiModelsResponse>();
-        return result?.Data?.Select(m => new OllamaModelInfo
+        return result?.Data?.Select(m => new AiModelInfo
         {
             Name = m.Id,
             Size = 0,

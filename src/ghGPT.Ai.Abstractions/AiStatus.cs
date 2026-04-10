@@ -1,6 +1,6 @@
-namespace ghGPT.Ai.Ollama;
+namespace ghGPT.Ai.Abstractions;
 
-public class OllamaStatus
+public class AiStatus
 {
     public bool Online { get; set; }
     public string BaseUrl { get; set; } = string.Empty;

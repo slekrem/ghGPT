@@ -1,6 +1,6 @@
-namespace ghGPT.Ai.Ollama;
+namespace ghGPT.Ai.Abstractions;
 
-public class OllamaModelInfo
+public class AiModelInfo
 {
     public string Name { get; set; } = string.Empty;
     public long Size { get; set; }

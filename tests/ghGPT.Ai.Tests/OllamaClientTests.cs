@@ -1,3 +1,4 @@
+using ghGPT.Ai.Abstractions;
 using ghGPT.Ai.Ollama;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -12,7 +13,7 @@ public class OllamaClientTests
 
     public OllamaClientTests()
     {
-        _settingsService.Load().Returns(new OllamaSettings
+        _settingsService.Load().Returns(new AiSettings
         {
             BaseUrl = "http://localhost:11434",
             Model = "llama3.2"
