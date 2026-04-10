@@ -1,5 +1,5 @@
 using ghGPT.Ai.Ollama;
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ghGPT.Api.Controllers;
