@@ -71,23 +71,10 @@ internal sealed class OllamaClient(
         };
 
         using var response = await SendAsync(request, cancellationToken);
-
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var reader = new System.IO.StreamReader(stream);
 
-        while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
-        {
-            var line = await reader.ReadLineAsync(cancellationToken);
-            if (string.IsNullOrEmpty(line) || !line.StartsWith("data: ")) continue;
-
-            var data = line["data: ".Length..];
-            if (data == "[DONE]") break;
-
-            var chunk = JsonSerializer.Deserialize<OpenAiChunk>(data);
-            var token = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
-            if (!string.IsNullOrEmpty(token))
-                yield return token;
-        }
+        await foreach (var token in OllamaSseParser.ParseTokensAsync(stream, cancellationToken))
+            yield return token;
     }
 
     public async Task<ToolCallResponse> CompleteWithToolsAsync(
@@ -180,89 +167,5 @@ internal sealed class OllamaClient(
 
             return new { role = m.Role, content = m.Content ?? string.Empty };
         });
-    }
-
-    private sealed class OpenAiModelsResponse
-    {
-        [JsonPropertyName("data")]
-        public List<OpenAiModel>? Data { get; set; }
-    }
-
-    private sealed class OpenAiModel
-    {
-        [JsonPropertyName("id")]
-        public string Id { get; set; } = string.Empty;
-
-        [JsonPropertyName("created")]
-        public long Created { get; set; }
-    }
-
-    private sealed class OpenAiChunk
-    {
-        [JsonPropertyName("choices")]
-        public List<OpenAiChoice>? Choices { get; set; }
-    }
-
-    private sealed class OpenAiChoice
-    {
-        [JsonPropertyName("delta")]
-        public OpenAiDelta? Delta { get; set; }
-
-        [JsonPropertyName("finish_reason")]
-        public string? FinishReason { get; set; }
-
-        [JsonPropertyName("message")]
-        public OpenAiMessage? Message { get; set; }
-    }
-
-    private sealed class OpenAiDelta
-    {
-        [JsonPropertyName("content")]
-        public string? Content { get; set; }
-    }
-
-    private sealed class OpenAiCompletion
-    {
-        [JsonPropertyName("choices")]
-        public List<OpenAiCompletionChoice>? Choices { get; set; }
-    }
-
-    private sealed class OpenAiCompletionChoice
-    {
-        [JsonPropertyName("finish_reason")]
-        public string? FinishReason { get; set; }
-
-        [JsonPropertyName("message")]
-        public OpenAiMessage? Message { get; set; }
-    }
-
-    private sealed class OpenAiMessage
-    {
-        [JsonPropertyName("role")]
-        public string? Role { get; set; }
-
-        [JsonPropertyName("content")]
-        public string? Content { get; set; }
-
-        [JsonPropertyName("tool_calls")]
-        public List<OpenAiToolCall>? ToolCalls { get; set; }
-    }
-
-    private sealed class OpenAiToolCall
-    {
-        [JsonPropertyName("id")]
-        public string? Id { get; set; }
-
-        [JsonPropertyName("function")]
-        public OpenAiToolCallFunction? Function { get; set; }
-    }
-
-    private sealed class OpenAiToolCallFunction
-    {
-        [JsonPropertyName("name")]
-        public string? Name { get; set; }
-
-        [JsonPropertyName("arguments")]
-        public string? Arguments { get; set; }
     }
 }

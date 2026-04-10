@@ -10,6 +10,7 @@ internal sealed class ChatContextBuilder(
     IRepositoryService repositoryService,
     IPullRequestService pullRequestService,
     IChatHistoryService historyService,
+    DiffService diffService,
     ILogger<ChatContextBuilder> logger) : IChatContextBuilder
 {
     public async Task<IEnumerable<ChatMessage>> BuildAsync(ChatRequest request)
@@ -117,35 +118,23 @@ internal sealed class ChatContextBuilder(
     private string? BuildChangesContext(string repoId)
     {
         var status = repositoryService.GetStatus(repoId);
-        var allFiles = status.Staged.Concat(status.Unstaged)
+        var fileCount = status.Staged.Concat(status.Unstaged)
             .Select(f => f.FilePath)
             .Distinct()
-            .ToList();
+            .Count();
 
-        if (allFiles.Count == 0) return null;
+        if (fileCount == 0) return null;
+
+        var diff = diffService.BuildCombinedDiff(repoId);
+        if (string.IsNullOrEmpty(diff)) return null;
 
         var sb = new StringBuilder();
         sb.AppendLine("## Ansicht: Änderungen");
-        sb.AppendLine($"Geänderte Dateien: {allFiles.Count}");
+        sb.AppendLine($"Geänderte Dateien: {fileCount}");
         sb.AppendLine();
-
-        foreach (var file in allFiles)
-        {
-            try
-            {
-                var diff = repositoryService.GetCombinedDiff(repoId, file);
-                if (string.IsNullOrEmpty(diff)) continue;
-
-                sb.AppendLine($"### {file}");
-                sb.AppendLine("```diff");
-                sb.AppendLine(diff);
-                sb.AppendLine("```");
-            }
-            catch (Exception ex)
-            {
-                logger.LogDebug(ex, "Diff für {FilePath} übersprungen.", file);
-            }
-        }
+        sb.AppendLine("```diff");
+        sb.AppendLine(diff);
+        sb.AppendLine("```");
 
         return sb.ToString().TrimEnd();
     }
