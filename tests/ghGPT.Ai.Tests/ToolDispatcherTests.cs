@@ -1,3 +1,4 @@
+using ghGPT.Ai.Abstractions;
 using ghGPT.Ai.Tools;
 using ghGPT.Core.Ai;
 using ghGPT.Core.Repositories;

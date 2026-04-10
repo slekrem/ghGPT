@@ -1,6 +1,4 @@
-using ghGPT.Core.Ai;
-
-namespace ghGPT.Ai.Ollama;
+namespace ghGPT.Ai.Abstractions;
 
 public class ChatMessage
 {

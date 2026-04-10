@@ -1,4 +1,3 @@
-using ghGPT.Core.Ai;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ghGPT.Ai.Tools;

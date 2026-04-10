@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ghGPT.Core\ghGPT.Core.csproj" />
+    <ProjectReference Include="..\ghGPT.Ai.Abstractions\ghGPT.Ai.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

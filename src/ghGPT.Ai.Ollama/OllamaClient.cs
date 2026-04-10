@@ -1,4 +1,4 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;

@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ghGPT.Ai\ghGPT.Ai.csproj" />
+    <ProjectReference Include="..\..\src\ghGPT.Ai.Abstractions\ghGPT.Ai.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\ghGPT.Ai.Ollama\ghGPT.Ai.Ollama.csproj" />
     <ProjectReference Include="..\..\src\ghGPT.Ai.Tools\ghGPT.Ai.Tools.csproj" />
   </ItemGroup>
