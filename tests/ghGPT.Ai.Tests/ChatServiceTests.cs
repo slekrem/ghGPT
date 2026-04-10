@@ -1,7 +1,6 @@
 using ghGPT.Ai.Abstractions;
 using ghGPT.Ai.Ollama;
 using ghGPT.Ai.Tools;
-using ghGPT.Core.Ai;
 using NSubstitute;
 
 namespace ghGPT.Ai.Tests;

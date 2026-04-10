@@ -1,4 +1,4 @@
-namespace ghGPT.Core.Ai;
+namespace ghGPT.Ai.Abstractions;
 
 public record ToolExecutedEvent(
     string ToolName,

@@ -1,5 +1,4 @@
 using ghGPT.Ai.Abstractions;
-using ghGPT.Core.Ai;
 
 namespace ghGPT.Ai;
 

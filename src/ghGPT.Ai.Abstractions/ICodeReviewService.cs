@@ -1,4 +1,4 @@
-namespace ghGPT.Core.Ai;
+namespace ghGPT.Ai.Abstractions;
 
 public interface ICodeReviewService
 {

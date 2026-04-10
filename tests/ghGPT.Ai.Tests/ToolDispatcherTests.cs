@@ -1,6 +1,5 @@
 using ghGPT.Ai.Abstractions;
 using ghGPT.Ai.Tools;
-using ghGPT.Core.Ai;
 using ghGPT.Core.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;

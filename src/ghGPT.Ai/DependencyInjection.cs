@@ -1,6 +1,6 @@
 using ghGPT.Ai.Ollama;
 using ghGPT.Ai.Tools;
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ghGPT.Ai;

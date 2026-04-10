@@ -1,7 +1,6 @@
 using ghGPT.Ai.Abstractions;
 using ghGPT.Ai.Ollama;
 using ghGPT.Ai.Tools;
-using ghGPT.Core.Ai;
 using System.Runtime.CompilerServices;
 using System.Text;
 
