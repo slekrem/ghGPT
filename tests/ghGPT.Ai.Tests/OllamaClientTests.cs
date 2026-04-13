@@ -46,7 +46,7 @@ public class OllamaClientTests
     public async Task IsAvailableAsync_WhenConnectionFails_ReturnsFalse()
     {
         var handler = new ThrowingHttpMessageHandler(new HttpRequestException("connection refused"));
-        var sut = new OllamaClient(_settingsService, NullLogger<OllamaClient>.Instance, new HttpClient(handler));
+        var sut = CreateClient(handler);
 
         var result = await sut.IsAvailableAsync();
 
@@ -307,7 +307,14 @@ public class OllamaClientTests
     private OllamaClient CreateClient(HttpStatusCode statusCode, string body)
     {
         var handler = new FakeHttpMessageHandler(statusCode, body);
-        return new OllamaClient(_settingsService, NullLogger<OllamaClient>.Instance, new HttpClient(handler));
+        return CreateClient(handler);
+    }
+
+    private OllamaClient CreateClient(HttpMessageHandler handler)
+    {
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient("Ollama").Returns(new HttpClient(handler));
+        return new OllamaClient(_settingsService, factory, NullLogger<OllamaClient>.Instance);
     }
 
     private static async Task<List<string>> CollectTokensAsync(OllamaClient client)
