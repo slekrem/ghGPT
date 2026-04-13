@@ -1,4 +1,5 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Repositories;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -14,7 +15,8 @@ public class CodeReviewServiceTests
 
     public CodeReviewServiceTests()
     {
-        _sut = new CodeReviewService(_ollamaClient, _repositoryService, NullLogger<CodeReviewService>.Instance);
+        var diffService = new DiffService(_repositoryService, NullLogger<DiffService>.Instance);
+        _sut = new CodeReviewService(_ollamaClient, _repositoryService, diffService, NullLogger<CodeReviewService>.Instance);
     }
 
     [Fact]

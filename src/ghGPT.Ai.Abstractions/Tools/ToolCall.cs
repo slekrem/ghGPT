@@ -1,0 +1,8 @@
+namespace ghGPT.Ai.Abstractions;
+
+public class ToolCall
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string ArgumentsJson { get; set; } = string.Empty;
+}

@@ -1,5 +1,5 @@
 using ghGPT.Api.Controllers;
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;

@@ -1,5 +1,7 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Repositories;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -13,7 +15,8 @@ public class CommitMessageServiceTests
 
     public CommitMessageServiceTests()
     {
-        _sut = new CommitMessageService(_ollamaClient, _repositoryService);
+        var diffService = new DiffService(_repositoryService, NullLogger<DiffService>.Instance);
+        _sut = new CommitMessageService(_ollamaClient, _repositoryService, diffService, NullLogger<CommitMessageService>.Instance);
     }
 
     // --- StreamCommitMessageAsync ---
@@ -83,9 +86,9 @@ public class CommitMessageServiceTests
         await foreach (var _ in _sut.StreamCommitMessageAsync("repo-1")) { }
 
         Assert.NotNull(capturedMessages);
-        var systemMsg = capturedMessages!.First(m => m.Role == "system");
-        Assert.Contains("feat(core): add Foo class", systemMsg.Content);
-        Assert.Contains("refactor(core): extract interface", systemMsg.Content);
+        var styleMsg = capturedMessages!.First(m => m.Role == "user" && m.Content!.Contains("STIL-VORGABE"));
+        Assert.Contains("feat(core): add Foo class", styleMsg.Content);
+        Assert.Contains("refactor(core): extract interface", styleMsg.Content);
     }
 
     [Fact]

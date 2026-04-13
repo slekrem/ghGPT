@@ -1,5 +1,7 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Repositories;
+using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -7,7 +9,8 @@ namespace ghGPT.Ai;
 
 internal sealed class CommitSummaryService(
     IOllamaClient ollamaClient,
-    IRepositoryService repositoryService) : ICommitSummaryService
+    IRepositoryService repositoryService,
+    ILogger<CommitSummaryService> logger) : ICommitSummaryService
 {
     private const string SystemPrompt =
         """
@@ -49,8 +52,9 @@ internal sealed class CommitSummaryService(
                 .Where(m => !string.IsNullOrWhiteSpace(m))
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Commits konnten nicht geladen werden für Repo {RepoId}.", repoId);
             return [];
         }
     }

@@ -1,5 +1,7 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Repositories;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -13,7 +15,7 @@ public class CommitSummaryServiceTests
 
     public CommitSummaryServiceTests()
     {
-        _sut = new CommitSummaryService(_ollamaClient, _repositoryService);
+        _sut = new CommitSummaryService(_ollamaClient, _repositoryService, NullLogger<CommitSummaryService>.Instance);
     }
 
     [Fact]

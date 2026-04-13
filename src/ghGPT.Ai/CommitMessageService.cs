@@ -1,5 +1,7 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
+using ghGPT.Ai.Ollama;
 using ghGPT.Core.Repositories;
+using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -7,7 +9,9 @@ namespace ghGPT.Ai;
 
 internal sealed class CommitMessageService(
     IOllamaClient ollamaClient,
-    IRepositoryService repositoryService) : ICommitMessageService
+    IRepositoryService repositoryService,
+    DiffService diffService,
+    ILogger<CommitMessageService> logger) : ICommitMessageService
 {
     private const int RecentCommitsForExamples = 5;
 
@@ -18,7 +22,7 @@ internal sealed class CommitMessageService(
         string? linkedIssueBody = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var diff = BuildStagedDiff(repoId);
+        var diff = diffService.BuildStagedDiff(repoId);
         var recentCommits = GetRecentCommitMessages(repoId);
 
         var messages = new List<ChatMessage>
@@ -102,35 +106,6 @@ internal sealed class CommitMessageService(
         return sb.ToString().TrimEnd();
     }
 
-    private string BuildStagedDiff(string repoId)
-    {
-        try
-        {
-            var status = repositoryService.GetStatus(repoId);
-            if (status.Staged.Count == 0) return string.Empty;
-
-            var sb = new StringBuilder();
-            foreach (var file in status.Staged)
-            {
-                try
-                {
-                    var diff = repositoryService.GetDiff(repoId, file.FilePath, staged: true);
-                    if (!string.IsNullOrEmpty(diff))
-                    {
-                        sb.AppendLine($"### {file.FilePath}");
-                        sb.AppendLine(diff);
-                    }
-                }
-                catch { /* Datei überspringen */ }
-            }
-            return sb.ToString().TrimEnd();
-        }
-        catch
-        {
-            return string.Empty;
-        }
-    }
-
     private IReadOnlyList<string> GetRecentCommitMessages(string repoId)
     {
         try
@@ -141,8 +116,9 @@ internal sealed class CommitMessageService(
                 .Where(m => !string.IsNullOrWhiteSpace(m))
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Letzte Commits konnten nicht geladen werden für Repo {RepoId}.", repoId);
             return [];
         }
     }

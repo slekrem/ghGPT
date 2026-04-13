@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ghGPT.Core\ghGPT.Core.csproj" />
+    <ProjectReference Include="..\ghGPT.Ai.Abstractions\ghGPT.Ai.Abstractions.csproj" />
+    <ProjectReference Include="..\ghGPT.Ai.Ollama\ghGPT.Ai.Ollama.csproj" />
+    <ProjectReference Include="..\ghGPT.Ai.Tools\ghGPT.Ai.Tools.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +22,9 @@
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>ghGPT.Ai.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 

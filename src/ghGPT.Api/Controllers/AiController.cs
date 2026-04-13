@@ -1,42 +1,38 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ghGPT.Api.Controllers;
 
 [ApiController]
 [Route("api/ai")]
-public class AiController(IOllamaClient ollamaClient, IAiSettingsService settingsService, IChatHistoryService historyService) : ControllerBase
+public class AiController(
+    IAiProviderService providerService,
+    IAiSettingsService settingsService,
+    IChatHistoryService historyService) : ControllerBase
 {
     [HttpGet("status")]
-    public async Task<ActionResult<OllamaStatus>> GetStatus()
+    public async Task<ActionResult<AiStatus>> GetStatus()
     {
-        var settings = settingsService.Load();
-        var online = await ollamaClient.IsAvailableAsync();
-
-        return Ok(new OllamaStatus
-        {
-            Online = online,
-            BaseUrl = settings.BaseUrl,
-            Model = settings.Model
-        });
+        var status = await providerService.GetStatusAsync();
+        return Ok(status);
     }
 
     [HttpGet("models")]
-    public async Task<ActionResult<IReadOnlyList<OllamaModelInfo>>> GetModels()
+    public async Task<ActionResult<IReadOnlyList<AiModelInfo>>> GetModels()
     {
         try
         {
-            var models = await ollamaClient.GetModelsAsync();
+            var models = await providerService.GetModelsAsync();
             return Ok(models);
         }
         catch (HttpRequestException)
         {
-            return StatusCode(503, "Ollama ist nicht erreichbar.");
+            return StatusCode(503, "AI-Provider ist nicht erreichbar.");
         }
     }
 
     [HttpPut("settings")]
-    public IActionResult SaveSettings([FromBody] OllamaSettings settings)
+    public IActionResult SaveSettings([FromBody] AiSettings settings)
     {
         if (string.IsNullOrWhiteSpace(settings.BaseUrl) || string.IsNullOrWhiteSpace(settings.Model))
             return BadRequest("BaseUrl und Model dürfen nicht leer sein.");

@@ -1,5 +1,5 @@
 using ghGPT.Api.Models;
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using System.Text.Json;

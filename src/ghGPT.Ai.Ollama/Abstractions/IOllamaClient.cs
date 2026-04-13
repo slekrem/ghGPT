@@ -1,0 +1,11 @@
+using ghGPT.Ai.Abstractions;
+
+namespace ghGPT.Ai.Ollama;
+
+public interface IOllamaClient
+{
+    Task<bool> IsAvailableAsync();
+    Task<IReadOnlyList<AiModelInfo>> GetModelsAsync();
+    IAsyncEnumerable<string> GenerateAsync(IEnumerable<ChatMessage> messages, CancellationToken cancellationToken = default);
+    Task<ToolCallResponse> CompleteWithToolsAsync(IEnumerable<ChatMessage> messages, IEnumerable<ToolDefinition> tools, CancellationToken cancellationToken = default);
+}

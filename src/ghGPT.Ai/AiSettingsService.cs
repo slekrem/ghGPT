@@ -1,32 +1,34 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace ghGPT.Ai;
 
-internal sealed class AiSettingsService : IAiSettingsService
+internal sealed class AiSettingsService(ILogger<AiSettingsService> logger) : IAiSettingsService
 {
     private static readonly string SettingsFilePath =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ghGPT", "ai-settings.json");
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public OllamaSettings Load()
+    public AiSettings Load()
     {
         if (!File.Exists(SettingsFilePath))
-            return new OllamaSettings();
+            return new AiSettings();
 
         try
         {
             var json = File.ReadAllText(SettingsFilePath);
-            return JsonSerializer.Deserialize<OllamaSettings>(json) ?? new OllamaSettings();
+            return JsonSerializer.Deserialize<AiSettings>(json) ?? new AiSettings();
         }
-        catch
+        catch (Exception ex)
         {
-            return new OllamaSettings();
+            logger.LogWarning(ex, "AI-Einstellungen konnten nicht geladen werden, Standardwerte werden verwendet.");
+            return new AiSettings();
         }
     }
 
-    public void Save(OllamaSettings settings)
+    public void Save(AiSettings settings)
     {
         var directory = Path.GetDirectoryName(SettingsFilePath)!;
         Directory.CreateDirectory(directory);

@@ -1,10 +1,11 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ghGPT.Ai;
 
-internal sealed class ChatHistoryService : IChatHistoryService
+internal sealed class ChatHistoryService(ILogger<ChatHistoryService> logger) : IChatHistoryService
 {
     private static readonly string HistoryDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ghGPT", "history");
@@ -25,8 +26,9 @@ internal sealed class ChatHistoryService : IChatHistoryService
             var json = File.ReadAllText(path);
             return JsonSerializer.Deserialize<List<ChatHistoryEntry>>(json, JsonOptions) ?? [];
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Chat-History konnte nicht geladen werden für Repo {RepoId}.", repoId);
             return [];
         }
     }
@@ -50,10 +52,17 @@ internal sealed class ChatHistoryService : IChatHistoryService
             File.Delete(path);
     }
 
-    private static void Save(string repoId, List<ChatHistoryEntry> entries)
+    private void Save(string repoId, List<ChatHistoryEntry> entries)
     {
-        Directory.CreateDirectory(HistoryDir);
-        File.WriteAllText(GetPath(repoId), JsonSerializer.Serialize(entries, JsonOptions));
+        try
+        {
+            Directory.CreateDirectory(HistoryDir);
+            File.WriteAllText(GetPath(repoId), JsonSerializer.Serialize(entries, JsonOptions));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Chat-History konnte nicht gespeichert werden für Repo {RepoId}.", repoId);
+        }
     }
 
     private static string GetPath(string repoId)

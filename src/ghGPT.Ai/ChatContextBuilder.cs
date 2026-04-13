@@ -1,6 +1,7 @@
-using ghGPT.Core.Ai;
+using ghGPT.Ai.Abstractions;
 using ghGPT.Core.PullRequests;
 using ghGPT.Core.Repositories;
+using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace ghGPT.Ai;
@@ -8,7 +9,9 @@ namespace ghGPT.Ai;
 internal sealed class ChatContextBuilder(
     IRepositoryService repositoryService,
     IPullRequestService pullRequestService,
-    IChatHistoryService historyService) : IChatContextBuilder
+    IChatHistoryService historyService,
+    DiffService diffService,
+    ILogger<ChatContextBuilder> logger) : IChatContextBuilder
 {
     public async Task<IEnumerable<ChatMessage>> BuildAsync(ChatRequest request)
     {
@@ -77,15 +80,14 @@ internal sealed class ChatContextBuilder(
             }
 
             var status = repositoryService.GetStatus(repoId);
-            var stagedCount = status.Staged.Count;
-            var unstagedCount = status.Unstaged.Count;
-            if (stagedCount > 0 || unstagedCount > 0)
-                sb.AppendLine($"- Änderungen: {stagedCount} staged, {unstagedCount} unstaged");
+            if (status.Staged.Count > 0 || status.Unstaged.Count > 0)
+                sb.AppendLine($"- Änderungen: {status.Staged.Count} staged, {status.Unstaged.Count} unstaged");
 
             return sb.ToString().TrimEnd();
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Repository-Kontext konnte nicht erstellt werden für Repo {RepoId}.", repoId);
             return null;
         }
     }
@@ -106,8 +108,9 @@ internal sealed class ChatContextBuilder(
                 _ => null
             };
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "View-Kontext '{ActiveView}' konnte nicht erstellt werden für Repo {RepoId}.", request.ActiveView, request.RepoId);
             return null;
         }
     }
@@ -115,32 +118,23 @@ internal sealed class ChatContextBuilder(
     private string? BuildChangesContext(string repoId)
     {
         var status = repositoryService.GetStatus(repoId);
-        var allFiles = status.Staged.Concat(status.Unstaged)
+        var fileCount = status.Staged.Concat(status.Unstaged)
             .Select(f => f.FilePath)
             .Distinct()
-            .ToList();
+            .Count();
 
-        if (allFiles.Count == 0) return null;
+        if (fileCount == 0) return null;
+
+        var diff = diffService.BuildCombinedDiff(repoId);
+        if (string.IsNullOrEmpty(diff)) return null;
 
         var sb = new StringBuilder();
         sb.AppendLine("## Ansicht: Änderungen");
-        sb.AppendLine($"Geänderte Dateien: {allFiles.Count}");
+        sb.AppendLine($"Geänderte Dateien: {fileCount}");
         sb.AppendLine();
-
-        foreach (var file in allFiles)
-        {
-            try
-            {
-                var diff = repositoryService.GetCombinedDiff(repoId, file);
-                if (string.IsNullOrEmpty(diff)) continue;
-
-                sb.AppendLine($"### {file}");
-                sb.AppendLine("```diff");
-                sb.AppendLine(diff);
-                sb.AppendLine("```");
-            }
-            catch { /* Datei überspringen */ }
-        }
+        sb.AppendLine("```diff");
+        sb.AppendLine(diff);
+        sb.AppendLine("```");
 
         return sb.ToString().TrimEnd();
     }
