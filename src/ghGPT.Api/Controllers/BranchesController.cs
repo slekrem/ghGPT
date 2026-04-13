@@ -8,14 +8,14 @@ namespace ghGPT.Api.Controllers;
 
 [ApiController]
 [Route("api/repos/{id}/branches")]
-public class BranchesController(IRepositoryService service, IIssueService issueService) : ControllerBase
+public class BranchesController(IRepositoryService service, IBranchService branchService, IIssueService issueService) : ControllerBase
 {
     [HttpGet]
     public ActionResult<IReadOnlyList<BranchInfo>> GetBranches(string id)
     {
         try
         {
-            return Ok(service.GetBranches(id));
+            return Ok(branchService.GetBranches(id));
         }
         catch (InvalidOperationException ex)
         {
@@ -31,7 +31,7 @@ public class BranchesController(IRepositoryService service, IIssueService issueS
 
         try
         {
-            service.CheckoutBranch(id, request.Name, request.Strategy, request.StashMessage);
+            branchService.CheckoutBranch(id, request.Name, request.Strategy, request.StashMessage);
             return NoContent();
         }
         catch (UncommittedChangesException)
@@ -52,7 +52,7 @@ public class BranchesController(IRepositoryService service, IIssueService issueS
 
         try
         {
-            var branch = service.CreateBranch(id, request.Name, request.StartPoint);
+            var branch = branchService.CreateBranch(id, request.Name, request.StartPoint);
             return Created(string.Empty, branch);
         }
         catch (InvalidOperationException ex)
@@ -66,7 +66,7 @@ public class BranchesController(IRepositoryService service, IIssueService issueS
     {
         try
         {
-            await service.DeleteBranch(id, Uri.UnescapeDataString(name));
+            await branchService.DeleteBranch(id, Uri.UnescapeDataString(name));
             return NoContent();
         }
         catch (InvalidOperationException ex)

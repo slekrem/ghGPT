@@ -7,14 +7,14 @@ public record PushStashRequest(string? Message, string[]? Paths);
 
 [ApiController]
 [Route("api/repos/{id}/stash")]
-public class StashController(IRepositoryService service) : ControllerBase
+public class StashController(IStashService stashService) : ControllerBase
 {
     [HttpGet]
     public ActionResult<IReadOnlyList<StashEntry>> GetStashes(string id)
     {
         try
         {
-            return Ok(service.GetStashes(id));
+            return Ok(stashService.GetStashes(id));
         }
         catch (InvalidOperationException ex)
         {
@@ -27,7 +27,7 @@ public class StashController(IRepositoryService service) : ControllerBase
     {
         try
         {
-            service.PushStash(id, request?.Message, request?.Paths);
+            stashService.PushStash(id, request?.Message, request?.Paths);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -41,7 +41,7 @@ public class StashController(IRepositoryService service) : ControllerBase
     {
         try
         {
-            return Ok(service.GetStashDiff(id, index));
+            return Ok(stashService.GetStashDiff(id, index));
         }
         catch (InvalidOperationException ex)
         {
@@ -54,7 +54,7 @@ public class StashController(IRepositoryService service) : ControllerBase
     {
         try
         {
-            service.PopStash(id, index);
+            stashService.PopStash(id, index);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -68,7 +68,7 @@ public class StashController(IRepositoryService service) : ControllerBase
     {
         try
         {
-            service.DropStash(id, index);
+            stashService.DropStash(id, index);
             return NoContent();
         }
         catch (InvalidOperationException ex)

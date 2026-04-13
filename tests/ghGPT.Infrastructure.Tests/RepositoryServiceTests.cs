@@ -86,11 +86,22 @@ public class RepositoryServiceTests : IDisposable
         p.WaitForExit();
     }
 
-    private RepositoryService ServiceWithRepo(string path)
+    private RepositoryRegistry RegistryWithRepo(string path)
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "repo", LocalPath = path, CurrentBranch = "master" };
         _store.Load().Returns([info]);
-        return new RepositoryService(_store);
+        return new RepositoryRegistry(_store);
+    }
+
+    private RepositoryService ServiceWithRepo(string path)
+    {
+        return new RepositoryService(RegistryWithRepo(path));
+    }
+
+    private (RepositoryService Service, StagingService Staging) ServiceWithStagingAndRepo(string path)
+    {
+        var registry = RegistryWithRepo(path);
+        return (new RepositoryService(registry), new StagingService(registry));
     }
 
     // --- Create / Import ---
@@ -99,7 +110,7 @@ public class RepositoryServiceTests : IDisposable
     public async Task CreateAsync_InitializesGitRepo()
     {
         var path = Path.Combine(_tempPath, "new-repo");
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(new RepositoryRegistry(_store));
 
         var result = await service.CreateAsync(path, "new-repo");
 
@@ -115,7 +126,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var path = Path.Combine(_tempPath, "not-a-repo");
         Directory.CreateDirectory(path);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(new RepositoryRegistry(_store));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ImportAsync(path));
     }
@@ -126,7 +137,7 @@ public class RepositoryServiceTests : IDisposable
         var path = Path.Combine(_tempPath, "existing-repo");
         var existing = new RepositoryInfo { Id = "id-1", Name = "existing-repo", LocalPath = path, CurrentBranch = "main" };
         _store.Load().Returns([existing]);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(new RepositoryRegistry(_store));
 
         Directory.CreateDirectory(path);
         LibGit2Sharp.Repository.Init(path);
@@ -142,7 +153,7 @@ public class RepositoryServiceTests : IDisposable
             new() { Id = "id-1", Name = "repo-a", LocalPath = "/a", CurrentBranch = "main" },
         };
         _store.Load().Returns(repos);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(new RepositoryRegistry(_store));
 
         var result = service.GetAll();
 
@@ -155,7 +166,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void GetActive_ReturnsNullInitially()
     {
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(new RepositoryRegistry(_store));
         Assert.Null(service.GetActive());
     }
 
@@ -173,7 +184,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void SetActive_ThrowsForUnknownId()
     {
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(new RepositoryRegistry(_store));
         Assert.Throws<InvalidOperationException>(() => service.SetActive("unknown"));
     }
 
@@ -184,7 +195,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "r", LocalPath = "/x", CurrentBranch = "main" };
         _store.Load().Returns([info]);
-        var service = new RepositoryService(_store);
+        var service = new RepositoryService(new RepositoryRegistry(_store));
 
         service.Remove("id-1");
 
@@ -224,10 +235,10 @@ public class RepositoryServiceTests : IDisposable
     public void GetStatus_ShowsModifiedFileAsStaged_AfterStage()
     {
         var path = CreateGitRepo("status-staged-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
 
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
         var status = service.GetStatus("id-1");
 
         Assert.Contains(status.Staged, f => f.FilePath == "README.md" && f.Status == "Modified");
@@ -238,9 +249,9 @@ public class RepositoryServiceTests : IDisposable
     public void GetHistory_ReturnsNewestCommitFirst()
     {
         var path = CreateGitRepo("history-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
         service.Commit("id-1", "feat: history test");
 
         var history = service.GetHistory("id-1");
@@ -254,14 +265,14 @@ public class RepositoryServiceTests : IDisposable
     public void GetCommits_ReturnsPagedBranchHistory()
     {
         var path = CreateGitRepo("commits-page-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
 
         File.WriteAllText(Path.Combine(path, "README.md"), "# Change 1\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
         service.Commit("id-1", "feat: first");
 
         File.WriteAllText(Path.Combine(path, "README.md"), "# Change 2\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
         service.Commit("id-1", "feat: second");
 
         var page = service.GetCommits("id-1", "master", skip: 0, take: 1);
@@ -276,9 +287,9 @@ public class RepositoryServiceTests : IDisposable
     public void GetCommitDetail_ReturnsFilesAndPatch()
     {
         var path = CreateGitRepo("commit-detail-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Detailed Change\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
         service.Commit("id-1", "feat: detail");
 
         using var repo = new LibGit2Sharp.Repository(path);
@@ -326,9 +337,9 @@ public class RepositoryServiceTests : IDisposable
     public void GetDiff_ReturnsStagedDiff_AfterStage()
     {
         var path = CreateGitRepo("diff-staged-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
 
         var diff = service.GetDiff("id-1", "README.md", staged: true);
 
@@ -355,10 +366,10 @@ public class RepositoryServiceTests : IDisposable
     public void StageFile_MovesFileToStaged()
     {
         var path = CreateGitRepo("stage-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
 
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
 
         var status = service.GetStatus("id-1");
         Assert.Contains(status.Staged, f => f.FilePath == "README.md");
@@ -369,11 +380,11 @@ public class RepositoryServiceTests : IDisposable
     public void UnstageFile_MovesFileBackToUnstaged()
     {
         var path = CreateGitRepo("unstage-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
 
-        service.UnstageFile("id-1", "README.md");
+        staging.UnstageFile("id-1", "README.md");
 
         var status = service.GetStatus("id-1");
         Assert.Contains(status.Unstaged, f => f.FilePath == "README.md");
@@ -384,11 +395,11 @@ public class RepositoryServiceTests : IDisposable
     public void StageAll_StagesAllModifiedFiles()
     {
         var path = CreateGitRepo("stageall-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
         File.WriteAllText(Path.Combine(path, "new-file.txt"), "new\n");
 
-        service.StageAll("id-1");
+        staging.StageAll("id-1");
 
         var status = service.GetStatus("id-1");
         Assert.Empty(status.Unstaged);
@@ -399,11 +410,11 @@ public class RepositoryServiceTests : IDisposable
     public void UnstageAll_MovesAllStagedFilesBackToUnstaged()
     {
         var path = CreateGitRepo("unstageall-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
-        service.StageAll("id-1");
+        staging.StageAll("id-1");
 
-        service.UnstageAll("id-1");
+        staging.UnstageAll("id-1");
 
         var status = service.GetStatus("id-1");
         Assert.Empty(status.Staged);
@@ -416,7 +427,7 @@ public class RepositoryServiceTests : IDisposable
     public void StageLines_AppliesPartialPatchToIndex()
     {
         var path = CreateGitRepo("stagelines-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
 
         // Commit a base file with 3 lines
         File.WriteAllText(Path.Combine(path, "feature.txt"), "Line one\nLine two\nLine three\n");
@@ -438,7 +449,7 @@ public class RepositoryServiceTests : IDisposable
             " Line two\n" +
             " Line three\n";
 
-        service.StageLines("id-1", "feature.txt", patch);
+        staging.StageLines("id-1", "feature.txt", patch);
 
         var status = service.GetStatus("id-1");
         Assert.Contains(status.Staged, f => f.FilePath == "feature.txt");
@@ -456,20 +467,20 @@ public class RepositoryServiceTests : IDisposable
     public void StageLines_ThrowsOnInvalidPatch()
     {
         var path = CreateGitRepo("stagelines-invalid-repo");
-        var service = ServiceWithRepo(path);
+        var (_, staging) = ServiceWithStagingAndRepo(path);
 
         Assert.Throws<InvalidOperationException>(() =>
-            service.StageLines("id-1", "README.md", "this is not a valid patch"));
+            staging.StageLines("id-1", "README.md", "this is not a valid patch"));
     }
 
     [Fact]
     public void StageLines_ThrowsWhenPatchHasNoHunkHeader()
     {
         var path = CreateGitRepo("stagelines-nohunk-repo");
-        var service = ServiceWithRepo(path);
+        var (_, staging) = ServiceWithStagingAndRepo(path);
 
         Assert.Throws<InvalidOperationException>(() =>
-            service.StageLines("id-1", "README.md",
+            staging.StageLines("id-1", "README.md",
                 "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n+some line\n"));
     }
 
@@ -479,7 +490,7 @@ public class RepositoryServiceTests : IDisposable
     public void UnstageLines_RemovesOnlySelectedPartialPatchFromIndex()
     {
         var path = CreateGitRepo("unstagelines-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
 
         File.WriteAllText(Path.Combine(path, "feature.txt"), "Line one\nLine two\nLine three\n");
         Run("git add feature.txt", path);
@@ -500,7 +511,7 @@ public class RepositoryServiceTests : IDisposable
             " Line two-and-half\n" +
             " Line three\n";
 
-        service.UnstageLines("id-1", "feature.txt", patch);
+        staging.UnstageLines("id-1", "feature.txt", patch);
 
         var status = service.GetStatus("id-1");
         Assert.Contains(status.Staged, f => f.FilePath == "feature.txt");
@@ -519,10 +530,10 @@ public class RepositoryServiceTests : IDisposable
     public void UnstageLines_ThrowsOnInvalidPatch()
     {
         var path = CreateGitRepo("unstagelines-invalid-repo");
-        var service = ServiceWithRepo(path);
+        var (_, staging) = ServiceWithStagingAndRepo(path);
 
         Assert.Throws<InvalidOperationException>(() =>
-            service.UnstageLines("id-1", "README.md", "this is not a valid patch"));
+            staging.UnstageLines("id-1", "README.md", "this is not a valid patch"));
     }
 
     // --- Commit ---
@@ -531,9 +542,9 @@ public class RepositoryServiceTests : IDisposable
     public void Commit_CreatesCommitWithStagedFiles()
     {
         var path = CreateGitRepo("commit-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
 
         service.Commit("id-1", "test: first commit");
 
@@ -546,9 +557,9 @@ public class RepositoryServiceTests : IDisposable
     public void Commit_IncludesDescriptionInMessage()
     {
         var path = CreateGitRepo("commit-desc-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
         File.WriteAllText(Path.Combine(path, "README.md"), "# Changed\n");
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
 
         service.Commit("id-1", "feat: title", "some description");
 
@@ -570,11 +581,11 @@ public class RepositoryServiceTests : IDisposable
     public void Commit_SucceedsWhenOnlyDeletionsAreStaged()
     {
         var path = CreateGitRepo("commit-delete-repo");
-        var service = ServiceWithRepo(path);
+        var (service, staging) = ServiceWithStagingAndRepo(path);
 
         // Delete the tracked README.md and stage the deletion
         File.Delete(Path.Combine(path, "README.md"));
-        service.StageFile("id-1", "README.md");
+        staging.StageFile("id-1", "README.md");
 
         // Should not throw even though the deleted file is removed from the index
         service.Commit("id-1", "chore: remove readme");

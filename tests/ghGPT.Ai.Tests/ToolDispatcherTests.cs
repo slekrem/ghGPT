@@ -10,11 +10,12 @@ namespace ghGPT.Ai.Tests;
 public class ToolDispatcherTests
 {
     private readonly IRepositoryService _repositoryService = Substitute.For<IRepositoryService>();
+    private readonly IBranchService _branchService = Substitute.For<IBranchService>();
     private readonly ToolDispatcher _sut;
 
     public ToolDispatcherTests()
     {
-        _sut = new ToolDispatcher(_repositoryService, NullLogger<ToolDispatcher>.Instance);
+        _sut = new ToolDispatcher(_repositoryService, _branchService, NullLogger<ToolDispatcher>.Instance);
     }
 
     // --- get_status ---
@@ -68,7 +69,7 @@ public class ToolDispatcherTests
     [Fact]
     public async Task GetBranches_ReturnsBothLocalAndRemoteBranches()
     {
-        _repositoryService.GetBranches("repo-1").Returns([
+        _branchService.GetBranches("repo-1").Returns([
             new BranchInfo { Name = "main", IsHead = true, IsRemote = false },
             new BranchInfo { Name = "feature/x", IsHead = false, IsRemote = false },
             new BranchInfo { Name = "origin/main", IsHead = false, IsRemote = true }
@@ -93,7 +94,7 @@ public class ToolDispatcherTests
 
         Assert.True(success);
         Assert.Contains("feature/x", result);
-        _repositoryService.Received(1).CheckoutBranch("repo-1", "feature/x");
+        _branchService.Received(1).CheckoutBranch("repo-1", "feature/x");
     }
 
     [Fact]
@@ -103,13 +104,13 @@ public class ToolDispatcherTests
             ToolCall("checkout_branch", "{}"), "repo-1");
 
         Assert.False(success);
-        _repositoryService.DidNotReceive().CheckoutBranch(Arg.Any<string>(), Arg.Any<string>());
+        _branchService.DidNotReceive().CheckoutBranch(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
     public async Task CheckoutBranch_WhenServiceThrows_ReturnsErrorResult()
     {
-        _repositoryService.When(s => s.CheckoutBranch("repo-1", "ghost"))
+        _branchService.When(s => s.CheckoutBranch("repo-1", "ghost"))
             .Throw(new InvalidOperationException("Branch nicht gefunden."));
 
         var (result, _, success) = await _sut.DispatchAsync(
@@ -124,7 +125,7 @@ public class ToolDispatcherTests
     [Fact]
     public async Task CreateBranch_CallsServiceAndReturnsSuccess()
     {
-        _repositoryService.CreateBranch("repo-1", "feature/new", null)
+        _branchService.CreateBranch("repo-1", "feature/new", null)
             .Returns(new BranchInfo { Name = "feature/new" });
 
         var (result, displayArgs, success) = await _sut.DispatchAsync(
@@ -132,19 +133,19 @@ public class ToolDispatcherTests
 
         Assert.True(success);
         Assert.Contains("feature/new", result);
-        _repositoryService.Received(1).CreateBranch("repo-1", "feature/new", null);
+        _branchService.Received(1).CreateBranch("repo-1", "feature/new", null);
     }
 
     [Fact]
     public async Task CreateBranch_WithStartPoint_PassesStartPointToService()
     {
-        _repositoryService.CreateBranch("repo-1", "feature/new", "main")
+        _branchService.CreateBranch("repo-1", "feature/new", "main")
             .Returns(new BranchInfo { Name = "feature/new" });
 
         await _sut.DispatchAsync(
             ToolCall("create_branch", """{"name":"feature/new","start_point":"main"}"""), "repo-1");
 
-        _repositoryService.Received(1).CreateBranch("repo-1", "feature/new", "main");
+        _branchService.Received(1).CreateBranch("repo-1", "feature/new", "main");
     }
 
     [Fact]
@@ -154,7 +155,7 @@ public class ToolDispatcherTests
             ToolCall("create_branch", "{}"), "repo-1");
 
         Assert.False(success);
-        _repositoryService.DidNotReceive().CreateBranch(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>());
+        _branchService.DidNotReceive().CreateBranch(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>());
     }
 
     // --- get_history ---

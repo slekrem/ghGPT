@@ -11,12 +11,13 @@ namespace ghGPT.Api.Tests;
 public class BranchesControllerTests
 {
     private readonly IRepositoryService _service = Substitute.For<IRepositoryService>();
+    private readonly IBranchService _branchService = Substitute.For<IBranchService>();
     private readonly IIssueService _issueService = Substitute.For<IIssueService>();
     private readonly BranchesController _controller;
 
     public BranchesControllerTests()
     {
-        _controller = new BranchesController(_service, _issueService);
+        _controller = new BranchesController(_service, _branchService, _issueService);
     }
 
     // --- GetBranches ---
@@ -24,7 +25,7 @@ public class BranchesControllerTests
     [Fact]
     public void GetBranches_ReturnsOkWithBranchList()
     {
-        _service.GetBranches("id-1").Returns([
+        _branchService.GetBranches("id-1").Returns([
             new BranchInfo { Name = "main", IsHead = true, IsRemote = false },
             new BranchInfo { Name = "feature/x", IsHead = false, IsRemote = false },
             new BranchInfo { Name = "origin/main", IsHead = false, IsRemote = true },
@@ -40,7 +41,7 @@ public class BranchesControllerTests
     [Fact]
     public void GetBranches_ReturnsNotFoundForUnknownRepo()
     {
-        _service.When(s => s.GetBranches("bad")).Throw(new InvalidOperationException("not found"));
+        _branchService.When(s => s.GetBranches("bad")).Throw(new InvalidOperationException("not found"));
 
         var result = _controller.GetBranches("bad");
 
@@ -55,7 +56,7 @@ public class BranchesControllerTests
         var result = _controller.Checkout("id-1", new CheckoutBranchRequest { Name = "feature/x" });
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).CheckoutBranch("id-1", "feature/x");
+        _branchService.Received(1).CheckoutBranch("id-1", "feature/x");
     }
 
     [Fact]
@@ -64,13 +65,13 @@ public class BranchesControllerTests
         var result = _controller.Checkout("id-1", new CheckoutBranchRequest { Name = "" });
 
         Assert.IsType<BadRequestObjectResult>(result);
-        _service.DidNotReceive().CheckoutBranch(Arg.Any<string>(), Arg.Any<string>());
+        _branchService.DidNotReceive().CheckoutBranch(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
     public void Checkout_ReturnsBadRequestWhenDirtyWorkingTree()
     {
-        _service.When(s => s.CheckoutBranch("id-1", "feature/x"))
+        _branchService.When(s => s.CheckoutBranch("id-1", "feature/x"))
             .Throw(new InvalidOperationException("Uncommitted changes vorhanden."));
 
         var result = _controller.Checkout("id-1", new CheckoutBranchRequest { Name = "feature/x" });
@@ -81,7 +82,7 @@ public class BranchesControllerTests
     [Fact]
     public void Checkout_ReturnsBadRequestForUnknownBranch()
     {
-        _service.When(s => s.CheckoutBranch("id-1", "ghost"))
+        _branchService.When(s => s.CheckoutBranch("id-1", "ghost"))
             .Throw(new InvalidOperationException("Branch 'ghost' nicht gefunden."));
 
         var result = _controller.Checkout("id-1", new CheckoutBranchRequest { Name = "ghost" });
@@ -92,7 +93,7 @@ public class BranchesControllerTests
     [Fact]
     public void Checkout_ReturnsBadRequestWhenLocalTrackingBranchAlreadyExists()
     {
-        _service.When(s => s.CheckoutBranch("id-1", "origin/feature/x"))
+        _branchService.When(s => s.CheckoutBranch("id-1", "origin/feature/x"))
             .Throw(new InvalidOperationException("Lokaler Branch 'feature/x' existiert bereits."));
 
         var result = _controller.Checkout("id-1", new CheckoutBranchRequest { Name = "origin/feature/x" });
@@ -105,7 +106,7 @@ public class BranchesControllerTests
     [Fact]
     public void CreateBranch_ReturnsCreatedWithBranchInfo()
     {
-        _service.CreateBranch("id-1", "feature/new", null).Returns(
+        _branchService.CreateBranch("id-1", "feature/new", null).Returns(
             new BranchInfo { Name = "feature/new", IsHead = true, IsRemote = false });
 
         var result = _controller.CreateBranch("id-1", new CreateBranchRequest { Name = "feature/new" });
@@ -119,12 +120,12 @@ public class BranchesControllerTests
     [Fact]
     public void CreateBranch_PassesStartPointToService()
     {
-        _service.CreateBranch("id-1", "feature/from-main", "main").Returns(
+        _branchService.CreateBranch("id-1", "feature/from-main", "main").Returns(
             new BranchInfo { Name = "feature/from-main", IsHead = true, IsRemote = false });
 
         _controller.CreateBranch("id-1", new CreateBranchRequest { Name = "feature/from-main", StartPoint = "main" });
 
-        _service.Received(1).CreateBranch("id-1", "feature/from-main", "main");
+        _branchService.Received(1).CreateBranch("id-1", "feature/from-main", "main");
     }
 
     [Fact]
@@ -133,13 +134,13 @@ public class BranchesControllerTests
         var result = _controller.CreateBranch("id-1", new CreateBranchRequest { Name = "" });
 
         Assert.IsType<BadRequestObjectResult>(result.Result);
-        _service.DidNotReceive().CreateBranch(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>());
+        _branchService.DidNotReceive().CreateBranch(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>());
     }
 
     [Fact]
     public void CreateBranch_ReturnsBadRequestForUnknownStartPoint()
     {
-        _service.When(s => s.CreateBranch("id-1", "feature/new", "ghost"))
+        _branchService.When(s => s.CreateBranch("id-1", "feature/new", "ghost"))
             .Throw(new InvalidOperationException("Start-Branch 'ghost' nicht gefunden."));
 
         var result = _controller.CreateBranch("id-1", new CreateBranchRequest { Name = "feature/new", StartPoint = "ghost" });
@@ -152,29 +153,29 @@ public class BranchesControllerTests
     [Fact]
     public async Task DeleteBranch_ReturnsNoContentOnSuccess()
     {
-        _service.DeleteBranch("id-1", "feature/old").Returns(Task.CompletedTask);
+        _branchService.DeleteBranch("id-1", "feature/old").Returns(Task.CompletedTask);
 
         var result = await _controller.DeleteBranch("id-1", "feature/old");
 
         Assert.IsType<NoContentResult>(result);
-        await _service.Received(1).DeleteBranch("id-1", "feature/old");
+        await _branchService.Received(1).DeleteBranch("id-1", "feature/old");
     }
 
     [Fact]
     public async Task DeleteBranch_DecodesUrlEncodedBranchName()
     {
-        _service.DeleteBranch("id-1", "origin/feature/old").Returns(Task.CompletedTask);
+        _branchService.DeleteBranch("id-1", "origin/feature/old").Returns(Task.CompletedTask);
 
         var result = await _controller.DeleteBranch("id-1", "origin%2Ffeature%2Fold");
 
         Assert.IsType<NoContentResult>(result);
-        await _service.Received(1).DeleteBranch("id-1", "origin/feature/old");
+        await _branchService.Received(1).DeleteBranch("id-1", "origin/feature/old");
     }
 
     [Fact]
     public async Task DeleteBranch_ReturnsBadRequestWhenDeletingActiveBranch()
     {
-        _service.DeleteBranch("id-1", "main")
+        _branchService.DeleteBranch("id-1", "main")
             .Throws(new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden."));
 
         var result = await _controller.DeleteBranch("id-1", "main");
@@ -185,7 +186,7 @@ public class BranchesControllerTests
     [Fact]
     public async Task DeleteBranch_ReturnsBadRequestForUnknownBranch()
     {
-        _service.DeleteBranch("id-1", "ghost")
+        _branchService.DeleteBranch("id-1", "ghost")
             .Throws(new InvalidOperationException("Branch 'ghost' nicht gefunden."));
 
         var result = await _controller.DeleteBranch("id-1", "ghost");

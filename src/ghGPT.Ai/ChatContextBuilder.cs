@@ -8,6 +8,7 @@ namespace ghGPT.Ai;
 
 internal sealed class ChatContextBuilder(
     IRepositoryService repositoryService,
+    IBranchService branchService,
     IPullRequestService pullRequestService,
     IChatHistoryService historyService,
     IDiffService diffService,
@@ -56,7 +57,7 @@ internal sealed class ChatContextBuilder(
             if (!string.IsNullOrEmpty(repo.RemoteUrl))
                 sb.AppendLine($"- Remote: {repo.RemoteUrl}");
 
-            var branches = repositoryService.GetBranches(repoId);
+            var branches = branchService.GetBranches(repoId);
             var head = branches.FirstOrDefault(b => b.IsHead && !b.IsRemote);
             if (head is not null)
             {
@@ -154,7 +155,7 @@ internal sealed class ChatContextBuilder(
 
     private string BuildBranchesContext(string repoId)
     {
-        var branches = repositoryService.GetBranches(repoId);
+        var branches = branchService.GetBranches(repoId);
         var sb = new StringBuilder();
         sb.AppendLine("## Ansicht: Branches");
 
