@@ -12,6 +12,7 @@ namespace ghGPT.Api.Tests;
 public class ChangesControllerTests
 {
     private readonly IRepositoryService _service = Substitute.For<IRepositoryService>();
+    private readonly IStagingService _stagingService = Substitute.For<IStagingService>();
     private readonly IHubContext<RepositoryHub> _hub = Substitute.For<IHubContext<RepositoryHub>>();
     private readonly ChangesController _controller;
 
@@ -21,7 +22,7 @@ public class ChangesControllerTests
         var clientProxy = Substitute.For<IClientProxy>();
         _hub.Clients.Returns(clients);
         clients.All.Returns(clientProxy);
-        _controller = new ChangesController(_service, _hub);
+        _controller = new ChangesController(_service, _stagingService, _hub);
     }
 
     // --- GetStatus ---
@@ -188,13 +189,13 @@ public class ChangesControllerTests
         var result = _controller.StageFile("id-1", "README.md");
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).StageFile("id-1", "README.md");
+        _stagingService.Received(1).StageFile("id-1", "README.md");
     }
 
     [Fact]
     public void StageFile_ReturnsNotFoundForUnknownRepo()
     {
-        _service.When(s => s.StageFile("bad", Arg.Any<string>()))
+        _stagingService.When(s => s.StageFile("bad", Arg.Any<string>()))
             .Throw(new InvalidOperationException("not found"));
 
         var result = _controller.StageFile("bad", "file.txt");
@@ -210,13 +211,13 @@ public class ChangesControllerTests
         var result = _controller.UnstageFile("id-1", "README.md");
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).UnstageFile("id-1", "README.md");
+        _stagingService.Received(1).UnstageFile("id-1", "README.md");
     }
 
     [Fact]
     public void UnstageFile_ReturnsNotFoundForUnknownRepo()
     {
-        _service.When(s => s.UnstageFile("bad", Arg.Any<string>()))
+        _stagingService.When(s => s.UnstageFile("bad", Arg.Any<string>()))
             .Throw(new InvalidOperationException("not found"));
 
         var result = _controller.UnstageFile("bad", "file.txt");
@@ -232,13 +233,13 @@ public class ChangesControllerTests
         var result = _controller.StageAll("id-1");
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).StageAll("id-1");
+        _stagingService.Received(1).StageAll("id-1");
     }
 
     [Fact]
     public void StageAll_ReturnsNotFoundForUnknownRepo()
     {
-        _service.When(s => s.StageAll("bad")).Throw(new InvalidOperationException("not found"));
+        _stagingService.When(s => s.StageAll("bad")).Throw(new InvalidOperationException("not found"));
 
         var result = _controller.StageAll("bad");
 
@@ -255,7 +256,7 @@ public class ChangesControllerTests
         var result = _controller.StageLines("id-1", request);
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).StageLines("id-1", "src/foo.ts", request.Patch);
+        _stagingService.Received(1).StageLines("id-1", "src/foo.ts", request.Patch);
     }
 
     [Fact]
@@ -264,14 +265,14 @@ public class ChangesControllerTests
         var result = _controller.StageLines("id-1", new StageLinesRequest("src/foo.ts", ""));
 
         Assert.IsType<BadRequestObjectResult>(result);
-        _service.DidNotReceive().StageLines(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        _stagingService.DidNotReceive().StageLines(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
     public void StageLines_ReturnsBadRequestOnServiceError()
     {
         var request = new StageLinesRequest("src/foo.ts", "@@ -1 +1 @@\n+new\n");
-        _service.When(s => s.StageLines("id-1", Arg.Any<string>(), Arg.Any<string>()))
+        _stagingService.When(s => s.StageLines("id-1", Arg.Any<string>(), Arg.Any<string>()))
             .Throw(new InvalidOperationException("Patch konnte nicht angewendet werden."));
 
         var result = _controller.StageLines("id-1", request);
@@ -289,7 +290,7 @@ public class ChangesControllerTests
         var result = _controller.UnstageLines("id-1", request);
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).UnstageLines("id-1", "src/foo.ts", request.Patch);
+        _stagingService.Received(1).UnstageLines("id-1", "src/foo.ts", request.Patch);
     }
 
     [Fact]
@@ -298,14 +299,14 @@ public class ChangesControllerTests
         var result = _controller.UnstageLines("id-1", new StageLinesRequest("src/foo.ts", ""));
 
         Assert.IsType<BadRequestObjectResult>(result);
-        _service.DidNotReceive().UnstageLines(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        _stagingService.DidNotReceive().UnstageLines(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
     public void UnstageLines_ReturnsBadRequestOnServiceError()
     {
         var request = new StageLinesRequest("src/foo.ts", "@@ -1 +1 @@\n+new\n");
-        _service.When(s => s.UnstageLines("id-1", Arg.Any<string>(), Arg.Any<string>()))
+        _stagingService.When(s => s.UnstageLines("id-1", Arg.Any<string>(), Arg.Any<string>()))
             .Throw(new InvalidOperationException("Patch konnte nicht rückgängig gemacht werden."));
 
         var result = _controller.UnstageLines("id-1", request);
@@ -321,13 +322,13 @@ public class ChangesControllerTests
         var result = _controller.UnstageAll("id-1");
 
         Assert.IsType<NoContentResult>(result);
-        _service.Received(1).UnstageAll("id-1");
+        _stagingService.Received(1).UnstageAll("id-1");
     }
 
     [Fact]
     public void UnstageAll_ReturnsNotFoundForUnknownRepo()
     {
-        _service.When(s => s.UnstageAll("bad")).Throw(new InvalidOperationException("not found"));
+        _stagingService.When(s => s.UnstageAll("bad")).Throw(new InvalidOperationException("not found"));
 
         var result = _controller.UnstageAll("bad");
 

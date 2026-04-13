@@ -10,7 +10,11 @@ internal static class RepositoryServiceExtensions
     internal static IServiceCollection AddRepositoryServices(this IServiceCollection services)
     {
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
+        services.AddSingleton<RepositoryRegistry>();
         services.AddSingleton<IRepositoryService, RepositoryService>();
+        services.AddSingleton<IBranchService, BranchService>();
+        services.AddSingleton<IStagingService, StagingService>();
+        services.AddSingleton<IStashService, StashService>();
         services.AddSingleton<RepositoryWatcherService>();
         services.AddSingleton<IRepositoryWatcherService>(sp => sp.GetRequiredService<RepositoryWatcherService>());
         services.AddHostedService(sp => sp.GetRequiredService<RepositoryWatcherService>());

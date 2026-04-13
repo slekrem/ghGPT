@@ -1,36 +1,25 @@
 using ghGPT.Core.Repositories;
 using LibGit2Sharp;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
 namespace ghGPT.Infrastructure.Repositories;
 
-public class RepositoryService(IRepositoryStore store) : IRepositoryService
+public class RepositoryService(RepositoryRegistry registry) : IRepositoryService
 {
-    private readonly List<RepositoryInfo> _repos = [.. store.Load()];
-    private string? _activeRepoId;
+    public IReadOnlyList<RepositoryInfo> GetAll() => registry.GetAll();
 
-    public IReadOnlyList<RepositoryInfo> GetAll() => _repos.AsReadOnly();
+    public RepositoryInfo? GetActive() => registry.GetActive();
 
-    public RepositoryInfo? GetActive() =>
-        _activeRepoId is not null ? _repos.FirstOrDefault(r => r.Id == _activeRepoId) : null;
-
-    public void SetActive(string id)
-    {
-        if (_repos.All(r => r.Id != id))
-            throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
-        _activeRepoId = id;
-    }
+    public void SetActive(string id) => registry.SetActive(id);
 
     public Task<RepositoryInfo> CreateAsync(string localPath, string name)
     {
         Directory.CreateDirectory(localPath);
         LibGit2Sharp.Repository.Init(localPath);
 
-        var info = BuildInfo(localPath);
-        _repos.Add(info);
-        store.Save(_repos);
+        var info = RepositoryRegistry.BuildInfo(localPath);
+        registry.Add(info);
         return Task.FromResult(info);
     }
 
@@ -39,12 +28,11 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         if (!LibGit2Sharp.Repository.IsValid(localPath))
             throw new InvalidOperationException($"'{localPath}' ist kein gültiges Git-Repository.");
 
-        if (_repos.Any(r => r.LocalPath == localPath))
+        if (registry.GetAll().Any(r => r.LocalPath == localPath))
             throw new InvalidOperationException($"Repository '{localPath}' ist bereits importiert.");
 
-        var info = BuildInfo(localPath);
-        _repos.Add(info);
-        store.Save(_repos);
+        var info = RepositoryRegistry.BuildInfo(localPath);
+        registry.Add(info);
         return Task.FromResult(info);
     }
 
@@ -79,15 +67,14 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
         LibGit2Sharp.Repository.Clone(remoteUrl, localPath, options);
 
-        var info = BuildInfo(localPath);
-        _repos.Add(info);
-        store.Save(_repos);
+        var info = RepositoryRegistry.BuildInfo(localPath);
+        registry.Add(info);
         return Task.FromResult(info);
     }
 
     public RepositoryStatusResult GetStatus(string id)
     {
-        var info = GetRepoById(id);
+        var info = registry.GetById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
         var status = repo.RetrieveStatus();
 
@@ -122,7 +109,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
     public IReadOnlyList<CommitHistoryEntry> GetHistory(string id, int limit = 50)
     {
-        var info = GetRepoById(id);
+        var info = registry.GetById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
         return repo.Commits
@@ -141,17 +128,17 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
     public CommitListResult GetCommits(string id, string? branch = null, int skip = 0, int take = 100)
     {
-        var info = GetRepoById(id);
+        var info = registry.GetById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
         var branchName = string.IsNullOrWhiteSpace(branch) ? repo.Head.FriendlyName : branch;
         var selectedBranch = repo.Branches[branchName]
             ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
 
-        var filter = new LibGit2Sharp.CommitFilter
+        var filter = new CommitFilter
         {
             IncludeReachableFrom = selectedBranch,
-            SortBy = LibGit2Sharp.CommitSortStrategies.Topological | LibGit2Sharp.CommitSortStrategies.Time
+            SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Time
         };
         var commits = repo.Commits.QueryBy(filter)
             .Skip(Math.Max(skip, 0))
@@ -173,7 +160,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
     public CommitDetail GetCommitDetail(string id, string sha)
     {
-        var info = GetRepoById(id);
+        var info = registry.GetById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
         var commit = repo.Lookup<Commit>(sha)
@@ -205,7 +192,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
     public string GetDiff(string id, string filePath, bool staged)
     {
-        var info = GetRepoById(id);
+        var info = registry.GetById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
         if (!staged && IsUntrackedFile(repo, filePath))
@@ -227,7 +214,7 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
 
     public string GetCombinedDiff(string id, string filePath)
     {
-        var info = GetRepoById(id);
+        var info = registry.GetById(id);
         using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
         if (IsUntrackedFile(repo, filePath))
@@ -253,6 +240,70 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
                 $"Diff konnte nicht geladen werden: {error.Trim()}");
 
         return output.Replace("\r\n", "\n");
+    }
+
+    public void Commit(string id, string message, string? description = null)
+    {
+        var info = registry.GetById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+
+        var hasStagedChanges = repo.RetrieveStatus().Any(e =>
+            e.State.HasFlag(FileStatus.NewInIndex) ||
+            e.State.HasFlag(FileStatus.ModifiedInIndex) ||
+            e.State.HasFlag(FileStatus.DeletedFromIndex) ||
+            e.State.HasFlag(FileStatus.RenamedInIndex));
+
+        if (!hasStagedChanges)
+            throw new InvalidOperationException("Keine gestagten Änderungen vorhanden.");
+
+        var fullMessage = string.IsNullOrWhiteSpace(description)
+            ? message
+            : $"{message}\n\n{description}";
+
+        var config = repo.Config;
+        var name = config.Get<string>("user.name")?.Value ?? "ghGPT User";
+        var email = config.Get<string>("user.email")?.Value ?? "ghgpt@local";
+        var author = new Signature(name, email, DateTimeOffset.Now);
+
+        repo.Commit(fullMessage, author, author);
+    }
+
+    public Task FetchAsync(string id, IProgress<string>? progress = null) =>
+        GitProcessHelper.RunGitOperationAsync(registry.GetById(id).LocalPath, "fetch --all --prune --progress", progress);
+
+    public Task PullAsync(string id, IProgress<string>? progress = null) =>
+        GitProcessHelper.RunGitOperationAsync(registry.GetById(id).LocalPath, "pull --progress", progress);
+
+    public async Task PushAsync(string id, IProgress<string>? progress = null)
+    {
+        await GitProcessHelper.RunGitOperationAsync(registry.GetById(id).LocalPath, "push --progress", progress);
+        UpdateRemoteTrackingRef(id);
+    }
+
+    public void Remove(string id) => registry.Remove(id);
+
+    public void RefreshCurrentBranch(string id)
+    {
+        var info = registry.GetById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        info.CurrentBranch = repo.Head.FriendlyName;
+    }
+
+    private void UpdateRemoteTrackingRef(string id)
+    {
+        var info = registry.GetById(id);
+        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
+        var head = repo.Head;
+        if (head.Tip is null || repo.Network.Remotes["origin"] is null) return;
+
+        var trackingRefName = head.TrackedBranch?.CanonicalName
+            ?? $"refs/remotes/origin/{head.FriendlyName}";
+
+        var trackingRef = repo.Refs[trackingRefName];
+        if (trackingRef is null)
+            repo.Refs.Add(trackingRefName, head.Tip.Id);
+        else
+            repo.Refs.UpdateTarget(trackingRef, head.Tip.Id);
     }
 
     private static bool IsUntrackedFile(LibGit2Sharp.Repository repo, string filePath) =>
@@ -287,621 +338,4 @@ public class RepositoryService(IRepositoryStore store) : IRepositoryService
         AuthorEmail = commit.Author.Email,
         AuthorDate = commit.Author.When
     };
-
-    public void StageFile(string id, string filePath)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Stage(repo, filePath);
-    }
-
-    public void UnstageFile(string id, string filePath)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Unstage(repo, filePath);
-    }
-
-    public void StageAll(string id)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Stage(repo, "*");
-    }
-
-    public void StageLines(string id, string filePath, string patch)
-    {
-        ValidatePatch(patch);
-        var info = GetRepoById(id);
-        var tempFile = Path.GetTempFileName();
-        try
-        {
-            File.WriteAllText(tempFile, patch, Encoding.UTF8);
-            var psi = new ProcessStartInfo("git", $"apply --cached \"{tempFile}\"")
-            {
-                WorkingDirectory = info.LocalPath,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
-            var error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            if (process.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"Patch konnte nicht angewendet werden: {error.Trim()}");
-        }
-        finally
-        {
-            File.Delete(tempFile);
-        }
-    }
-
-    public void UnstageLines(string id, string filePath, string patch)
-    {
-        ValidatePatch(patch);
-        var info = GetRepoById(id);
-        var tempFile = Path.GetTempFileName();
-        try
-        {
-            File.WriteAllText(tempFile, patch, Encoding.UTF8);
-            var psi = new ProcessStartInfo("git", $"apply --cached --reverse \"{tempFile}\"")
-            {
-                WorkingDirectory = info.LocalPath,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
-            var error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            if (process.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"Patch konnte nicht rückgängig gemacht werden: {error.Trim()}");
-        }
-        finally
-        {
-            File.Delete(tempFile);
-        }
-    }
-
-    public void UnstageAll(string id)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Unstage(repo, "*");
-    }
-
-    public void Commit(string id, string message, string? description = null)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        var hasStagedChanges = repo.RetrieveStatus().Any(e =>
-            e.State.HasFlag(FileStatus.NewInIndex) ||
-            e.State.HasFlag(FileStatus.ModifiedInIndex) ||
-            e.State.HasFlag(FileStatus.DeletedFromIndex) ||
-            e.State.HasFlag(FileStatus.RenamedInIndex));
-
-        if (!hasStagedChanges)
-            throw new InvalidOperationException("Keine gestagten Änderungen vorhanden.");
-
-        var fullMessage = string.IsNullOrWhiteSpace(description)
-            ? message
-            : $"{message}\n\n{description}";
-
-        var config = repo.Config;
-        var name = config.Get<string>("user.name")?.Value ?? "ghGPT User";
-        var email = config.Get<string>("user.email")?.Value ?? "ghgpt@local";
-        var author = new Signature(name, email, DateTimeOffset.Now);
-
-        repo.Commit(fullMessage, author, author);
-    }
-
-    public Task FetchAsync(string id, IProgress<string>? progress = null) =>
-        RunGitOperationAsync(id, "fetch --all --prune --progress", progress);
-
-    public Task PullAsync(string id, IProgress<string>? progress = null) =>
-        RunGitOperationAsync(id, "pull --progress", progress);
-
-    public async Task PushAsync(string id, IProgress<string>? progress = null)
-    {
-        await RunGitOperationAsync(id, "push --progress", progress);
-        UpdateRemoteTrackingRef(id);
-    }
-
-    private void UpdateRemoteTrackingRef(string id)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        var head = repo.Head;
-        if (head.Tip is null || repo.Network.Remotes["origin"] is null) return;
-
-        var trackingRefName = head.TrackedBranch?.CanonicalName
-            ?? $"refs/remotes/origin/{head.FriendlyName}";
-
-        var trackingRef = repo.Refs[trackingRefName];
-        if (trackingRef is null)
-            repo.Refs.Add(trackingRefName, head.Tip.Id);
-        else
-            repo.Refs.UpdateTarget(trackingRef, head.Tip.Id);
-    }
-
-    public void Remove(string id)
-    {
-        var repo = GetRepoById(id);
-        _repos.Remove(repo);
-        if (_activeRepoId == id) _activeRepoId = null;
-        store.Save(_repos);
-    }
-
-    public IReadOnlyList<BranchInfo> GetBranches(string id)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        return repo.Branches
-            .Select(branch => new BranchInfo
-            {
-                Name = branch.FriendlyName,
-                IsRemote = branch.IsRemote,
-                IsHead = branch.IsCurrentRepositoryHead,
-                AheadBy = branch.TrackingDetails?.AheadBy ?? 0,
-                BehindBy = branch.TrackingDetails?.BehindBy ?? 0,
-                TrackingBranch = branch.TrackedBranch?.FriendlyName
-            })
-            .OrderBy(b => b.IsRemote)
-            .ThenBy(b => b.Name)
-            .ToList();
-    }
-
-    public void CheckoutBranch(string id, string branchName, CheckoutStrategy strategy = CheckoutStrategy.Normal, string? stashMessage = null)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        var status = repo.RetrieveStatus();
-        var isDirty = status.Any(e =>
-            e.State != FileStatus.Ignored &&
-            e.State != FileStatus.Unaltered);
-
-        if (isDirty && strategy == CheckoutStrategy.Normal)
-            throw new UncommittedChangesException();
-
-        if (isDirty && strategy == CheckoutStrategy.Stash)
-        {
-            var sig = repo.Config.BuildSignature(DateTimeOffset.Now);
-            repo.Stashes.Add(sig, stashMessage ?? "Auto-stash vor Branch-Wechsel", StashModifiers.Default);
-        }
-
-        if (isDirty && strategy == CheckoutStrategy.Discard)
-        {
-            repo.Reset(ResetMode.Hard);
-            foreach (var entry in status.Where(e => e.State == FileStatus.NewInWorkdir))
-                File.Delete(Path.Combine(info.LocalPath, entry.FilePath));
-        }
-
-        var branch = repo.Branches[branchName]
-            ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
-
-        if (branch.IsRemote)
-        {
-            var localName = branch.FriendlyName.Contains('/')
-                ? branch.FriendlyName[(branch.FriendlyName.IndexOf('/') + 1)..]
-                : branch.FriendlyName;
-
-            if (repo.Branches[localName] is not null)
-                throw new InvalidOperationException($"Lokaler Branch '{localName}' existiert bereits.");
-
-            var localBranch = repo.CreateBranch(localName, branch.Tip);
-            repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
-            Commands.Checkout(repo, localBranch);
-            info.CurrentBranch = localBranch.FriendlyName;
-        }
-        else
-        {
-            Commands.Checkout(repo, branch);
-            info.CurrentBranch = branch.FriendlyName;
-        }
-
-        store.Save(_repos);
-    }
-
-    public BranchInfo CreateBranch(string id, string name, string? startPoint = null)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        if (string.IsNullOrWhiteSpace(name))
-            throw new InvalidOperationException("Branch-Name darf nicht leer sein.");
-
-        Commit? startCommit = null;
-        if (!string.IsNullOrWhiteSpace(startPoint))
-        {
-            var startBranch = repo.Branches[startPoint]
-                ?? throw new InvalidOperationException($"Start-Branch '{startPoint}' nicht gefunden.");
-            startCommit = startBranch.Tip;
-        }
-
-        var newBranch = startCommit is not null
-            ? repo.CreateBranch(name, startCommit)
-            : repo.CreateBranch(name);
-
-        Commands.Checkout(repo, newBranch);
-        info.CurrentBranch = newBranch.FriendlyName;
-        store.Save(_repos);
-
-        return new BranchInfo
-        {
-            Name = newBranch.FriendlyName,
-            IsRemote = false,
-            IsHead = true,
-            AheadBy = 0,
-            BehindBy = 0,
-            TrackingBranch = null
-        };
-    }
-
-    public void RefreshCurrentBranch(string id)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        info.CurrentBranch = repo.Head.FriendlyName;
-    }
-
-    public async Task DeleteBranch(string id, string branchName)
-    {
-        var info = GetRepoById(id);
-
-        bool isRemote;
-        string remoteName;
-        string branchOnRemote;
-
-        using (var repo = new LibGit2Sharp.Repository(info.LocalPath))
-        {
-            var branch = repo.Branches[branchName]
-                ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
-
-            if (branch.IsCurrentRepositoryHead)
-                throw new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden.");
-
-            isRemote = branch.IsRemote;
-            if (!isRemote)
-            {
-                repo.Branches.Remove(branch);
-                return;
-            }
-
-            remoteName = branch.RemoteName;
-            branchOnRemote = branch.FriendlyName[(remoteName.Length + 1)..];
-        }
-
-        await RunGitOperationAsync(id, $"push {remoteName} --delete {branchOnRemote}", null);
-
-        using var repoAfter = new LibGit2Sharp.Repository(info.LocalPath);
-        var trackingBranch = repoAfter.Branches[branchName];
-        if (trackingBranch is not null)
-            repoAfter.Branches.Remove(trackingBranch);
-    }
-
-    private static void ValidatePatch(string patch)
-    {
-        if (!patch.Contains("@@"))
-            throw new InvalidOperationException("Ungültiges Patch-Format: kein Hunk-Header (@@) gefunden.");
-        if (!patch.Contains("---") || !patch.Contains("+++"))
-            throw new InvalidOperationException("Ungültiges Patch-Format: fehlende Datei-Header (--- / +++).");
-        var lines = patch.Split('\n');
-        var hasChange = lines.Any(l => l.StartsWith('+') && !l.StartsWith("+++"))
-                     || lines.Any(l => l.StartsWith('-') && !l.StartsWith("---"));
-        if (!hasChange)
-            throw new InvalidOperationException("Patch enthält keine Änderungen.");
-    }
-
-    private RepositoryInfo GetRepoById(string id) =>
-        _repos.FirstOrDefault(r => r.Id == id)
-        ?? throw new InvalidOperationException($"Repository '{id}' nicht gefunden.");
-
-    private async Task RunGitOperationAsync(string id, string arguments, IProgress<string>? progress)
-    {
-        var info = GetRepoById(id);
-        progress?.Report($"> git {arguments}");
-
-        var psi = new ProcessStartInfo("git", arguments)
-        {
-            WorkingDirectory = info.LocalPath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
-
-        using var process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-        var outputLines = new List<string>();
-
-        void OnOutput(object _, DataReceivedEventArgs args)
-        {
-            if (string.IsNullOrWhiteSpace(args.Data))
-                return;
-
-            var line = args.Data.Trim();
-            lock (outputLines)
-            {
-                outputLines.Add(line);
-            }
-            progress?.Report(line);
-        }
-
-        process.OutputDataReceived += OnOutput;
-        process.ErrorDataReceived += OnOutput;
-
-        try
-        {
-            if (!process.Start())
-                throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            await process.WaitForExitAsync();
-        }
-        catch (Win32Exception ex)
-        {
-            throw new InvalidOperationException("Git wurde nicht gefunden oder konnte nicht gestartet werden.", ex);
-        }
-        finally
-        {
-            process.OutputDataReceived -= OnOutput;
-            process.ErrorDataReceived -= OnOutput;
-        }
-
-        if (process.ExitCode == 0)
-            return;
-
-        var message = BuildGitOperationError(outputLines);
-        throw new InvalidOperationException(message);
-    }
-
-    private static void RunGitSync(string workingDirectory, string arguments, string errorPrefix)
-    {
-        var psi = new ProcessStartInfo("git", arguments)
-        {
-            WorkingDirectory = workingDirectory,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        using var process = Process.Start(psi)
-            ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException($"{errorPrefix}: {error.Trim()}");
-    }
-
-    private static string BuildGitOperationError(IEnumerable<string> outputLines)
-    {
-        var relevantLines = outputLines
-            .Select(line => line.Trim())
-            .Where(line =>
-                !string.IsNullOrWhiteSpace(line) &&
-                !line.StartsWith("remote:", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("From ", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Enumerating objects:", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Counting objects:", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Compressing objects:", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Writing objects:", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Receiving objects:", StringComparison.OrdinalIgnoreCase) &&
-                !line.StartsWith("Resolving deltas:", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        var mergeConflict = relevantLines.FirstOrDefault(line =>
-            line.Contains("CONFLICT", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Automatic merge failed", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Automatischer Merge fehlgeschlagen", StringComparison.OrdinalIgnoreCase));
-        if (mergeConflict is not null)
-            return $"Merge-Konflikt beim Aktualisieren des Branches. {mergeConflict}";
-
-        var lines = outputLines.ToList();
-        var has403 = lines.Any(line => line.Contains("error: 403", StringComparison.OrdinalIgnoreCase) || line.Contains("returned error: 403", StringComparison.OrdinalIgnoreCase));
-        var hasPermissionDenied = lines.Any(line => line.Contains("Permission to", StringComparison.OrdinalIgnoreCase) && line.Contains("denied", StringComparison.OrdinalIgnoreCase));
-        if (has403 || hasPermissionDenied)
-            return "Push fehlgeschlagen (403): Der hinterlegte GitHub-Token hat keine Schreibberechtigung. Bitte stelle sicher, dass der PAT die Berechtigung 'Contents: Write' (Fine-grained) bzw. den Scope 'repo' (Classic) besitzt.";
-
-        var authError = relevantLines.FirstOrDefault(line =>
-            line.Contains("Authentication failed", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("could not read Username", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Permission denied", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("Repository not found", StringComparison.OrdinalIgnoreCase) ||
-            line.Contains("fatal: could not", StringComparison.OrdinalIgnoreCase));
-        if (authError is not null)
-            return $"Authentifizierung oder Remote-Zugriff fehlgeschlagen. {authError}";
-
-        return relevantLines.LastOrDefault()
-            ?? "Git-Operation fehlgeschlagen.";
-    }
-
-    public IReadOnlyList<StashEntry> GetStashes(string id)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        return repo.Stashes
-            .Select((stash, index) =>
-            {
-                var raw = stash.WorkTree?.MessageShort ?? stash.Message ?? string.Empty;
-                ParseStashMessage(raw, out var branch, out var message);
-                return new StashEntry
-                {
-                    Index = index,
-                    Message = message,
-                    Branch = branch,
-                    CreatedAt = stash.Index?.Author.When ?? DateTimeOffset.MinValue
-                };
-            })
-            .ToList();
-    }
-
-    public IReadOnlyList<CommitFileChange> GetStashDiff(string id, int index)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        if (index < 0 || index >= repo.Stashes.Count())
-            throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
-
-        var stash = repo.Stashes[index];
-        var patch = repo.Diff.Compare<Patch>(stash.Base.Tree, stash.WorkTree.Tree);
-
-        return patch.Select(entry => new CommitFileChange
-        {
-            Path = entry.Path,
-            OldPath = entry.OldPath != entry.Path ? entry.OldPath : null,
-            Status = entry.Status.ToString(),
-            Additions = entry.LinesAdded,
-            Deletions = entry.LinesDeleted,
-            Patch = entry.Patch
-        }).ToList();
-    }
-
-    public void PushStash(string id, string? message = null, string[]? paths = null)
-    {
-        var info = GetRepoById(id);
-        var msgArg = message is not null ? $"-m \"{message}\" " : "";
-
-        if (paths is { Length: > 0 })
-        {
-            var pathArgs = string.Join(" ", paths.Select(p => $"\"{p}\""));
-            RunGitSync(info.LocalPath, $"stash push {msgArg}-- {pathArgs}", "Stash fehlgeschlagen");
-        }
-        else
-        {
-            using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-            var sig = repo.Config.BuildSignature(DateTimeOffset.Now);
-            var isDirty = repo.RetrieveStatus().IsDirty;
-            if (!isDirty)
-                throw new InvalidOperationException("Keine Änderungen zum Stashen vorhanden.");
-            repo.Stashes.Add(sig, message ?? "Manueller Stash", StashModifiers.Default);
-        }
-    }
-
-    public void PopStash(string id, int index = 0)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        if (index < 0 || index >= repo.Stashes.Count())
-            throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
-
-        var result = repo.Stashes.Pop(index, new StashApplyOptions());
-        if (result == StashApplyStatus.Conflicts)
-            throw new InvalidOperationException("Stash konnte nicht angewendet werden: Konflikte im Working Directory.");
-        if (result != StashApplyStatus.Applied)
-            throw new InvalidOperationException($"Stash konnte nicht angewendet werden: {result}.");
-    }
-
-    public void DropStash(string id, int index)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        if (index < 0 || index >= repo.Stashes.Count())
-            throw new InvalidOperationException($"Stash[{index}] nicht gefunden.");
-
-        repo.Stashes.Remove(index);
-    }
-
-    public void DiscardFile(string id, string filePath)
-    {
-        var info = GetRepoById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        var existsInHead = repo.Head.Tip?.Tree?[filePath] is not null;
-
-        if (!existsInHead)
-        {
-            try { Commands.Unstage(repo, filePath); } catch { /* ignore if not staged */ }
-            var fullPath = Path.Combine(info.LocalPath, filePath);
-            if (File.Exists(fullPath)) File.Delete(fullPath);
-        }
-        else
-        {
-            RunGitSync(info.LocalPath, $"restore --source=HEAD --staged --worktree -- \"{filePath}\"",
-                "Änderungen konnten nicht verworfen werden");
-        }
-    }
-
-    public void DiscardLines(string id, string filePath, string patch)
-    {
-        ValidatePatch(patch);
-        var info = GetRepoById(id);
-        var tempFile = Path.GetTempFileName();
-        try
-        {
-            File.WriteAllText(tempFile, patch, Encoding.UTF8);
-            var psi = new ProcessStartInfo("git", $"apply --reverse \"{tempFile}\"")
-            {
-                WorkingDirectory = info.LocalPath,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException("Git-Prozess konnte nicht gestartet werden.");
-            var error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            if (process.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"Zeilen konnten nicht verworfen werden: {error.Trim()}");
-        }
-        finally
-        {
-            File.Delete(tempFile);
-        }
-    }
-
-    // Git stash messages are formatted as:
-    //   "On <branch>: <user message>"       (when -m is provided)
-    //   "WIP on <branch>: <sha> <commit>"   (auto-generated)
-    private static void ParseStashMessage(string raw, out string branch, out string message)
-    {
-        var onMatch = System.Text.RegularExpressions.Regex.Match(raw, @"^On (.+?): (.+)$");
-        if (onMatch.Success)
-        {
-            branch = onMatch.Groups[1].Value;
-            message = onMatch.Groups[2].Value;
-            return;
-        }
-        var wipMatch = System.Text.RegularExpressions.Regex.Match(raw, @"^WIP on (.+?): \S+ (.+)$");
-        if (wipMatch.Success)
-        {
-            branch = wipMatch.Groups[1].Value;
-            message = wipMatch.Groups[2].Value;
-            return;
-        }
-        branch = string.Empty;
-        message = raw;
-    }
-
-    private static RepositoryInfo BuildInfo(string localPath)
-    {
-        using var repo = new LibGit2Sharp.Repository(localPath);
-        var name = Path.GetFileName(localPath.TrimEnd(Path.DirectorySeparatorChar));
-        var remoteUrl = repo.Network.Remotes["origin"]?.Url;
-        var branch = repo.Head.FriendlyName;
-        var id = Guid.NewGuid().ToString();
-        return new RepositoryInfo
-        {
-            Id = id,
-            Name = name,
-            LocalPath = localPath,
-            RemoteUrl = remoteUrl,
-            CurrentBranch = branch
-        };
-    }
 }

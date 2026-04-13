@@ -8,7 +8,7 @@ namespace ghGPT.Api.Controllers;
 
 [ApiController]
 [Route("api/repos/{id}")]
-public class ChangesController(IRepositoryService service, IHubContext<RepositoryHub> hub) : ControllerBase
+public class ChangesController(IRepositoryService service, IStagingService stagingService, IHubContext<RepositoryHub> hub) : ControllerBase
 {
     [HttpGet("status")]
     public ActionResult<RepositoryStatusResult> GetStatus(string id)
@@ -99,7 +99,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
     {
         try
         {
-            service.StageFile(id, file);
+            stagingService.StageFile(id, file);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -113,7 +113,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
     {
         try
         {
-            service.UnstageFile(id, file);
+            stagingService.UnstageFile(id, file);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -129,7 +129,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
             return BadRequest(new { error = "Patch darf nicht leer sein." });
         try
         {
-            service.StageLines(id, request.FilePath, request.Patch);
+            stagingService.StageLines(id, request.FilePath, request.Patch);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -145,7 +145,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
             return BadRequest(new { error = "Patch darf nicht leer sein." });
         try
         {
-            service.UnstageLines(id, request.FilePath, request.Patch);
+            stagingService.UnstageLines(id, request.FilePath, request.Patch);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -159,7 +159,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
     {
         try
         {
-            service.StageAll(id);
+            stagingService.StageAll(id);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -173,7 +173,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
     {
         try
         {
-            service.UnstageAll(id);
+            stagingService.UnstageAll(id);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -204,7 +204,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
     {
         try
         {
-            service.DiscardFile(id, file);
+            stagingService.DiscardFile(id, file);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -220,7 +220,7 @@ public class ChangesController(IRepositoryService service, IHubContext<Repositor
             return BadRequest(new { error = "Patch darf nicht leer sein." });
         try
         {
-            service.DiscardLines(id, request.FilePath, request.Patch);
+            stagingService.DiscardLines(id, request.FilePath, request.Patch);
             return NoContent();
         }
         catch (InvalidOperationException ex)

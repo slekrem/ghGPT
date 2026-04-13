@@ -8,6 +8,7 @@ namespace ghGPT.Ai.Tools;
 
 internal sealed class ToolDispatcher(
     IRepositoryService repositoryService,
+    IBranchService branchService,
     ILogger<ToolDispatcher> logger) : IToolDispatcher
 {
     public async Task<(string Result, string DisplayArgs, bool Success)> DispatchAsync(
@@ -66,7 +67,7 @@ internal sealed class ToolDispatcher(
 
     private (string, string, bool) ExecuteGetBranches(string repoId)
     {
-        var branches = repositoryService.GetBranches(repoId);
+        var branches = branchService.GetBranches(repoId);
         var sb = new StringBuilder();
 
         var local = branches.Where(b => !b.IsRemote).ToList();
@@ -96,7 +97,7 @@ internal sealed class ToolDispatcher(
         if (string.IsNullOrWhiteSpace(name))
             return ("Fehler: Branch-Name fehlt.", ToolNames.CheckoutBranch, false);
 
-        repositoryService.CheckoutBranch(repoId, name);
+        branchService.CheckoutBranch(repoId, name);
         return ($"Branch '{name}' wurde erfolgreich ausgecheckt.", $"{ToolNames.CheckoutBranch}({name})", true);
     }
 
@@ -107,7 +108,7 @@ internal sealed class ToolDispatcher(
             return ("Fehler: Branch-Name fehlt.", ToolNames.CreateBranch, false);
 
         var startPoint = args.RootElement.TryGetProperty("start_point", out var sp) ? sp.GetString() : null;
-        var branch = repositoryService.CreateBranch(repoId, name, startPoint);
+        var branch = branchService.CreateBranch(repoId, name, startPoint);
 
         var displayArgs = startPoint is not null
             ? $"{ToolNames.CreateBranch}({name}, von {startPoint})"
