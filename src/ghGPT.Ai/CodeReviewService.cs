@@ -10,7 +10,7 @@ namespace ghGPT.Ai;
 internal sealed class CodeReviewService(
     IOllamaClient ollamaClient,
     IRepositoryService repositoryService,
-    DiffService diffService,
+    IDiffService diffService,
     ILogger<CodeReviewService> logger) : ICodeReviewService
 {
     private const string SessionFileName = ".review-session.md";
