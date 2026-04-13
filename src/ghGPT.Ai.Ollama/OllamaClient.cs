@@ -9,10 +9,10 @@ namespace ghGPT.Ai.Ollama;
 
 internal sealed class OllamaClient(
     IAiSettingsService settingsService,
-    ILogger<OllamaClient> logger,
-    HttpClient? httpClient = null) : IOllamaClient
+    IHttpClientFactory httpClientFactory,
+    ILogger<OllamaClient> logger) : IOllamaClient
 {
-    private readonly HttpClient _http = httpClient ?? new() { Timeout = TimeSpan.FromMinutes(10) };
+    private HttpClient CreateHttpClient() => httpClientFactory.CreateClient("Ollama");
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -25,8 +25,9 @@ internal sealed class OllamaClient(
         var settings = settingsService.Load();
         try
         {
+            using var http = CreateHttpClient();
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models", cts.Token);
+            var response = await http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models", cts.Token);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -39,8 +40,9 @@ internal sealed class OllamaClient(
     public async Task<IReadOnlyList<AiModelInfo>> GetModelsAsync()
     {
         var settings = settingsService.Load();
+        using var http = CreateHttpClient();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var response = await _http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models", cts.Token);
+        var response = await http.GetAsync($"{settings.BaseUrl.TrimEnd('/')}/v1/models", cts.Token);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<OpenAiModelsResponse>();
@@ -65,12 +67,13 @@ internal sealed class OllamaClient(
             stream = true
         };
 
+        using var http = CreateHttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl.TrimEnd('/')}/v1/chat/completions")
         {
             Content = JsonContent.Create(requestBody)
         };
 
-        using var response = await SendAsync(request, cancellationToken);
+        using var response = await SendAsync(http, request, cancellationToken);
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
 
         await foreach (var token in OllamaSseParser.ParseTokensAsync(stream, cancellationToken))
@@ -101,12 +104,13 @@ internal sealed class OllamaClient(
             stream = false
         };
 
+        using var http = CreateHttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{settings.BaseUrl.TrimEnd('/')}/v1/chat/completions")
         {
             Content = JsonContent.Create(requestBody)
         };
 
-        using var response = await SendAsync(request, cancellationToken);
+        using var response = await SendAsync(http, request, cancellationToken);
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var completion = JsonSerializer.Deserialize<OpenAiCompletion>(json);
@@ -130,9 +134,9 @@ internal sealed class OllamaClient(
         return new ToolCallResponse { Content = choice.Message?.Content ?? string.Empty };
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient http, HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
         return response;
     }
