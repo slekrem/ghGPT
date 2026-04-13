@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ghGPT.Ai;
 
-internal sealed class DiffService(IRepositoryService repositoryService, ILogger<DiffService> logger)
+internal sealed class DiffService(IRepositoryService repositoryService, ILogger<DiffService> logger) : IDiffService
 {
     public string BuildStagedDiff(string repoId)
     {

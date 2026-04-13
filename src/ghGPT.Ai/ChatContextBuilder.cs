@@ -10,7 +10,7 @@ internal sealed class ChatContextBuilder(
     IRepositoryService repositoryService,
     IPullRequestService pullRequestService,
     IChatHistoryService historyService,
-    DiffService diffService,
+    IDiffService diffService,
     ILogger<ChatContextBuilder> logger) : IChatContextBuilder
 {
     public async Task<IEnumerable<ChatMessage>> BuildAsync(ChatRequest request)

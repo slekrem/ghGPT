@@ -10,7 +10,7 @@ namespace ghGPT.Ai;
 internal sealed class CommitMessageService(
     IOllamaClient ollamaClient,
     IRepositoryService repositoryService,
-    DiffService diffService,
+    IDiffService diffService,
     ILogger<CommitMessageService> logger) : ICommitMessageService
 {
     private const int RecentCommitsForExamples = 5;

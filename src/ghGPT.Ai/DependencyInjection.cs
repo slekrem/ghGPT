@@ -12,7 +12,7 @@ public static class DependencyInjection
         services.AddOllamaClient();
         services.AddAiTools();
 
-        services.AddSingleton<DiffService>();
+        services.AddSingleton<IDiffService, DiffService>();
         services.AddSingleton<IAiSettingsService, AiSettingsService>();
         services.AddSingleton<IChatHistoryService, ChatHistoryService>();
         services.AddSingleton<IChatContextBuilder, ChatContextBuilder>();
