@@ -1,8 +1,0 @@
-namespace ghGPT.Ai.Abstractions;
-
-public class ChatHistoryEntry
-{
-    public string Role { get; set; } = string.Empty;
-    public string Content { get; set; } = string.Empty;
-    public DateTimeOffset Timestamp { get; set; }
-}
