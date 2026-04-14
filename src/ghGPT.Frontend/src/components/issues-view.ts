@@ -6,6 +6,7 @@ import {
   type IssueListItem,
   type IssueDetail,
 } from '../services/repository-service';
+import { renderStateBadge, renderLabel } from '../utils/render-helpers';
 
 @customElement('issues-view')
 export class IssuesView extends AppElement {
@@ -131,19 +132,6 @@ export class IssuesView extends AppElement {
     }
   }
 
-  private renderStateBadge(state: string) {
-    const s = state.toLowerCase();
-    if (s === 'closed') return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(243,139,168,0.15)] text-cat-red border border-[rgba(243,139,168,0.3)]">Closed</span>`;
-    return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(166,227,161,0.15)] text-cat-green border border-[rgba(166,227,161,0.3)]">Open</span>`;
-  }
-
-  private renderLabel(name: string, color: string) {
-    const hex = color.startsWith('#') ? color : `#${color}`;
-    return html`<span
-      class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold border"
-      style="background:${hex}22;color:${hex};border-color:${hex}55">${name}</span>`;
-  }
-
   render() {
     return html`
       <div data-testid="issues-list-panel" class="w-[380px] min-w-[380px] flex flex-col border-r border-cat-border bg-cat-surface overflow-hidden">
@@ -190,9 +178,9 @@ export class IssuesView extends AppElement {
                   <span class="text-[0.87rem] font-semibold text-[#eef1ff] leading-[1.3] flex-1 min-w-0 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">${issue.title}</span>
                 </div>
                 <div class="flex flex-wrap items-center gap-[0.4rem] text-[0.74rem] text-[#8f96b3]">
-                  ${this.renderStateBadge(issue.state)}
+                  ${renderStateBadge(issue.state)}
                   <span>${issue.authorLogin}</span>
-                  ${issue.labels.map(l => this.renderLabel(l.name, l.color))}
+                  ${issue.labels.map(l => renderLabel(l.name, l.color))}
                 </div>
               </div>
             `)}
@@ -275,13 +263,13 @@ export class IssuesView extends AppElement {
                 </div>
               </div>
               <div class="flex flex-wrap items-center gap-2 text-[0.78rem] text-cat-subtext">
-                ${this.renderStateBadge(this.selectedIssue.state)}
+                ${renderStateBadge(this.selectedIssue.state)}
                 <span>${this.selectedIssue.authorLogin}</span>
                 ${this.selectedIssue.assignees.length > 0 ? html`
                   <span class="text-cat-subtle">→</span>
                   ${this.selectedIssue.assignees.map(a => html`<span class="text-cat-subtext">${a}</span>`)}
                 ` : ''}
-                ${this.selectedIssue.labels.map(l => this.renderLabel(l.name, l.color))}
+                ${this.selectedIssue.labels.map(l => renderLabel(l.name, l.color))}
               </div>
               ${this.actionError ? html`<div class="text-cat-red text-[0.8rem] px-4 py-2 bg-[rgba(243,139,168,0.08)] rounded mt-2">${this.actionError}</div>` : ''}
             </div>

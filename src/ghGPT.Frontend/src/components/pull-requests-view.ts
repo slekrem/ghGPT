@@ -6,6 +6,7 @@ import {
   type PullRequestListItem,
   type PullRequestDetail,
 } from '../services/repository-service';
+import { renderStateBadge, renderAvatar } from '../utils/render-helpers';
 
 @customElement('pull-requests-view')
 export class PullRequestsView extends AppElement {
@@ -247,25 +248,6 @@ export class PullRequestsView extends AppElement {
     }
   }
 
-  private renderStateBadge(state: string, isDraft: boolean) {
-    if (isDraft) return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(166,173,200,0.15)] text-cat-subtext border border-[rgba(166,173,200,0.3)]">Draft</span>`;
-    const s = state.toLowerCase();
-    if (s === 'merged') return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(203,166,247,0.15)] text-[#cba6f7] border border-[rgba(203,166,247,0.3)]">Merged</span>`;
-    if (s === 'closed') return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(243,139,168,0.15)] text-cat-red border border-[rgba(243,139,168,0.3)]">Closed</span>`;
-    return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(166,227,161,0.15)] text-cat-green border border-[rgba(166,227,161,0.3)]">Open</span>`;
-  }
-
-  private renderAvatar(avatarUrl: string, login: string, size: 'small' | 'medium' = 'small') {
-    if (size === 'small') {
-      return avatarUrl
-        ? html`<img class="w-4 h-4 rounded-full object-cover" src=${avatarUrl} alt=${login} />`
-        : html`<div class="w-4 h-4 rounded-full bg-gradient-to-br from-cat-blue to-cat-peach text-[#11111b] flex items-center justify-center text-[0.55rem] font-bold shrink-0">${login.charAt(0).toUpperCase()}</div>`;
-    }
-    return avatarUrl
-      ? html`<img class="w-6 h-6 rounded-full object-cover shrink-0" src=${avatarUrl} alt=${login} />`
-      : html`<div class="w-6 h-6 rounded-full bg-gradient-to-br from-cat-blue to-cat-peach text-[#11111b] flex items-center justify-center text-[0.65rem] font-bold shrink-0">${login.charAt(0).toUpperCase()}</div>`;
-  }
-
   private renderFileStatusColor(status: string) {
     if (status === 'added') return 'text-cat-green';
     if (status === 'removed') return 'text-cat-red';
@@ -378,9 +360,9 @@ export class PullRequestsView extends AppElement {
                   <span class="text-[0.87rem] font-semibold text-[#eef1ff] leading-[1.3] flex-1 min-w-0 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">${pr.title}</span>
                 </div>
                 <div class="flex flex-wrap items-center gap-[0.4rem] text-[0.74rem] text-[#8f96b3]">
-                  ${this.renderStateBadge(pr.state, pr.isDraft)}
+                  ${renderStateBadge(pr.state, pr.isDraft)}
                   <div class="flex items-center gap-1">
-                    ${this.renderAvatar(pr.authorAvatarUrl, pr.authorLogin)}
+                    ${renderAvatar(pr.authorAvatarUrl, pr.authorLogin)}
                     <span>${pr.authorLogin}</span>
                   </div>
                   <span class="font-mono text-[0.72rem] text-cat-blue">${pr.headBranch} → ${pr.baseBranch}</span>
@@ -467,9 +449,9 @@ export class PullRequestsView extends AppElement {
                 ${this._renderDetailActions(this.selectedPr)}
               </div>
               <div class="flex flex-wrap items-center gap-2 text-[0.78rem] text-cat-subtext">
-                ${this.renderStateBadge(this.selectedPr.state, this.selectedPr.isDraft)}
+                ${renderStateBadge(this.selectedPr.state, this.selectedPr.isDraft)}
                 <div class="flex items-center gap-1">
-                  ${this.renderAvatar(this.selectedPr.authorAvatarUrl, this.selectedPr.authorLogin)}
+                  ${renderAvatar(this.selectedPr.authorAvatarUrl, this.selectedPr.authorLogin)}
                   <span>${this.selectedPr.authorLogin}</span>
                 </div>
                 <span class="font-mono text-[0.78rem] text-cat-blue">${this.selectedPr.headBranch} → ${this.selectedPr.baseBranch}</span>
@@ -562,7 +544,7 @@ export class PullRequestsView extends AppElement {
                   <div class="flex flex-col gap-1.5">
                     ${this.selectedPr.reviews.map(r => html`
                       <div class="flex items-center gap-2.5 px-2.5 py-1.5 bg-cat-base rounded text-[0.8rem]">
-                        ${this.renderAvatar(r.reviewerAvatarUrl, r.reviewerLogin, 'medium')}
+                        ${renderAvatar(r.reviewerAvatarUrl, r.reviewerLogin, 'medium')}
                         <span class="text-cat-text font-semibold">${r.reviewerLogin}</span>
                         <span class="${this.renderReviewStateColor(r.state)}">
                           ${this.renderReviewStateLabel(r.state)}
