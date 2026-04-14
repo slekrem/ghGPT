@@ -238,8 +238,8 @@ export class PullRequestsView extends AppElement {
     try {
       await repositoryService.addPullRequestComment(this.repoId, this.selectedNumber, this.commentBody.trim());
       this.commentBody = '';
-      this.showCommentForm = false;
       this.commentSuccess = true;
+      setTimeout(() => { this.showCommentForm = false; this.commentSuccess = false; }, 2000);
     } catch (e: unknown) {
       this.commentError = e instanceof Error ? e.message : 'Fehler beim Kommentieren.';
     } finally {
@@ -327,7 +327,7 @@ export class PullRequestsView extends AppElement {
         ` : ''}
         ${isMerged ? '' : ''}
         <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay"
-          @click=${() => { this.showCommentForm = !this.showCommentForm; this.commentError = null; }}>
+          @click=${() => { this.showCommentForm = !this.showCommentForm; this.commentError = null; this.commentSuccess = false; }}>
           💬 Kommentar
         </button>
         <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-blue cursor-pointer whitespace-nowrap shrink-0 hover:bg-[rgba(137,180,250,0.1)] hover:border-cat-blue"
