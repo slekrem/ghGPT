@@ -16,15 +16,8 @@ public class DiscussionsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var discussions = await discussionService.GetDiscussionsAsync(ownerRepo.owner, ownerRepo.repo, limit);
-            return Ok(discussions);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var discussions = await discussionService.GetDiscussionsAsync(ownerRepo.owner, ownerRepo.repo, limit);
+        return Ok(discussions);
     }
 
     [HttpPost]
@@ -33,17 +26,10 @@ public class DiscussionsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var discussion = await discussionService.CreateAsync(
-                ownerRepo.owner, ownerRepo.repo,
-                request.Title, request.Body, request.Category ?? "General");
-            return Ok(discussion);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var discussion = await discussionService.CreateAsync(
+            ownerRepo.owner, ownerRepo.repo,
+            request.Title, request.Body, request.Category ?? "General");
+        return Ok(discussion);
     }
 }
 

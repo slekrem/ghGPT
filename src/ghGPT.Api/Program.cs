@@ -1,5 +1,6 @@
 using ghGPT.Ai;
 using ghGPT.Api.Hubs;
+using ghGPT.Api.Middleware;
 using ghGPT.Core.Repositories;
 using ghGPT.Infrastructure;
 
@@ -17,6 +18,8 @@ var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
