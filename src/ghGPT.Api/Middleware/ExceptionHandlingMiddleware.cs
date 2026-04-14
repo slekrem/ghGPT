@@ -11,16 +11,16 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
         {
             await next(context);
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException ex) when (!context.Response.HasStarted)
         {
             await WriteErrorAsync(context, HttpStatusCode.BadRequest, ex.Message);
         }
-        catch (HttpRequestException ex)
+        catch (HttpRequestException ex) when (!context.Response.HasStarted)
         {
             logger.LogWarning(ex, "Externe HTTP-Anfrage fehlgeschlagen.");
             await WriteErrorAsync(context, HttpStatusCode.ServiceUnavailable, "Externer Dienst ist nicht erreichbar.");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!context.Response.HasStarted)
         {
             logger.LogError(ex, "Unbehandelter Fehler.");
             await WriteErrorAsync(context, HttpStatusCode.InternalServerError, "Ein unerwarteter Fehler ist aufgetreten.");
