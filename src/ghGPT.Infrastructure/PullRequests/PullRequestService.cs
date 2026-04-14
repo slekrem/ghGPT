@@ -62,6 +62,17 @@ public class PullRequestService(IPullRequestClient pullRequestClient) : IPullReq
         return MapDetail(pr);
     }
 
+    public Task CreateReviewAsync(string owner, string repo, int number, string reviewEvent, string? body = null)
+    {
+        var evt = reviewEvent.ToLowerInvariant() switch
+        {
+            "request_changes" => PullRequestReviewEvent.RequestChanges,
+            "comment" => PullRequestReviewEvent.Comment,
+            _ => PullRequestReviewEvent.Approve
+        };
+        return pullRequestClient.CreateReviewAsync(owner, repo, number, evt, body);
+    }
+
     private static CoreDetail MapDetail(GhCli.Net.PullRequests.Models.PullRequestDetail pr)
     {
         var reviews = pr.Reviews

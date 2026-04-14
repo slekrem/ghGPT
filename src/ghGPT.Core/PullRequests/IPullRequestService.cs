@@ -9,4 +9,5 @@ public interface IPullRequestService
     Task EditAsync(string owner, string repo, int number, string? title, string? body);
     Task MergeAsync(string owner, string repo, int number, string method, string? commitTitle, string? commitBody);
     Task<PullRequestDetail> CreateAsync(string owner, string repo, string title, string body, string headBranch, string baseBranch, bool draft);
+    Task CreateReviewAsync(string owner, string repo, int number, string reviewEvent, string? body = null);
 }

@@ -282,6 +282,8 @@ export const repositoryService = {
     api.patch<void>(`/repos/${id}/pull-requests/${number}/reopen`, {}),
   mergePullRequest: (id: string, number: number, method: 'merge' | 'squash' | 'rebase' = 'merge', commitTitle?: string, commitBody?: string) =>
     api.post<void>(`/repos/${id}/pull-requests/${number}/merge`, { method, commitTitle, commitBody }),
+  createPullRequestReview: (id: string, number: number, event: 'approve' | 'request_changes' | 'comment', body?: string) =>
+    api.post<void>(`/repos/${id}/pull-requests/${number}/reviews`, { event, body }),
 
   getDiscussions: (id: string, limit = 30) =>
     api.get<DiscussionItem[]>(`/repos/${id}/discussions?limit=${limit}`),

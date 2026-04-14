@@ -31,6 +31,11 @@ export class PullRequestsView extends AppElement {
   @state() private createHead = '';
   @state() private createBase = '';
   @state() private createDraft = false;
+  @state() private showReviewForm = false;
+  @state() private reviewBody = '';
+  @state() private reviewBusy = false;
+  @state() private reviewError: string | null = null;
+  @state() private reviewSuccess = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -73,6 +78,10 @@ export class PullRequestsView extends AppElement {
     this.showEditForm = false;
     this.showMergeDropdown = false;
     this.showCreateForm = false;
+    this.showReviewForm = false;
+    this.reviewBody = '';
+    this.reviewError = null;
+    this.reviewSuccess = false;
     this.loadingDetail = true;
     try {
       const result = await repositoryService.getPullRequestDetail(requestedRepoId, number);
@@ -185,6 +194,29 @@ export class PullRequestsView extends AppElement {
       this.actionError = e instanceof Error ? e.message : 'Fehler beim Erstellen.';
     } finally {
       this.actionBusy = false;
+    }
+  }
+
+  private async _doReview(event: 'approve' | 'request_changes' | 'comment') {
+    if (!this.selectedNumber) return;
+    if (event !== 'approve' && !this.reviewBody.trim()) {
+      this.reviewError = 'Bitte gib einen Review-Kommentar ein.';
+      return;
+    }
+    this.reviewBusy = true;
+    this.reviewError = null;
+    this.reviewSuccess = false;
+    try {
+      await repositoryService.createPullRequestReview(
+        this.repoId, this.selectedNumber, event, this.reviewBody.trim() || undefined);
+      this.reviewBody = '';
+      this.showReviewForm = false;
+      this.reviewSuccess = true;
+      await this.selectPr(this.selectedNumber);
+    } catch (e: unknown) {
+      this.reviewError = e instanceof Error ? e.message : 'Fehler beim Erstellen des Reviews.';
+    } finally {
+      this.reviewBusy = false;
     }
   }
 
@@ -485,6 +517,67 @@ export class PullRequestsView extends AppElement {
                       </div>
                     `)}
                   </div>
+                </div>
+              ` : ''}
+
+              ${this.selectedPr.state.toLowerCase() === 'open' ? html`
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="text-[0.8rem] font-bold text-cat-subtext uppercase tracking-[0.07em]">Review erstellen</div>
+                    ${!this.showReviewForm ? html`
+                      <button class="px-2.5 py-0.5 text-[0.75rem] border border-cat-muted rounded bg-transparent text-cat-subtext cursor-pointer hover:bg-cat-overlay hover:text-cat-text"
+                        @click=${() => { this.showReviewForm = true; this.reviewError = null; this.reviewSuccess = false; }}>
+                        + Review
+                      </button>
+                    ` : ''}
+                  </div>
+
+                  ${this.reviewSuccess ? html`
+                    <div class="text-cat-green text-[0.8rem] px-3 py-2 bg-[rgba(166,227,161,0.08)] rounded border border-[rgba(166,227,161,0.2)]">
+                      Review erfolgreich abgeschickt.
+                    </div>
+                  ` : ''}
+
+                  ${this.showReviewForm ? html`
+                    <div class="flex flex-col gap-2.5 p-3 bg-cat-base rounded-lg border border-cat-border">
+                      <textarea
+                        class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border min-h-[80px] resize-y leading-[1.5] focus:outline-none focus:border-cat-blue"
+                        .value=${this.reviewBody}
+                        @input=${(e: Event) => this.reviewBody = (e.target as HTMLTextAreaElement).value}
+                        placeholder="Review-Kommentar (optional bei Approve, Pflicht bei anderen)..."></textarea>
+
+                      ${this.reviewError ? html`
+                        <div class="text-cat-red text-[0.8rem] px-3 py-1.5 bg-[rgba(243,139,168,0.08)] rounded">${this.reviewError}</div>
+                      ` : ''}
+
+                      <div class="flex gap-2 flex-wrap">
+                        <button
+                          class="flex-1 px-3 py-1.5 text-[0.78rem] border border-cat-green rounded-md bg-transparent text-cat-green cursor-pointer hover:bg-[rgba(166,227,161,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+                          ?disabled=${this.reviewBusy}
+                          @click=${() => this._doReview('approve')}>
+                          ${this.reviewBusy ? '…' : '✓ Approve'}
+                        </button>
+                        <button
+                          class="flex-1 px-3 py-1.5 text-[0.78rem] border border-cat-red rounded-md bg-transparent text-cat-red cursor-pointer hover:bg-[rgba(243,139,168,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+                          ?disabled=${this.reviewBusy}
+                          @click=${() => this._doReview('request_changes')}>
+                          ${this.reviewBusy ? '…' : '✗ Request Changes'}
+                        </button>
+                        <button
+                          class="flex-1 px-3 py-1.5 text-[0.78rem] border border-cat-blue rounded-md bg-transparent text-cat-blue cursor-pointer hover:bg-[rgba(137,180,250,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+                          ?disabled=${this.reviewBusy}
+                          @click=${() => this._doReview('comment')}>
+                          ${this.reviewBusy ? '…' : '💬 Comment'}
+                        </button>
+                        <button
+                          class="px-3 py-1.5 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-subtext cursor-pointer hover:bg-cat-overlay disabled:opacity-45 disabled:cursor-not-allowed"
+                          ?disabled=${this.reviewBusy}
+                          @click=${() => { this.showReviewForm = false; this.reviewError = null; }}>
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
               ` : ''}
             </div>
