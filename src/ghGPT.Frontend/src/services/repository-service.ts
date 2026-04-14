@@ -284,6 +284,8 @@ export const repositoryService = {
     api.post<void>(`/repos/${id}/pull-requests/${number}/merge`, { method, commitTitle, commitBody }),
   createPullRequestReview: (id: string, number: number, event: 'approve' | 'request_changes' | 'comment', body?: string) =>
     api.post<void>(`/repos/${id}/pull-requests/${number}/reviews`, { event, body }),
+  addPullRequestComment: (id: string, number: number, body: string) =>
+    api.post<void>(`/repos/${id}/pull-requests/${number}/comments`, { body }),
 
   getDiscussions: (id: string, limit = 30) =>
     api.get<DiscussionItem[]>(`/repos/${id}/discussions?limit=${limit}`),

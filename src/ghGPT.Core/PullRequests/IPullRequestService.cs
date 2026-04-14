@@ -10,4 +10,5 @@ public interface IPullRequestService
     Task MergeAsync(string owner, string repo, int number, string method, string? commitTitle, string? commitBody);
     Task<PullRequestDetail> CreateAsync(string owner, string repo, string title, string body, string headBranch, string baseBranch, bool draft);
     Task CreateReviewAsync(string owner, string repo, int number, string reviewEvent, string? body = null);
+    Task AddCommentAsync(string owner, string repo, int number, string body);
 }

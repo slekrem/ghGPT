@@ -62,6 +62,9 @@ public class PullRequestService(IPullRequestClient pullRequestClient) : IPullReq
         return MapDetail(pr);
     }
 
+    public Task AddCommentAsync(string owner, string repo, int number, string body) =>
+        pullRequestClient.AddCommentAsync(owner, repo, number, body);
+
     public Task CreateReviewAsync(string owner, string repo, int number, string reviewEvent, string? body = null)
     {
         var evt = reviewEvent.ToLowerInvariant() switch

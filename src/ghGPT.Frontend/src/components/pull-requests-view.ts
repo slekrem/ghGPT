@@ -37,6 +37,11 @@ export class PullRequestsView extends AppElement {
   @state() private reviewBusy = false;
   @state() private reviewError: string | null = null;
   @state() private reviewSuccess = false;
+  @state() private showCommentForm = false;
+  @state() private commentBody = '';
+  @state() private commentBusy = false;
+  @state() private commentError: string | null = null;
+  @state() private commentSuccess = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -83,6 +88,10 @@ export class PullRequestsView extends AppElement {
     this.reviewBody = '';
     this.reviewError = null;
     this.reviewSuccess = false;
+    this.showCommentForm = false;
+    this.commentBody = '';
+    this.commentError = null;
+    this.commentSuccess = false;
     this.loadingDetail = true;
     try {
       const result = await repositoryService.getPullRequestDetail(requestedRepoId, number);
@@ -221,6 +230,23 @@ export class PullRequestsView extends AppElement {
     }
   }
 
+  private async _doAddComment() {
+    if (!this.commentBody.trim() || !this.selectedNumber) return;
+    this.commentBusy = true;
+    this.commentError = null;
+    this.commentSuccess = false;
+    try {
+      await repositoryService.addPullRequestComment(this.repoId, this.selectedNumber, this.commentBody.trim());
+      this.commentBody = '';
+      this.commentSuccess = true;
+      setTimeout(() => { this.showCommentForm = false; this.commentSuccess = false; }, 2000);
+    } catch (e: unknown) {
+      this.commentError = e instanceof Error ? e.message : 'Fehler beim Kommentieren.';
+    } finally {
+      this.commentBusy = false;
+    }
+  }
+
   private renderStateBadge(state: string, isDraft: boolean) {
     if (isDraft) return html`<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-semibold bg-[rgba(166,173,200,0.15)] text-cat-subtext border border-[rgba(166,173,200,0.3)]">Draft</span>`;
     const s = state.toLowerCase();
@@ -300,6 +326,10 @@ export class PullRequestsView extends AppElement {
             ?disabled=${busy} @click=${this._doReopen}>Wiedereröffnen</button>
         ` : ''}
         ${isMerged ? '' : ''}
+        <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay"
+          @click=${() => { this.showCommentForm = !this.showCommentForm; this.commentError = null; this.commentSuccess = false; }}>
+          💬 Kommentar
+        </button>
         <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-blue cursor-pointer whitespace-nowrap shrink-0 hover:bg-[rgba(137,180,250,0.1)] hover:border-cat-blue"
           @click=${() => window.open(pr.htmlUrl, '_blank')}>
           Auf GitHub ↗
@@ -470,6 +500,28 @@ export class PullRequestsView extends AppElement {
                   <button class="px-3 py-1 text-[0.78rem] border border-cat-blue rounded-md bg-transparent text-cat-blue cursor-pointer whitespace-nowrap hover:bg-[rgba(137,180,250,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
                     ?disabled=${this.actionBusy} @click=${this._doEdit}>
                     ${this.actionBusy ? 'Speichere...' : 'Speichern'}
+                  </button>
+                </div>
+              </div>
+            ` : ''}
+
+            ${this.showCommentForm ? html`
+              <div class="px-4 py-4 flex flex-col gap-3 border-b border-cat-border bg-cat-base">
+                <div class="text-[0.8rem] font-bold text-cat-subtext uppercase tracking-[0.07em]">Kommentar hinzufügen</div>
+                <textarea class="bg-cat-surface border border-cat-muted rounded-md text-cat-text text-[0.875rem] px-3 py-2 font-[inherit] w-full box-border min-h-[80px] resize-y leading-[1.5] focus:outline-none focus:border-cat-blue"
+                  .value=${this.commentBody}
+                  @input=${(e: Event) => this.commentBody = (e.target as HTMLTextAreaElement).value}
+                  placeholder="Kommentar..."></textarea>
+                ${this.commentError ? html`<div class="text-cat-red text-[0.8rem]">${this.commentError}</div>` : ''}
+                ${this.commentSuccess ? html`<div class="text-cat-green text-[0.8rem]">Kommentar erfolgreich gesendet.</div>` : ''}
+                <div class="flex gap-2 justify-end">
+                  <button class="px-3 py-1 text-[0.78rem] border border-cat-border rounded-md bg-transparent text-cat-text cursor-pointer whitespace-nowrap hover:bg-cat-overlay"
+                    @click=${() => { this.showCommentForm = false; this.commentBody = ''; this.commentError = null; }}>
+                    Abbrechen
+                  </button>
+                  <button class="px-3 py-1 text-[0.78rem] border border-cat-blue rounded-md bg-transparent text-cat-blue cursor-pointer whitespace-nowrap hover:bg-[rgba(137,180,250,0.1)] disabled:opacity-45 disabled:cursor-not-allowed"
+                    ?disabled=${this.commentBusy || !this.commentBody.trim()} @click=${this._doAddComment}>
+                    ${this.commentBusy ? 'Sende...' : 'Kommentieren'}
                   </button>
                 </div>
               </div>

@@ -135,6 +135,23 @@ public class PullRequestsController(
         }
     }
 
+    [HttpPost("{number:int}/comments")]
+    public async Task<IActionResult> AddComment(string id, int number, [FromBody] AddCommentRequest request)
+    {
+        if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
+            return error!;
+
+        try
+        {
+            await pullRequestService.AddCommentAsync(ownerRepo.owner, ownerRepo.repo, number, request.Body);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("{number:int}/merge")]
     public async Task<IActionResult> MergePullRequest(string id, int number, [FromBody] MergePullRequestRequest request)
     {
