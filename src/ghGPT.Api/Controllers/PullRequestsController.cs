@@ -118,6 +118,23 @@ public class PullRequestsController(
         }
     }
 
+    [HttpPost("{number:int}/reviews")]
+    public async Task<IActionResult> CreateReview(string id, int number, [FromBody] CreateReviewRequest request)
+    {
+        if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
+            return error!;
+
+        try
+        {
+            await pullRequestService.CreateReviewAsync(ownerRepo.owner, ownerRepo.repo, number, request.Event, request.Body);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("{number:int}/merge")]
     public async Task<IActionResult> MergePullRequest(string id, int number, [FromBody] MergePullRequestRequest request)
     {
@@ -181,3 +198,7 @@ public record MergePullRequestRequest(
     string Method = "merge",
     string? CommitTitle = null,
     string? CommitBody = null);
+
+public record CreateReviewRequest(
+    string Event,
+    string? Body = null);

@@ -195,7 +195,7 @@ export class AppShell extends AppElement {
       case 'stashes':
         return html`<stashes-view .repoId=${s.activeRepoId ?? ''} .refreshKey=${this.stashesRefreshKey} @stash-popped=${() => this.changesRefreshKey++}></stashes-view>`;
       case 'pull-requests':
-        return html`<pull-requests-view .repoId=${s.activeRepoId ?? ''}></pull-requests-view>`;
+        return html`<pull-requests-view .repoId=${s.activeRepoId ?? ''} .accountLogin=${s.account?.login ?? ''}></pull-requests-view>`;
       case 'issues':
         return html`<issues-view .repoId=${s.activeRepoId ?? ''}></issues-view>`;
       case 'releases':
