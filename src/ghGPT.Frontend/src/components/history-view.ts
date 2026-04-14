@@ -22,10 +22,10 @@ export class HistoryView extends AppElement {
   @state() private entries: CommitListItem[] = [];
   @state() private branchName = '';
   @state() private hasMore = false;
-  @state() private loadingList = false;
+  @state() private loading = false;
   @state() private loadingDetail = false;
-  @state() private listError = '';
-  @state() private detailError = '';
+  @state() private listError: string | null = null;
+  @state() private detailError: string | null = null;
   @state() private selectedCommitSha = '';
   @state() private selectedCommit: CommitDetail | null = null;
   @state() private selectedFileIndex = 0;
@@ -50,8 +50,8 @@ export class HistoryView extends AppElement {
     this.entries = [];
     this.branchName = this.branch;
     this.hasMore = false;
-    this.listError = '';
-    this.detailError = '';
+    this.listError = null;
+    this.detailError = null;
     this.selectedCommit = null;
     this.selectedCommitSha = '';
     this.selectedFileIndex = 0;
@@ -114,9 +114,9 @@ export class HistoryView extends AppElement {
   }
 
   private async loadMoreCommits(reset = false) {
-    if (!this.repoId || this.loadingList || (!reset && !this.hasMore && this.entries.length > 0)) return;
+    if (!this.repoId || this.loading || (!reset && !this.hasMore && this.entries.length > 0)) return;
 
-    this.loadingList = true;
+    this.loading = true;
     try {
       const result = await repositoryService.getCommits(
         this.repoId,
@@ -128,7 +128,7 @@ export class HistoryView extends AppElement {
       this.branchName = result.branch;
       this.hasMore = result.hasMore;
       this.entries = reset ? result.commits : [...this.entries, ...result.commits];
-      this.listError = '';
+      this.listError = null;
 
       const selectedStillExists = this.entries.some(entry => entry.sha === this.selectedCommitSha);
       if (this.entries.length > 0 && (!this.selectedCommitSha || !selectedStillExists)) {
@@ -137,7 +137,7 @@ export class HistoryView extends AppElement {
     } catch (e: unknown) {
       this.listError = e instanceof Error ? e.message : 'Fehler beim Laden der Commits';
     } finally {
-      this.loadingList = false;
+      this.loading = false;
     }
   }
 
@@ -325,7 +325,7 @@ export class HistoryView extends AppElement {
             `}
 
         <div data-testid="footer-hint" class="px-3.5 py-2 border-t border-cat-border text-[0.72rem] text-[#8f96b3] shrink-0">
-          ${this.loadingList ? 'Lade weitere Commits…' : this.hasMore ? 'Weitere Commits werden beim Scrollen geladen.' : `${this.entries.length} Commits geladen`}
+          ${this.loading ? 'Lade weitere Commits…' : this.hasMore ? 'Weitere Commits werden beim Scrollen geladen.' : `${this.entries.length} Commits geladen`}
         </div>
       </section>
 

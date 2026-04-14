@@ -10,7 +10,7 @@ export class StashesView extends AppElement {
 
   @state() private stashes: StashEntry[] = [];
   @state() private loading = false;
-  @state() private error = '';
+  @state() private error: string | null = null;
   @state() private selectedStash: StashEntry | null = null;
   @state() private stashFiles: CommitFileChange[] = [];
   @state() private loadingDiff = false;
@@ -22,7 +22,7 @@ export class StashesView extends AppElement {
 
   private async load() {
     this.loading = true;
-    this.error = '';
+    this.error = null;
     try {
       this.stashes = await repositoryService.getStashes(this.repoId);
       if (this.selectedStash !== null) {
@@ -56,7 +56,7 @@ export class StashesView extends AppElement {
   }
 
   private async pop(index: number) {
-    this.error = '';
+    this.error = null;
     try {
       await repositoryService.popStash(this.repoId, index);
       if (this.selectedStash?.index === index) {
@@ -72,7 +72,7 @@ export class StashesView extends AppElement {
 
   private async drop(index: number) {
     if (!confirm(`Stash #${index} wirklich verwerfen?`)) return;
-    this.error = '';
+    this.error = null;
     try {
       await repositoryService.dropStash(this.repoId, index);
       if (this.selectedStash?.index === index) {
