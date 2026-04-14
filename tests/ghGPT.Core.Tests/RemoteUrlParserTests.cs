@@ -20,12 +20,41 @@ public class RemoteUrlParserTests
     }
 
     [Theory]
-    [InlineData("https://gitlab.com/owner/repo")]
+    [InlineData("https://github.com/gitlab.com/owner/repo")]
     [InlineData("git@bitbucket.org:owner/repo.git")]
     [InlineData("not-a-url")]
     [InlineData("")]
     public void Parse_ThrowsForNonGitHubUrls(string remoteUrl)
     {
         Assert.Throws<InvalidOperationException>(() => RemoteUrlParser.Parse(remoteUrl));
+    }
+
+    [Theory]
+    [InlineData("https://github.com/my-org/my_repo_underscore", "my-org", "my_repo_underscore")]
+    [InlineData("git@github.com:org-with-dash/repo-with-dash.git", "org-with-dash", "repo-with-dash")]
+    [InlineData("https://github.com/UPPERCASE/Repo", "UPPERCASE", "Repo")]
+    public void Parse_HandlesSpecialCharactersInNamesCorrectly(string remoteUrl, string expectedOwner, string expectedRepo)
+    {
+        var (owner, repo) = RemoteUrlParser.Parse(remoteUrl);
+
+        Assert.Equal(expectedOwner, owner);
+        Assert.Equal(expectedRepo, repo);
+    }
+
+    [Fact]
+    public void Parse_ThrowsInvalidOperationException_WithGermanMessage()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => RemoteUrlParser.Parse("not-a-github-url"));
+
+        Assert.Contains("GitHub", ex.Message);
+    }
+
+    [Fact]
+    public void Parse_StripsDotGitSuffix()
+    {
+        var withGit = RemoteUrlParser.Parse("https://github.com/owner/repo.git");
+        var withoutGit = RemoteUrlParser.Parse("https://github.com/owner/repo");
+
+        Assert.Equal(withGit.Repo, withoutGit.Repo);
     }
 }
