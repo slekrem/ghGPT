@@ -18,15 +18,8 @@ public class IssuesController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var issues = await issueService.GetIssuesAsync(ownerRepo.owner, ownerRepo.repo, state);
-            return Ok(issues);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var issues = await issueService.GetIssuesAsync(ownerRepo.owner, ownerRepo.repo, state);
+        return Ok(issues);
     }
 
     [HttpGet("{number:int}")]
@@ -35,15 +28,8 @@ public class IssuesController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var detail = await issueService.GetIssueDetailAsync(ownerRepo.owner, ownerRepo.repo, number);
-            return Ok(detail);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var detail = await issueService.GetIssueDetailAsync(ownerRepo.owner, ownerRepo.repo, number);
+        return Ok(detail);
     }
 
     [HttpPost]
@@ -52,17 +38,10 @@ public class IssuesController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var issue = await issueService.CreateAsync(
-                ownerRepo.owner, ownerRepo.repo,
-                request.Title, request.Body, request.Labels);
-            return Ok(issue);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var issue = await issueService.CreateAsync(
+            ownerRepo.owner, ownerRepo.repo,
+            request.Title, request.Body, request.Labels);
+        return Ok(issue);
     }
 
     [HttpPost("{number:int}/comments")]
@@ -71,15 +50,8 @@ public class IssuesController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            await issueService.AddCommentAsync(ownerRepo.owner, ownerRepo.repo, number, request.Body);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await issueService.AddCommentAsync(ownerRepo.owner, ownerRepo.repo, number, request.Body);
+        return NoContent();
     }
 }
 

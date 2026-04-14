@@ -18,15 +18,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var prs = await pullRequestService.GetPullRequestsAsync(ownerRepo.owner, ownerRepo.repo, state);
-            return Ok(prs);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var prs = await pullRequestService.GetPullRequestsAsync(ownerRepo.owner, ownerRepo.repo, state);
+        return Ok(prs);
     }
 
     [HttpGet("{number:int}")]
@@ -35,15 +28,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var detail = await pullRequestService.GetPullRequestDetailAsync(ownerRepo.owner, ownerRepo.repo, number);
-            return Ok(detail);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var detail = await pullRequestService.GetPullRequestDetailAsync(ownerRepo.owner, ownerRepo.repo, number);
+        return Ok(detail);
     }
 
     [HttpPost]
@@ -52,19 +38,12 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var detail = await pullRequestService.CreateAsync(
-                ownerRepo.owner, ownerRepo.repo,
-                request.Title, request.Body,
-                request.HeadBranch, request.BaseBranch,
-                request.Draft);
-            return Ok(detail);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var detail = await pullRequestService.CreateAsync(
+            ownerRepo.owner, ownerRepo.repo,
+            request.Title, request.Body,
+            request.HeadBranch, request.BaseBranch,
+            request.Draft);
+        return Ok(detail);
     }
 
     [HttpPatch("{number:int}")]
@@ -73,15 +52,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            await pullRequestService.EditAsync(ownerRepo.owner, ownerRepo.repo, number, request.Title, request.Body);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await pullRequestService.EditAsync(ownerRepo.owner, ownerRepo.repo, number, request.Title, request.Body);
+        return NoContent();
     }
 
     [HttpPatch("{number:int}/close")]
@@ -90,15 +62,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            await pullRequestService.CloseAsync(ownerRepo.owner, ownerRepo.repo, number);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await pullRequestService.CloseAsync(ownerRepo.owner, ownerRepo.repo, number);
+        return NoContent();
     }
 
     [HttpPatch("{number:int}/reopen")]
@@ -107,15 +72,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            await pullRequestService.ReopenAsync(ownerRepo.owner, ownerRepo.repo, number);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await pullRequestService.ReopenAsync(ownerRepo.owner, ownerRepo.repo, number);
+        return NoContent();
     }
 
     [HttpPost("{number:int}/reviews")]
@@ -124,15 +82,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            await pullRequestService.CreateReviewAsync(ownerRepo.owner, ownerRepo.repo, number, request.Event, request.Body);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await pullRequestService.CreateReviewAsync(ownerRepo.owner, ownerRepo.repo, number, request.Event, request.Body);
+        return NoContent();
     }
 
     [HttpPost("{number:int}/comments")]
@@ -141,15 +92,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            await pullRequestService.AddCommentAsync(ownerRepo.owner, ownerRepo.repo, number, request.Body);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await pullRequestService.AddCommentAsync(ownerRepo.owner, ownerRepo.repo, number, request.Body);
+        return NoContent();
     }
 
     [HttpPost("{number:int}/merge")]
@@ -158,15 +102,8 @@ public class PullRequestsController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            await pullRequestService.MergeAsync(ownerRepo.owner, ownerRepo.repo, number, request.Method, request.CommitTitle, request.CommitBody);
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        await pullRequestService.MergeAsync(ownerRepo.owner, ownerRepo.repo, number, request.Method, request.CommitTitle, request.CommitBody);
+        return NoContent();
     }
 }
 

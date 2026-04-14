@@ -16,15 +16,8 @@ public class ReleasesController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var releases = await releaseService.GetReleasesAsync(ownerRepo.owner, ownerRepo.repo, limit);
-            return Ok(releases);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var releases = await releaseService.GetReleasesAsync(ownerRepo.owner, ownerRepo.repo, limit);
+        return Ok(releases);
     }
 
     [HttpGet("latest")]
@@ -33,15 +26,8 @@ public class ReleasesController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var release = await releaseService.GetLatestAsync(ownerRepo.owner, ownerRepo.repo);
-            return Ok(release);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var release = await releaseService.GetLatestAsync(ownerRepo.owner, ownerRepo.repo);
+        return Ok(release);
     }
 
     [HttpGet("{tag}")]
@@ -50,14 +36,7 @@ public class ReleasesController(
         if (!TryResolveOwnerRepo(id, out var ownerRepo, out var error))
             return error!;
 
-        try
-        {
-            var release = await releaseService.GetByTagAsync(ownerRepo.owner, ownerRepo.repo, tag);
-            return Ok(release);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        var release = await releaseService.GetByTagAsync(ownerRepo.owner, ownerRepo.repo, tag);
+        return Ok(release);
     }
 }
