@@ -10,6 +10,7 @@ import {
 @customElement('pull-requests-view')
 export class PullRequestsView extends AppElement {
   @property() repoId = '';
+  @property() accountLogin = '';
 
   @state() private prs: PullRequestListItem[] = [];
   @state() private selectedPr: PullRequestDetail | null = null;
@@ -520,7 +521,7 @@ export class PullRequestsView extends AppElement {
                 </div>
               ` : ''}
 
-              ${this.selectedPr.state.toLowerCase() === 'open' ? html`
+              ${this.selectedPr.state.toLowerCase() === 'open' && (!this.accountLogin || this.selectedPr.authorLogin !== this.accountLogin) ? html`
                 <div>
                   <div class="flex items-center justify-between mb-2">
                     <div class="text-[0.8rem] font-bold text-cat-subtext uppercase tracking-[0.07em]">Review erstellen</div>
