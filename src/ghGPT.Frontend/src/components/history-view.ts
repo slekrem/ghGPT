@@ -145,7 +145,7 @@ export class HistoryView extends AppElement {
     this.selectedCommitSha = sha;
     this.selectedCommit = null;
     this.selectedFileIndex = 0;
-    this.detailError = '';
+    this.detailError = null;
     this.loadingDetail = true;
 
     try {
