@@ -1,5 +1,6 @@
 using Git.Process.Abstractions;
 using Git.Process.Repository;
+using Git.Process.Staging;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Git.Process;
@@ -7,12 +8,14 @@ namespace Git.Process;
 public class GitClient
 {
     public IGitRepositoryClient Repository { get; }
+    public IGitStagingClient Staging { get; }
 
     public GitClient() : this(new GitRunner()) { }
 
     internal GitClient(IGitRunner runner)
     {
         Repository = new GitRepositoryClient(runner);
+        Staging = new GitStagingClient(runner);
     }
 }
 
@@ -22,6 +25,7 @@ public static class GitClientServiceCollectionExtensions
     {
         services.AddSingleton<IGitRunner, GitRunner>();
         services.AddSingleton<IGitRepositoryClient, GitRepositoryClient>();
+        services.AddSingleton<IGitStagingClient, GitStagingClient>();
         services.AddSingleton<GitClient>();
         return services;
     }
