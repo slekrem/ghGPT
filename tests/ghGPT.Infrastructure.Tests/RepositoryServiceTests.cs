@@ -1,5 +1,7 @@
 using ghGPT.Core.Repositories;
 using ghGPT.Infrastructure.Repositories;
+using Git.Process;
+using Git.Process.Abstractions;
 using NSubstitute;
 
 namespace ghGPT.Infrastructure.Tests;
@@ -8,6 +10,8 @@ public class RepositoryServiceTests : IDisposable
 {
     private readonly string _tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
     private readonly IRepositoryStore _store = Substitute.For<IRepositoryStore>();
+    private readonly IGitRunner _runner = new GitRunner();
+    private readonly GitClient _git = new();
 
     public RepositoryServiceTests()
     {
@@ -86,23 +90,50 @@ public class RepositoryServiceTests : IDisposable
         p.WaitForExit();
     }
 
+    private static string RunOutput(string cmd, string cwd)
+    {
+        var parts = cmd.Split(' ', 2);
+        var psi = new System.Diagnostics.ProcessStartInfo(parts[0], parts.Length > 1 ? parts[1] : "")
+        {
+            WorkingDirectory = cwd,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        var output = p.StandardOutput.ReadToEnd();
+        p.WaitForExit();
+        return output.Trim();
+    }
+
+    private static string HeadSha(string path) => RunOutput("git rev-parse HEAD", path);
+    private static string HeadMessage(string path) => RunOutput("git log -1 --format=%B", path);
+    private static string HeadMessageShort(string path) => RunOutput("git log -1 --format=%s", path);
+    private static string HeadMessageShort(string path, string rev) => RunOutput($"git log -1 --format=%s {rev}", path);
+    private static string CurrentBranch(string path) => RunOutput("git rev-parse --abbrev-ref HEAD", path);
+
     private RepositoryRegistry RegistryWithRepo(string path)
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "repo", LocalPath = path, CurrentBranch = "master" };
         _store.Load().Returns([info]);
-        return new RepositoryRegistry(_store);
+        return new RepositoryRegistry(_store, _runner);
     }
 
     private RepositoryService ServiceWithRepo(string path)
     {
-        return new RepositoryService(RegistryWithRepo(path));
+        return new RepositoryService(RegistryWithRepo(path), _git.Repository, _git.Branch);
     }
 
     private (RepositoryService Service, StagingService Staging) ServiceWithStagingAndRepo(string path)
     {
         var registry = RegistryWithRepo(path);
-        return (new RepositoryService(registry), new StagingService(registry));
+        return (
+            new RepositoryService(registry, _git.Repository, _git.Branch),
+            new StagingService(registry, _git.Staging));
     }
+
+    private RepositoryRegistry EmptyRegistry() => new(_store, _runner);
+    private RepositoryService EmptyService() => new(EmptyRegistry(), _git.Repository, _git.Branch);
 
     // --- Create / Import ---
 
@@ -110,7 +141,7 @@ public class RepositoryServiceTests : IDisposable
     public async Task CreateAsync_InitializesGitRepo()
     {
         var path = Path.Combine(_tempPath, "new-repo");
-        var service = new RepositoryService(new RepositoryRegistry(_store));
+        var service = EmptyService();
 
         var result = await service.CreateAsync(path, "new-repo");
 
@@ -126,7 +157,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var path = Path.Combine(_tempPath, "not-a-repo");
         Directory.CreateDirectory(path);
-        var service = new RepositoryService(new RepositoryRegistry(_store));
+        var service = EmptyService();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ImportAsync(path));
     }
@@ -137,10 +168,10 @@ public class RepositoryServiceTests : IDisposable
         var path = Path.Combine(_tempPath, "existing-repo");
         var existing = new RepositoryInfo { Id = "id-1", Name = "existing-repo", LocalPath = path, CurrentBranch = "main" };
         _store.Load().Returns([existing]);
-        var service = new RepositoryService(new RepositoryRegistry(_store));
+        var service = new RepositoryService(new RepositoryRegistry(_store, _runner), _git.Repository, _git.Branch);
 
         Directory.CreateDirectory(path);
-        LibGit2Sharp.Repository.Init(path);
+        Run("git init", path);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.ImportAsync(path));
     }
@@ -153,7 +184,7 @@ public class RepositoryServiceTests : IDisposable
             new() { Id = "id-1", Name = "repo-a", LocalPath = "/a", CurrentBranch = "main" },
         };
         _store.Load().Returns(repos);
-        var service = new RepositoryService(new RepositoryRegistry(_store));
+        var service = EmptyService();
 
         var result = service.GetAll();
 
@@ -166,7 +197,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void GetActive_ReturnsNullInitially()
     {
-        var service = new RepositoryService(new RepositoryRegistry(_store));
+        var service = EmptyService();
         Assert.Null(service.GetActive());
     }
 
@@ -184,7 +215,7 @@ public class RepositoryServiceTests : IDisposable
     [Fact]
     public void SetActive_ThrowsForUnknownId()
     {
-        var service = new RepositoryService(new RepositoryRegistry(_store));
+        var service = EmptyService();
         Assert.Throws<InvalidOperationException>(() => service.SetActive("unknown"));
     }
 
@@ -195,7 +226,7 @@ public class RepositoryServiceTests : IDisposable
     {
         var info = new RepositoryInfo { Id = "id-1", Name = "r", LocalPath = "/x", CurrentBranch = "main" };
         _store.Load().Returns([info]);
-        var service = new RepositoryService(new RepositoryRegistry(_store));
+        var service = EmptyService();
 
         service.Remove("id-1");
 
@@ -229,6 +260,24 @@ public class RepositoryServiceTests : IDisposable
 
         Assert.Contains(status.Unstaged, f => f.FilePath == "README.md" && f.Status == "Modified");
         Assert.Empty(status.Staged);
+    }
+
+    [Fact]
+    public void GetStatus_RenamedFile_UsesNewPathAsFilePath()
+    {
+        var path = CreateGitRepo("status-rename-repo");
+        var service = ServiceWithRepo(path);
+
+        // Rename README.md -> DOCS.md and stage it via git mv
+        Run("git mv README.md DOCS.md", path);
+
+        var status = service.GetStatus("id-1");
+
+        // The staged entry must reference the new path (DOCS.md), not the old (README.md)
+        // OldFilePath must carry the original name for the UI to render "README.md -> DOCS.md"
+        Assert.Contains(status.Staged,
+            f => f.FilePath == "DOCS.md" && f.Status == "Renamed" && f.OldFilePath == "README.md");
+        Assert.DoesNotContain(status.Staged, f => f.FilePath == "README.md");
     }
 
     [Fact]
@@ -292,8 +341,7 @@ public class RepositoryServiceTests : IDisposable
         staging.StageFile("id-1", "README.md");
         service.Commit("id-1", "feat: detail");
 
-        using var repo = new LibGit2Sharp.Repository(path);
-        var detail = service.GetCommitDetail("id-1", repo.Head.Tip.Sha);
+        var detail = service.GetCommitDetail("id-1", HeadSha(path));
 
         Assert.Equal("feat: detail", detail.Message);
         Assert.Contains(detail.Files, file => file.Path == "README.md" && file.Patch.Contains("+# Detailed Change"));
@@ -548,8 +596,7 @@ public class RepositoryServiceTests : IDisposable
 
         service.Commit("id-1", "test: first commit");
 
-        using var repo = new LibGit2Sharp.Repository(path);
-        Assert.Equal("test: first commit", repo.Head.Tip.Message.Trim());
+        Assert.Equal("test: first commit", HeadMessage(path).Trim());
         Assert.Empty(service.GetStatus("id-1").Staged);
     }
 
@@ -563,9 +610,9 @@ public class RepositoryServiceTests : IDisposable
 
         service.Commit("id-1", "feat: title", "some description");
 
-        using var repo = new LibGit2Sharp.Repository(path);
-        Assert.Contains("feat: title", repo.Head.Tip.Message);
-        Assert.Contains("some description", repo.Head.Tip.Message);
+        var message = HeadMessage(path);
+        Assert.Contains("feat: title", message);
+        Assert.Contains("some description", message);
     }
 
     [Fact]
@@ -590,8 +637,7 @@ public class RepositoryServiceTests : IDisposable
         // Should not throw even though the deleted file is removed from the index
         service.Commit("id-1", "chore: remove readme");
 
-        using var repo = new LibGit2Sharp.Repository(path);
-        Assert.Equal("chore: remove readme", repo.Head.Tip.Message.Trim());
+        Assert.Equal("chore: remove readme", HeadMessage(path).Trim());
     }
 
     [Fact]
@@ -609,10 +655,9 @@ public class RepositoryServiceTests : IDisposable
         var progress = new Progress<string>(line => progressLines.Add(line));
         await service.FetchAsync("id-1", progress);
 
-        using var repo = new LibGit2Sharp.Repository(localPath);
-        var remoteBranch = repo.Branches[$"origin/{repo.Head.FriendlyName}"];
-        Assert.NotNull(remoteBranch);
-        Assert.Equal("peer-change", remoteBranch.Tip.MessageShort);
+        var currentBranch = CurrentBranch(localPath);
+        var remoteTip = HeadMessageShort(localPath, $"origin/{currentBranch}");
+        Assert.Equal("peer-change", remoteTip);
         Assert.NotEmpty(progressLines);
     }
 
@@ -629,8 +674,7 @@ public class RepositoryServiceTests : IDisposable
 
         await service.PullAsync("id-1");
 
-        using var repo = new LibGit2Sharp.Repository(localPath);
-        Assert.Equal("peer-change", repo.Head.Tip.MessageShort);
+        Assert.Equal("peer-change", HeadMessageShort(localPath));
         Assert.Contains("Pulled change", File.ReadAllText(Path.Combine(localPath, "README.md")));
     }
 
@@ -646,10 +690,10 @@ public class RepositoryServiceTests : IDisposable
 
         await service.PushAsync("id-1");
 
-        using var remoteRepo = new LibGit2Sharp.Repository(remotePath);
-        var remoteBranch = remoteRepo.Branches["master"] ?? remoteRepo.Branches["main"];
-        Assert.NotNull(remoteBranch);
-        Assert.Equal("local-push", remoteBranch.Tip.MessageShort);
+        var masterTip = RunOutput("git log -1 --format=%s master", remotePath);
+        var mainTip = RunOutput("git log -1 --format=%s main", remotePath);
+        var tip = !string.IsNullOrEmpty(masterTip) ? masterTip : mainTip;
+        Assert.Equal("local-push", tip);
     }
 
     // --- RefreshCurrentBranch ---

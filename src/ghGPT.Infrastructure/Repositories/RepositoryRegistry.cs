@@ -1,9 +1,9 @@
 using ghGPT.Core.Repositories;
-using LibGit2Sharp;
+using Git.Process.Abstractions;
 
 namespace ghGPT.Infrastructure.Repositories;
 
-public class RepositoryRegistry(IRepositoryStore store)
+public class RepositoryRegistry(IRepositoryStore store, IGitRunner runner)
 {
     private readonly List<RepositoryInfo> _repos = [.. store.Load()];
     private string? _activeRepoId;
@@ -40,20 +40,46 @@ public class RepositoryRegistry(IRepositoryStore store)
 
     public void Save() => store.Save(_repos);
 
-    public static RepositoryInfo BuildInfo(string localPath)
+    public async Task<RepositoryInfo> BuildInfoAsync(string localPath)
     {
-        using var repo = new LibGit2Sharp.Repository(localPath);
         var name = Path.GetFileName(localPath.TrimEnd(Path.DirectorySeparatorChar));
-        var remoteUrl = repo.Network.Remotes["origin"]?.Url;
-        var branch = repo.Head.FriendlyName;
-        var id = Guid.NewGuid().ToString();
+        var remoteUrl = await TryGetRemoteUrlAsync(localPath);
+        var branch = await GetCurrentBranchAsync(localPath);
+
         return new RepositoryInfo
         {
-            Id = id,
+            Id = Guid.NewGuid().ToString(),
             Name = name,
             LocalPath = localPath,
             RemoteUrl = remoteUrl,
             CurrentBranch = branch
         };
+    }
+
+    private async Task<string?> TryGetRemoteUrlAsync(string localPath)
+    {
+        try
+        {
+            var output = await runner.RunAsync(localPath, "config", "--get", "remote.origin.url");
+            var trimmed = output.Trim();
+            return string.IsNullOrEmpty(trimmed) ? null : trimmed;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<string> GetCurrentBranchAsync(string localPath)
+    {
+        try
+        {
+            var output = await runner.RunAsync(localPath, "rev-parse", "--abbrev-ref", "HEAD");
+            return output.Trim();
+        }
+        catch (InvalidOperationException)
+        {
+            return string.Empty;
+        }
     }
 }

@@ -1,71 +1,64 @@
 using ghGPT.Core.Repositories;
-using LibGit2Sharp;
-using System.Text;
+using Git.Process.Abstractions;
 
 namespace ghGPT.Infrastructure.Repositories;
 
-public class StagingService(RepositoryRegistry registry) : IStagingService
+public class StagingService(RepositoryRegistry registry, IGitStagingClient git) : IStagingService
 {
     public void StageFile(string id, string filePath)
     {
         var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Stage(repo, filePath);
+        git.StageFileAsync(info.LocalPath, filePath).GetAwaiter().GetResult();
     }
 
     public void UnstageFile(string id, string filePath)
     {
         var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Unstage(repo, filePath);
+        git.UnstageFileAsync(info.LocalPath, filePath).GetAwaiter().GetResult();
     }
 
     public void StageAll(string id)
     {
         var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Stage(repo, "*");
+        git.StageAllAsync(info.LocalPath).GetAwaiter().GetResult();
     }
 
     public void UnstageAll(string id)
     {
         var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-        Commands.Unstage(repo, "*");
+        git.UnstageAllAsync(info.LocalPath).GetAwaiter().GetResult();
     }
 
     public void StageLines(string id, string filePath, string patch)
     {
         ValidatePatch(patch);
         var info = registry.GetById(id);
-        ApplyPatch(info.LocalPath, patch, "--cached");
+        git.ApplyPatchAsync(info.LocalPath, patch, cached: true, reverse: false).GetAwaiter().GetResult();
     }
 
     public void UnstageLines(string id, string filePath, string patch)
     {
         ValidatePatch(patch);
         var info = registry.GetById(id);
-        ApplyPatch(info.LocalPath, patch, "--cached --reverse");
+        git.ApplyPatchAsync(info.LocalPath, patch, cached: true, reverse: true).GetAwaiter().GetResult();
     }
 
     public void DiscardFile(string id, string filePath)
     {
         var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        var existsInHead = repo.Head.Tip?.Tree?[filePath] is not null;
+        var existsInHead = git.ExistsInHeadAsync(info.LocalPath, filePath).GetAwaiter().GetResult();
 
         if (!existsInHead)
         {
-            try { Commands.Unstage(repo, filePath); } catch { /* ignore if not staged */ }
+            try { git.UnstageFileAsync(info.LocalPath, filePath).GetAwaiter().GetResult(); }
+            catch { /* ignore if not staged */ }
+
             var fullPath = Path.Combine(info.LocalPath, filePath);
             if (File.Exists(fullPath)) File.Delete(fullPath);
         }
         else
         {
-            GitProcessHelper.RunGitSync(info.LocalPath,
-                $"restore --source=HEAD --staged --worktree -- \"{filePath}\"",
-                "Änderungen konnten nicht verworfen werden");
+            git.RestoreFromHeadAsync(info.LocalPath, filePath).GetAwaiter().GetResult();
         }
     }
 
@@ -73,23 +66,7 @@ public class StagingService(RepositoryRegistry registry) : IStagingService
     {
         ValidatePatch(patch);
         var info = registry.GetById(id);
-        ApplyPatch(info.LocalPath, patch, "--reverse");
-    }
-
-    private static void ApplyPatch(string workingDirectory, string patch, string flags)
-    {
-        var tempFile = Path.GetTempFileName();
-        try
-        {
-            File.WriteAllText(tempFile, patch, Encoding.UTF8);
-            GitProcessHelper.RunGitSync(workingDirectory,
-                $"apply {flags} \"{tempFile}\"",
-                "Patch konnte nicht angewendet werden");
-        }
-        finally
-        {
-            File.Delete(tempFile);
-        }
+        git.ApplyPatchAsync(info.LocalPath, patch, cached: false, reverse: true).GetAwaiter().GetResult();
     }
 
     private static void ValidatePatch(string patch)

@@ -12,6 +12,7 @@ const ACTIVE_REPO_KEY = 'ghgpt:activeRepoId';
 
 export interface FileStatusEntry {
   filePath: string;
+  oldFilePath?: string | null;
   status: string;
   isStaged: boolean;
 }

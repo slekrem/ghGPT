@@ -3,10 +3,10 @@
   <ItemGroup>
     <ProjectReference Include="..\ghGPT.Core\ghGPT.Core.csproj" />
     <ProjectReference Include="..\GhCli.Net\GhCli.Net.csproj" />
+    <ProjectReference Include="..\Git.Process\Git.Process.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.4" />

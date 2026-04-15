@@ -1,5 +1,6 @@
 using ghGPT.Core.Repositories;
 using ghGPT.Infrastructure.Repositories;
+using Git.Process;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -9,6 +10,7 @@ internal static class RepositoryServiceExtensions
 {
     internal static IServiceCollection AddRepositoryServices(this IServiceCollection services)
     {
+        services.AddGitProcess();
         services.AddSingleton<IRepositoryStore, RepositoryStore>();
         services.AddSingleton<RepositoryRegistry>();
         services.AddSingleton<IRepositoryService, RepositoryService>();
