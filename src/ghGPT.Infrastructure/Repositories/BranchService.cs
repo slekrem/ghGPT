@@ -1,77 +1,58 @@
 using ghGPT.Core.Repositories;
-using LibGit2Sharp;
+using Git.Process.Abstractions;
+using Git.Process.Branch.Models;
 
 namespace ghGPT.Infrastructure.Repositories;
 
-public class BranchService(RepositoryRegistry registry) : IBranchService
+public class BranchService(RepositoryRegistry registry, IGitBranchClient git) : IBranchService
 {
     public IReadOnlyList<BranchInfo> GetBranches(string id)
     {
         var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
-        return repo.Branches
-            .Select(branch => new BranchInfo
-            {
-                Name = branch.FriendlyName,
-                IsRemote = branch.IsRemote,
-                IsHead = branch.IsCurrentRepositoryHead,
-                AheadBy = branch.TrackingDetails?.AheadBy ?? 0,
-                BehindBy = branch.TrackingDetails?.BehindBy ?? 0,
-                TrackingBranch = branch.TrackedBranch?.FriendlyName
-            })
-            .OrderBy(b => b.IsRemote)
-            .ThenBy(b => b.Name)
-            .ToList();
+        var branches = git.GetBranchesAsync(info.LocalPath).GetAwaiter().GetResult();
+        return branches.Select(Map).ToList();
     }
 
     public void CheckoutBranch(string id, string branchName, CheckoutStrategy strategy = CheckoutStrategy.Normal, string? stashMessage = null)
     {
         var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
 
-        var status = repo.RetrieveStatus();
-        var isDirty = status.Any(e =>
-            e.State != FileStatus.Ignored &&
-            e.State != FileStatus.Unaltered);
+        var isDirty = git.HasUncommittedChangesAsync(info.LocalPath).GetAwaiter().GetResult();
 
         if (isDirty && strategy == CheckoutStrategy.Normal)
             throw new UncommittedChangesException();
 
         if (isDirty && strategy == CheckoutStrategy.Stash)
-        {
-            var sig = repo.Config.BuildSignature(DateTimeOffset.Now);
-            repo.Stashes.Add(sig, stashMessage ?? "Auto-stash vor Branch-Wechsel", StashModifiers.Default);
-        }
+            git.StashAsync(info.LocalPath, stashMessage ?? "Auto-stash vor Branch-Wechsel").GetAwaiter().GetResult();
 
         if (isDirty && strategy == CheckoutStrategy.Discard)
         {
-            repo.Reset(ResetMode.Hard);
-            foreach (var entry in status.Where(e => e.State == FileStatus.NewInWorkdir))
-                File.Delete(Path.Combine(info.LocalPath, entry.FilePath));
+            git.ResetHardAsync(info.LocalPath).GetAwaiter().GetResult();
+            git.CleanUntrackedAsync(info.LocalPath).GetAwaiter().GetResult();
         }
 
-        var branch = repo.Branches[branchName]
-            ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
+        var isLocal = git.BranchExistsAsync(info.LocalPath, branchName).GetAwaiter().GetResult();
 
-        if (branch.IsRemote)
+        if (isLocal)
         {
-            var localName = branch.FriendlyName.Contains('/')
-                ? branch.FriendlyName[(branch.FriendlyName.IndexOf('/') + 1)..]
-                : branch.FriendlyName;
-
-            if (repo.Branches[localName] is not null)
-                throw new InvalidOperationException($"Lokaler Branch '{localName}' existiert bereits.");
-
-            var localBranch = repo.CreateBranch(localName, branch.Tip);
-            repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
-            Commands.Checkout(repo, localBranch);
-            info.CurrentBranch = localBranch.FriendlyName;
+            git.CheckoutAsync(info.LocalPath, branchName).GetAwaiter().GetResult();
+            info.CurrentBranch = branchName;
         }
         else
         {
-            Commands.Checkout(repo, branch);
-            info.CurrentBranch = branch.FriendlyName;
+            var isRemote = git.IsRemoteBranchAsync(info.LocalPath, branchName).GetAwaiter().GetResult();
+            if (!isRemote)
+                throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
+
+            var localName = branchName.Contains('/')
+                ? branchName[(branchName.IndexOf('/') + 1)..]
+                : branchName;
+
+            if (git.BranchExistsAsync(info.LocalPath, localName).GetAwaiter().GetResult())
+                throw new InvalidOperationException($"Lokaler Branch '{localName}' existiert bereits.");
+
+            git.CheckoutNewTrackingBranchAsync(info.LocalPath, localName, branchName).GetAwaiter().GetResult();
+            info.CurrentBranch = localName;
         }
 
         registry.Save();
@@ -79,31 +60,26 @@ public class BranchService(RepositoryRegistry registry) : IBranchService
 
     public BranchInfo CreateBranch(string id, string name, string? startPoint = null)
     {
-        var info = registry.GetById(id);
-        using var repo = new LibGit2Sharp.Repository(info.LocalPath);
-
         if (string.IsNullOrWhiteSpace(name))
             throw new InvalidOperationException("Branch-Name darf nicht leer sein.");
 
-        Commit? startCommit = null;
+        var info = registry.GetById(id);
+
         if (!string.IsNullOrWhiteSpace(startPoint))
         {
-            var startBranch = repo.Branches[startPoint]
-                ?? throw new InvalidOperationException($"Start-Branch '{startPoint}' nicht gefunden.");
-            startCommit = startBranch.Tip;
+            var existsLocal = git.BranchExistsAsync(info.LocalPath, startPoint).GetAwaiter().GetResult();
+            var existsRemote = !existsLocal && git.IsRemoteBranchAsync(info.LocalPath, startPoint).GetAwaiter().GetResult();
+            if (!existsLocal && !existsRemote)
+                throw new InvalidOperationException($"Start-Branch '{startPoint}' nicht gefunden.");
         }
 
-        var newBranch = startCommit is not null
-            ? repo.CreateBranch(name, startCommit)
-            : repo.CreateBranch(name);
-
-        Commands.Checkout(repo, newBranch);
-        info.CurrentBranch = newBranch.FriendlyName;
+        git.CreateBranchAsync(info.LocalPath, name, startPoint).GetAwaiter().GetResult();
+        info.CurrentBranch = name;
         registry.Save();
 
         return new BranchInfo
         {
-            Name = newBranch.FriendlyName,
+            Name = name,
             IsRemote = false,
             IsHead = true,
             AheadBy = 0,
@@ -115,35 +91,39 @@ public class BranchService(RepositoryRegistry registry) : IBranchService
     public async Task DeleteBranch(string id, string branchName)
     {
         var info = registry.GetById(id);
+        var current = await git.GetCurrentBranchAsync(info.LocalPath);
+        if (current == branchName)
+            throw new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden.");
 
-        bool isRemote;
-        string remoteName;
-        string branchOnRemote;
+        var isRemote = await git.IsRemoteBranchAsync(info.LocalPath, branchName);
 
-        using (var repo = new LibGit2Sharp.Repository(info.LocalPath))
+        if (!isRemote)
         {
-            var branch = repo.Branches[branchName]
-                ?? throw new InvalidOperationException($"Branch '{branchName}' nicht gefunden.");
-
-            if (branch.IsCurrentRepositoryHead)
-                throw new InvalidOperationException("Der aktive Branch kann nicht gelöscht werden.");
-
-            isRemote = branch.IsRemote;
-            if (!isRemote)
-            {
-                repo.Branches.Remove(branch);
-                return;
-            }
-
-            remoteName = branch.RemoteName;
-            branchOnRemote = branch.FriendlyName[(remoteName.Length + 1)..];
+            await git.DeleteLocalBranchAsync(info.LocalPath, branchName);
+            return;
         }
 
-        await GitProcessHelper.RunGitOperationAsync(info.LocalPath, $"push {remoteName} --delete {branchOnRemote}", null);
+        var slashIndex = branchName.IndexOf('/');
+        if (slashIndex <= 0)
+            throw new InvalidOperationException($"Remote-Branch '{branchName}' hat keinen Remote-Präfix.");
 
-        using var repoAfter = new LibGit2Sharp.Repository(info.LocalPath);
-        var trackingBranch = repoAfter.Branches[branchName];
-        if (trackingBranch is not null)
-            repoAfter.Branches.Remove(trackingBranch);
+        var remoteName = branchName[..slashIndex];
+        var branchOnRemote = branchName[(slashIndex + 1)..];
+
+        await git.DeleteRemoteBranchAsync(info.LocalPath, remoteName, branchOnRemote, null);
+
+        // Remove local tracking ref if present
+        try { await git.DeleteLocalBranchAsync(info.LocalPath, branchName); }
+        catch (InvalidOperationException) { /* ignore — remote ref may already be gone */ }
     }
+
+    private static BranchInfo Map(GitBranchEntry entry) => new()
+    {
+        Name = entry.Name,
+        IsRemote = entry.IsRemote,
+        IsHead = entry.IsHead,
+        AheadBy = entry.AheadBy,
+        BehindBy = entry.BehindBy,
+        TrackingBranch = entry.TrackingBranch
+    };
 }

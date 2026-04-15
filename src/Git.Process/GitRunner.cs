@@ -7,7 +7,7 @@ using System.Text;
 
 namespace Git.Process;
 
-internal class GitRunner : IGitRunner
+public class GitRunner : IGitRunner
 {
     public async Task<string> RunAsync(string workingDirectory, params string[] args)
     {

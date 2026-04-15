@@ -127,8 +127,19 @@ internal class GitRepositoryClient(IGitRunner runner) : IGitRepositoryClient
         return output.Replace("\r\n", "\n");
     }
 
-    public Task CommitAsync(string repoPath, string message) =>
-        runner.RunWithInputAsync(repoPath, message, "commit", "-F", "-");
+    public async Task CommitAsync(string repoPath, string message)
+    {
+        var tempFile = System.IO.Path.GetTempFileName();
+        try
+        {
+            await File.WriteAllTextAsync(tempFile, message);
+            await runner.RunAsync(repoPath, "commit", "-F", tempFile);
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
 
     public Task FetchAsync(string repoPath, IProgress<string>? progress) =>
         runner.RunWithProgressAsync(repoPath, progress, "fetch", "--all", "--prune", "--progress");
