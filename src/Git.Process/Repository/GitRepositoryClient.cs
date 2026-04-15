@@ -8,6 +8,37 @@ internal class GitRepositoryClient(IGitRunner runner) : IGitRepositoryClient
 {
     private const string LogFormat = "%H%x00%s%x00%an%x00%ae%x00%aI";
 
+    public async Task InitAsync(string repoPath)
+    {
+        Directory.CreateDirectory(repoPath);
+        await runner.RunAsync(repoPath, "init");
+    }
+
+    public async Task<bool> IsValidRepositoryAsync(string repoPath)
+    {
+        if (!Directory.Exists(repoPath)) return false;
+
+        try
+        {
+            await runner.RunAsync(repoPath, "rev-parse", "--git-dir");
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    public async Task CloneAsync(string remoteUrl, string targetDirectory, IProgress<string>? progress)
+    {
+        var parent = System.IO.Path.GetDirectoryName(targetDirectory.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar))
+            ?? throw new InvalidOperationException("Übergeordnetes Verzeichnis konnte nicht ermittelt werden.");
+
+        Directory.CreateDirectory(parent);
+
+        await runner.RunWithProgressAsync(parent, progress, "clone", "--progress", remoteUrl, targetDirectory);
+    }
+
     public async Task<GitStatusResult> GetStatusAsync(string repoPath)
     {
         var output = await runner.RunAsync(repoPath, "status", "--porcelain=v1");
@@ -95,6 +126,18 @@ internal class GitRepositoryClient(IGitRunner runner) : IGitRepositoryClient
         var output = await runner.RunAsync(repoPath, "diff", "HEAD", "--", filePath);
         return output.Replace("\r\n", "\n");
     }
+
+    public Task CommitAsync(string repoPath, string message) =>
+        runner.RunWithInputAsync(repoPath, message, "commit", "-F", "-");
+
+    public Task FetchAsync(string repoPath, IProgress<string>? progress) =>
+        runner.RunWithProgressAsync(repoPath, progress, "fetch", "--all", "--prune", "--progress");
+
+    public Task PullAsync(string repoPath, IProgress<string>? progress) =>
+        runner.RunWithProgressAsync(repoPath, progress, "pull", "--progress");
+
+    public Task PushAsync(string repoPath, IProgress<string>? progress) =>
+        runner.RunWithProgressAsync(repoPath, progress, "push", "--progress");
 
     private async Task<string> ResolveBranchAsync(string repoPath, string? branch)
     {
