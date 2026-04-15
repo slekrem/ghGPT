@@ -28,9 +28,10 @@ internal static class StatusParser
 
             if (path.Contains(" -> "))
             {
+                // git status --porcelain=v1 format: "R  orig -> new"
                 var parts = path.Split(" -> ", 2);
-                filePath = parts[0].Trim();
-                oldFilePath = parts[1].Trim();
+                oldFilePath = parts[0].Trim();
+                filePath = parts[1].Trim();
             }
             else
             {

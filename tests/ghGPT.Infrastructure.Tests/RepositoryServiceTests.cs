@@ -263,6 +263,22 @@ public class RepositoryServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetStatus_RenamedFile_UsesNewPathAsFilePath()
+    {
+        var path = CreateGitRepo("status-rename-repo");
+        var service = ServiceWithRepo(path);
+
+        // Rename README.md -> DOCS.md and stage it via git mv
+        Run("git mv README.md DOCS.md", path);
+
+        var status = service.GetStatus("id-1");
+
+        // The staged entry must reference the new path (DOCS.md), not the old (README.md)
+        Assert.Contains(status.Staged, f => f.FilePath == "DOCS.md" && f.Status == "Renamed");
+        Assert.DoesNotContain(status.Staged, f => f.FilePath == "README.md");
+    }
+
+    [Fact]
     public void GetStatus_ShowsModifiedFileAsStaged_AfterStage()
     {
         var path = CreateGitRepo("status-staged-repo");
