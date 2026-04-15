@@ -5,7 +5,7 @@ namespace Git.Process.Parsing;
 internal static class StatusParser
 {
     // Parses output of: git status --porcelain=v1
-    // Format: XY PATH or XY PATH -> ORIG_PATH (for renames)
+    // Format: XY PATH or XY ORIG_PATH -> PATH (for renames)
     // X = index (staged), Y = worktree (unstaged)
     public static GitStatusResult Parse(string output)
     {

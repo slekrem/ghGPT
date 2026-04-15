@@ -274,7 +274,9 @@ public class RepositoryServiceTests : IDisposable
         var status = service.GetStatus("id-1");
 
         // The staged entry must reference the new path (DOCS.md), not the old (README.md)
-        Assert.Contains(status.Staged, f => f.FilePath == "DOCS.md" && f.Status == "Renamed");
+        // OldFilePath must carry the original name for the UI to render "README.md -> DOCS.md"
+        Assert.Contains(status.Staged,
+            f => f.FilePath == "DOCS.md" && f.Status == "Renamed" && f.OldFilePath == "README.md");
         Assert.DoesNotContain(status.Staged, f => f.FilePath == "README.md");
     }
 

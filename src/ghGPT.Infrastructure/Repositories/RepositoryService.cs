@@ -145,6 +145,7 @@ public class RepositoryService(
     private static FileStatusEntry MapStatusEntry(GitStatusEntry entry) => new()
     {
         FilePath = entry.FilePath,
+        OldFilePath = entry.OldFilePath,
         Status = entry.Status,
         IsStaged = entry.IsStaged
     };
