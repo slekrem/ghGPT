@@ -28,6 +28,27 @@ public class FileStatusEntryTests
     }
 
     [Fact]
+    public void FileStatusEntry_OldFilePath_DefaultsToNull()
+    {
+        var entry = new FileStatusEntry();
+
+        Assert.Null(entry.OldFilePath);
+    }
+
+    [Fact]
+    public void FileStatusEntry_OldFilePath_CanBeSet()
+    {
+        var entry = new FileStatusEntry
+        {
+            FilePath = "DOCS.md",
+            OldFilePath = "README.md",
+            Status = "Renamed"
+        };
+
+        Assert.Equal("README.md", entry.OldFilePath);
+    }
+
+    [Fact]
     public void FileStatusEntry_IsStaged_ReflectsStagingState()
     {
         var staged = new FileStatusEntry { FilePath = "a.cs", Status = "Modified", IsStaged = true };
