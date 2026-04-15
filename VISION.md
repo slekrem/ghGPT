@@ -1,6 +1,5 @@
 # ghGPT – Vision
 
-
 > **"Ein Git-Werkzeug, das mitdenkt."**
 
 ---
