@@ -798,7 +798,12 @@ export class ChangesView extends AppElement {
               );
             }} />
           <span class="text-[0.65rem] font-bold w-[14px] text-center shrink-0 ${statusColor}">${this.statusChar(entry.status)}</span>
-          <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1" title="${filePath}">${filePath}</span>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+            title="${entry.status === 'Renamed' && entry.oldFilePath ? `${entry.oldFilePath} → ${filePath}` : filePath}">
+            ${entry.status === 'Renamed' && entry.oldFilePath
+              ? html`<span class="text-cat-subtext">${entry.oldFilePath}</span> → ${filePath}`
+              : filePath}
+          </span>
           <button
             class="bg-transparent border-none text-cat-muted cursor-pointer text-[0.7rem] px-[0.2rem] leading-none hover:text-cat-red shrink-0 disabled:opacity-45 disabled:cursor-default"
             title="Änderungen verwerfen"
